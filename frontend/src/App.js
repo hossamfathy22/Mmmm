@@ -547,7 +547,7 @@ const AnalyticsComponent = () => {
           </Card>
           
           <Card withBorder radius="md" p="md" style={{ textAlign: "center" }}>
-            <IconAlertsRhombus size={32} color="#FF5722" style={{ margin: "0 auto" }} />
+            <IconAlertTriangle size={32} color="#FF5722" style={{ margin: "0 auto" }} />
             <Text mt="sm" weight={500}>سرعة التوصيل</Text>
             <Progress value={90} mt="xs" color="orange" />
           </Card>
