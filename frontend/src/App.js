@@ -58,7 +58,7 @@ import {
   IconX,
   IconMapPin,
   IconDirections,
-  IconAlertsRhombus,
+  IconAlertTriangle,
   IconSpeakerphone,
   IconStarFilled,
   IconNotes,
