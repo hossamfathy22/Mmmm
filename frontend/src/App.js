@@ -160,6 +160,8 @@ function getAppIcon(appName) {
 
 // Splash Screen Component
 const SplashScreen = ({ onFinished }) => {
+  const [animationError, setAnimationError] = useState(false);
+  
   useEffect(() => {
     const timer = setTimeout(() => {
       onFinished();
@@ -171,10 +173,15 @@ const SplashScreen = ({ onFinished }) => {
   return (
     <Center style={{ height: "100vh", background: "#1A237E" }}>
       <Box style={{ textAlign: "center", color: "white" }}>
-        <Lottie 
-          animationData={deliveryAnimation} 
-          style={{ width: 200, height: 200 }}
-        />
+        {!animationError ? (
+          <Lottie 
+            animationData={deliveryAnimation} 
+            style={{ width: 200, height: 200 }}
+            onError={() => setAnimationError(true)}
+          />
+        ) : (
+          <IconMap size={64} style={{ margin: "20px auto" }} stroke={1.5} />
+        )}
         <Title order={2} mt="md">Mandoob Pro 2024</Title>
         <Text size="lg" mt="xs">مرحبًا، لنضاعف أرباحك اليوم!</Text>
       </Box>
