@@ -1,0 +1,104 @@
+{
+ "style1": {
+  "iou_rebuilt_with_measured_brush": 0.9742,
+  "brushes": {
+   "tablet": {
+    "tool": "tablet (pressure + tilt)",
+    "holdout_iou": {
+     "meem (init)": 0.788,
+     "zain (fina)": 0.753,
+     "noon (isol)": 0.825
+    },
+    "mean_holdout_iou": 0.789,
+    "params_from_all_letters": {
+     "base_half_width_px": 64.91,
+     "extra_half_width_top_to_bottom_px": 56.17,
+     "thinning_per_curvature": -1627.2,
+     "outer_side_bulge_per_curvature": -727.6,
+     "round_terminal_radius_px": 300.0,
+     "r2_on_training_strokes": 0.542
+    }
+   },
+   "qalam": {
+    "tool": "qalam (broad nib, rotating)",
+    "holdout_iou": {
+     "meem (init)": 0.773,
+     "zain (fina)": 0.627,
+     "noon (isol)": 0.757
+    },
+    "mean_holdout_iou": 0.719,
+    "params_from_all_letters": {
+     "nib_angle_deg": 36.0,
+     "nib_rotation_along_stroke_deg": 60.0,
+     "nib_width_px": 167.5,
+     "hairline_px": 100.1,
+     "r2_on_training_strokes": 0.116
+    }
+   },
+   "monoline": {
+    "tool": "monoline",
+    "holdout_iou": {
+     "meem (init)": 0.773,
+     "zain (fina)": 0.634,
+     "noon (isol)": 0.773
+    },
+    "mean_holdout_iou": 0.727,
+    "params_from_all_letters": {
+     "half_width_px": 76.0
+    }
+   }
+  },
+  "selected_brush": "tablet"
+ },
+ "style2": {
+  "iou_rebuilt_with_measured_brush": 0.8503,
+  "brushes": {
+   "tablet": {
+    "tool": "tablet (pressure + tilt)",
+    "holdout_iou": {
+     "letter 1": 0.582,
+     "letter 3": 0.779,
+     "letter 4": 0.682
+    },
+    "mean_holdout_iou": 0.681,
+    "params_from_all_letters": {
+     "base_half_width_px": 22.16,
+     "extra_half_width_top_to_bottom_px": 78.68,
+     "thinning_per_curvature": -492.6,
+     "outer_side_bulge_per_curvature": -299.6,
+     "round_terminal_radius_px": 110.0,
+     "r2_on_training_strokes": 0.32
+    }
+   },
+   "qalam": {
+    "tool": "qalam (broad nib, rotating)",
+    "holdout_iou": {
+     "letter 1": 0.53,
+     "letter 3": 0.697,
+     "letter 4": 0.614
+    },
+    "mean_holdout_iou": 0.614,
+    "params_from_all_letters": {
+     "nib_angle_deg": 75.0,
+     "nib_rotation_along_stroke_deg": -10.0,
+     "nib_width_px": 150.7,
+     "hairline_px": 60.0,
+     "r2_on_training_strokes": 0.22
+    }
+   },
+   "monoline": {
+    "tool": "monoline",
+    "holdout_iou": {
+     "letter 1": 0.556,
+     "letter 3": 0.674,
+     "letter 4": 0.672
+    },
+    "mean_holdout_iou": 0.634,
+    "params_from_all_letters": {
+     "half_width_px": 55.5
+    }
+   }
+  },
+  "selected_brush": "tablet"
+ }
+}

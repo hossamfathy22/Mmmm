@@ -41,6 +41,11 @@ def cap(d, Rc):
 
 
 class BrushModel:
+    # Longest terminal taper searched. A cap of 160 px (about one stroke width)
+    # was tried: held-out IoU fell from 0.789 to 0.764, so the long tapering
+    # tails are a real feature of this style and the search stays wide.
+    max_cap = 600
+
     def __init__(self):
         self.beta = None
         self.Rc = None
@@ -61,7 +66,7 @@ class BrushModel:
             raw.append((y, k, d0, d1, st["wl"], st["wr"]))
         best = None
         for Rb in (0,):  # (a terminal-ball term was tried; it did not help on held-out letters)
-            for Rc in np.arange(20, 601, 10):
+            for Rc in np.arange(20, self.max_cap + 1, 10):
                 A, b = [], []
                 for y, k, d0, d1, wl, wr in raw:
                     Xl, Xr = self._design(y, k, d0, d1, Rb)
@@ -99,3 +104,84 @@ class BrushModel:
     def to_json(self):
         return json.dumps({"beta": [float(v) for v in self.beta], "Rc": float(self.Rc), "Rb": float(self.Rb),
                            "y_top": float(self.y_top), "y_bot": float(self.y_bot)})
+
+
+# ----------------------------------------------------------------------------
+# Brush library: the three ways letters are actually drawn
+# ----------------------------------------------------------------------------
+
+
+class TabletBrush(BrushModel):
+    """Tablet / pressure brush (the model above): width from pressure along
+    the stroke, heavier low in the letter, thinner in tight turns, outer side
+    of a curve fuller (pen tilt)."""
+
+    kind = "tablet (pressure + tilt)"
+
+
+class QalamBrush:
+    """Broad-nib reed pen (qalam). The mark is the nib dragged along the path:
+    full width = W * |sin(theta - alpha)| + w0, where theta is the direction of
+    travel and alpha the nib angle. As in calligraphy practice the nib may be
+    rotated gradually during a stroke: alpha(u) = a0 + a1 * u."""
+
+    kind = "qalam (broad nib, rotating)"
+
+    def fit(self, strokes, y_top=None, y_bot=None):
+        rows = []
+        for st in strokes:
+            T = sb._tangents(st["q"])
+            th = np.arctan2(T[:, 1], T[:, 0])
+            u, _ = sb.arclen_u(st["q"])
+            rows.append((th, u, st["wl"] + st["wr"]))
+        th = np.concatenate([r[0] for r in rows])
+        u = np.concatenate([r[1] for r in rows])
+        w = np.concatenate([r[2] for r in rows])
+        best = None
+        for a0 in np.radians(np.arange(0, 180, 3)):
+            for a1 in np.radians(np.arange(-60, 61, 10)):
+                x = np.abs(np.sin(th - (a0 + a1 * u)))
+                A = np.stack([x, np.ones_like(x)], 1)
+                coef, *_ = np.linalg.lstsq(A, w, rcond=None)
+                err = np.mean((A @ coef - w) ** 2)
+                if best is None or err < best[0]:
+                    best = (err, a0, a1, coef)
+        err, self.a0, self.a1, (self.W, self.w0) = best
+        self.r2 = 1 - err / np.var(w)
+        return self
+
+    def predict(self, q, attached_start=False):
+        T = sb._tangents(q)
+        th = np.arctan2(T[:, 1], T[:, 0])
+        u, _ = sb.arclen_u(q)
+        w = np.clip(self.W * np.abs(np.sin(th - (self.a0 + self.a1 * u))) + self.w0, 2, None)
+        return w / 2, w / 2
+
+    def describe(self):
+        return {"nib_angle_deg": round(math.degrees(self.a0), 1),
+                "nib_rotation_along_stroke_deg": round(math.degrees(self.a1), 1),
+                "nib_width_px": round(float(self.W + self.w0), 1), "hairline_px": round(float(self.w0), 1),
+                "r2_on_training_strokes": round(float(self.r2), 3)}
+
+
+class MonolineBrush:
+    """Even-width pen with round ends."""
+
+    kind = "monoline"
+
+    def fit(self, strokes, y_top=None, y_bot=None):
+        self.h = float(np.median(np.concatenate([np.r_[s["wl"], s["wr"]] for s in strokes])))
+        return self
+
+    def predict(self, q, attached_start=False):
+        _, _, d0, d1 = stroke_features(q, 0, 1)
+        if attached_start:
+            d0 = d0 + 1e9
+        c = cap(d0, self.h) * cap(d1, self.h)
+        return self.h * c, self.h * c
+
+    def describe(self):
+        return {"half_width_px": round(self.h, 1)}
+
+
+BRUSHES = {"tablet": TabletBrush, "qalam": QalamBrush, "monoline": MonolineBrush}

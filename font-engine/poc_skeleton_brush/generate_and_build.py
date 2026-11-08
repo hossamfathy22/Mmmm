@@ -33,6 +33,9 @@ OUT = sb.OUT
 REF_FONT = sb.HERE / "ref_fonts" / "Lemonada[wght].ttf"
 BOX = (1000, 360, 1850, 880)
 KAPPA = 0.5522847498
+GENERATED = [("uni0628", "ب", "beh.isol"), ("uni062A", "ت", "teh.isol"), ("uni062B", "ث", "theh.isol"),
+             ("uni0649", "ى", "alefmaksura.isol"), ("uni062F", "د", "dal.isol"), ("uni0644", "ل", "lam.isol"),
+             ("uni0627", "ا", "alef.isol"), ("uni0633", "س", "seen.isol")]
 
 
 # ----------------------------------------------------------------------------
@@ -153,9 +156,14 @@ def ensure_ref_font():
         urllib.request.urlretrieve(url, REF_FONT)
 
 
-def ref_glyph(ch, size=700):
-    ensure_ref_font()
-    font = ImageFont.truetype(str(REF_FONT), size, layout_engine=ImageFont.Layout.BASIC)
+def ref_glyph(ch, font_path=None, size=700):
+    """Centerline of a letter in a donor typeface, extracted with the same
+    single-smooth-path rules as the uploaded word."""
+    import pen_path as pp
+    if font_path is None:
+        ensure_ref_font()
+        font_path = REF_FONT
+    font = ImageFont.truetype(str(font_path), size, layout_engine=ImageFont.Layout.BASIC)
     img = Image.new("L", (size * 3, size * 3), 0)  # big canvas: tails must not be clipped
     ImageDraw.Draw(img).text((size, size // 2), ch, fill=255, font=font)
     m = np.array(img) > 127
@@ -163,8 +171,8 @@ def ref_glyph(ch, size=700):
     body = max(comps, key=lambda c: c["area"])
     dots = [c for c in comps if c is not body and c["area"] < 0.2 * body["area"]]
     d = ndimage.distance_transform_edt(body["mask"])
-    raw, _ = sb.extract_strokes(body["mask"], d)
-    p = sb.smooth_open(sb.resample(sb.orient_rtl(raw[0]), 1.0), 4.0)
+    coords, _ = pp.single_walk(body["mask"], d)
+    p = sb.smooth_open(sb.resample(sb.orient_rtl(coords), 1.0), 8.0)
     p = sb.extend_to_tips(p, body["mask"])
     dot_c = [tuple(np.argwhere(c["mask"]).mean(0)[::-1]) for c in dots]
     return p, dot_c
@@ -251,29 +259,56 @@ def main():
     clearance = float(np.mean(clear))
     stats["measured_dot_clearance_px"] = round(clearance, 1)
 
-    # ---- generated letters: reference centerline -> style frame -> learned brush
+    # ---- generated letters
+    #   proportions : predicted in nuqtas from meem/zain/noon (proportions.py, validated per font)
+    #   pen path    : single smooth centerline of the closest typeface in proportion space
+    #   brush       : the tablet brush learned from the uploaded word
+    import pen_path as pp
+    from proportions import load as load_corpus, measure_image, predict_for
+    corpus = load_corpus()
+    user = measure_image()
+    preds, nearest, _ = predict_for(user, corpus)
+    donor_name = nearest[0][0]
+    donor = sb.HERE / "corpus" / (donor_name.replace(" ", "") + ".ttf")
+    D, ref_y = user["nuqta_px"], user["noon_bottom_y"]
     noon_q = [s for s in strokes if s["comp"] == noon_i][0]["q"]
-    ref_noon, _ = ref_glyph("ن")
-    s_scale = (noon_q[:, 1].max() - noon_q[:, 1].min()) / (ref_noon[:, 1].max() - ref_noon[:, 1].min())
-    ref_bottom, sty_bottom = ref_noon[:, 1].max(), noon_q[:, 1].max()
+    sty_bottom = noon_q[:, 1].max()
     centerlines = {}
-    for name, ch in [("uni0628", "ب"), ("uni062A", "ت"), ("uni062B", "ث"), ("uni0649", "ى")]:
-        p, dots = ref_glyph(ch)
-        q = np.stack([(p[:, 0] - p[:, 0].min()) * s_scale + 100, (p[:, 1] - ref_bottom) * s_scale + sty_bottom], 1)
-        q = sb.resample(q, 1.0)
-        nodes, segs = sb.fit_stroke(q, tol=4.0, min_gap=30.0)
+    from shapely.geometry import Point
+    for name, ch, form in GENERATED:
+        p, dots = ref_glyph(ch, donor)
+        W_t, H_t = preds[form]["w"] * D, preds[form]["h"] * D
+        bottom_t = ref_y - preds[form]["bottom"] * D           # image y of the body bottom
+        pw, ph = np.ptp(p[:, 0]), np.ptp(p[:, 1])
+        h0 = bm.beta[0]
+        sy = max(H_t - 2 * h0, 0.25 * H_t) / max(ph, 1)
+        sx = max(W_t - 2 * h0, 0.25 * W_t) / max(pw, 1) if pw > 0.15 * ph else sy
+        for _ in range(6):  # scale the skeleton until the brushed INK matches the predicted box
+            q = np.stack([(p[:, 0] - p[:, 0].min()) * sx + 100, (p[:, 1] - p[:, 1].max()) * sy + bottom_t - h0], 1)
+            q = sb.resample(q, 1.0)
+            nodes, segs = pp.fit_smooth(q, tol=4.0, min_gap=30.0)
+            qq = sb.sample_beziers(segs, 1.0)
+            wl, wr = bm.predict(qq)
+            body_geom = ribbon_polygon(qq, wl, wr)
+            minx, miny, maxx, maxy = body_geom.bounds
+            dy = bottom_t - maxy
+            q[:, 1] += dy
+            if pw > 0.15 * ph:
+                sx *= (W_t / max(maxx - minx, 1)) ** 0.8
+            sy *= (H_t / max(maxy - miny, 1)) ** 0.8
+            if pw <= 0.15 * ph:
+                sx = sy
+        segs = [P + np.array([0.0, dy]) for P in segs]
         qq = sb.sample_beziers(segs, 1.0)
         wl, wr = bm.predict(qq)
-        cont, n = geom_to_contours(ribbon_polygon(qq, wl, wr))
-        dc = [((x - p[:, 0].min()) * s_scale + 100, (y - ref_bottom) * s_scale + sty_bottom) for x, y in dots]
         body_geom = ribbon_polygon(qq, wl, wr)
+        cont, n = geom_to_contours(body_geom)
+        minx, miny, maxx, maxy = body_geom.bounds
+        dc = [((x - p[:, 0].min()) * sx + 100, (y - p[:, 1].max()) * sy + bottom_t - h0 + dy) for x, y in dots]
         if dc:
             dc = spread_dots(dc, r_dot)
-            # keep the same clearance between dot and body as in the uploaded word
-            body_cy = qq[:, 1].mean()
-            direction = -1.0 if np.mean([c[1] for c in dc]) < body_cy else 1.0
-            from shapely.geometry import Point
-            for _ in range(400):
+            direction = -1.0 if np.mean([c[1] for c in dc]) < qq[:, 1].mean() else 1.0
+            for _ in range(600):
                 if min(body_geom.distance(Point(cx, cy)) for cx, cy in dc) >= r_dot + clearance:
                     break
                 dc = dc + np.array([0.0, direction * 2.0])
@@ -282,8 +317,12 @@ def main():
             n += 4
         glyph_px[name] = cont
         centerlines[name] = segs
-        stats[name] = {"source": "generated: Lemonada centerline + learned brush", "path_nodes": len(segs) + 1,
-                       "outline_nodes": n}
+        stats[name] = {"source": f"generated: {donor_name} single pen path + predicted nuqta proportions + learned tablet brush",
+                       "path_nodes": len(segs) + 1, "outline_nodes": n,
+                       "predicted_nuqta_wxh": [preds[form]["w"], preds[form]["h"]],
+                       "achieved_nuqta_wxh": [round((maxx - minx) / D, 2), round((maxy - miny) / D, 2)],
+                       "path_quality": pp.path_quality(segs, np.ones((4000, 4000), bool))}
+    stats["proportions_donor_typefaces"] = nearest
 
     # ---- px -> font units
     word_h = (y_bot - y_top)
@@ -297,7 +336,7 @@ def main():
     from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 
     order = [".notdef", "space", "uni0645", "uni0645.init", "uni0632", "uni0632.fina", "uni0646",
-             "uni0631", "uni0628", "uni062A", "uni062B", "uni0649", "uni064F"]
+             "uni0631"] + [g[0] for g in GENERATED] + ["uni064F"]
     glyph_px["uni0645"] = glyph_px["uni0645.init"]   # placeholder isolated meem (not in image)
     glyph_px["uni0632"] = glyph_px["uni0632.fina"]   # isolated zain ~ final zain in this style
     charstrings, metrics, bounds = {}, {}, {}
@@ -348,9 +387,9 @@ def main():
     desc = int(min(b[1] for b in bounds.values())) - 20
     fb = FontBuilder(1000, isTTF=False)
     fb.setupGlyphOrder(order)
-    fb.setupCharacterMap({0x20: "space", 0x645: "uni0645", 0x632: "uni0632", 0x646: "uni0646", 0x631: "uni0631",
-                          0x628: "uni0628", 0x62A: "uni062A", 0x62B: "uni062B", 0x649: "uni0649",
-                          0x64F: "uni064F"})
+    cmap = {0x20: "space", 0x645: "uni0645", 0x632: "uni0632", 0x646: "uni0646", 0x631: "uni0631", 0x64F: "uni064F"}
+    cmap.update({ord(ch): g for g, ch, _ in GENERATED})
+    fb.setupCharacterMap(cmap)
     fb.setupCFF("MuznBrush-Regular", {"FullName": "Muzn Brush Regular"}, charstrings, {})
     fb.setupHorizontalMetrics(metrics)
     fb.setupHorizontalHeader(ascent=asc, descent=desc)
@@ -363,7 +402,7 @@ def main():
     fea = f"""
 languagesystem DFLT dflt;
 languagesystem arab dflt;
-@BASES = [uni0645 uni0645.init uni0632 uni0632.fina uni0646 uni0631 uni0628 uni062A uni062B uni0649];
+@BASES = [uni0645 uni0645.init uni0632 uni0632.fina uni0646 uni0631 {" ".join(g[0] for g in GENERATED)}];
 table GDEF {{ GlyphClassDef @BASES, , [uni064F], ; }} GDEF;
 feature init {{ sub uni0645 by uni0645.init; }} init;
 feature fina {{ sub uni0632 by uni0632.fina; }} fina;
@@ -386,7 +425,7 @@ feature mark {{ pos base uni0645.init <anchor {anchor_base[0]} {anchor_base[1]}>
     gen_svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900">',
                '<rect width="100%" height="100%" fill="#111"/>']
     x_off = 0
-    for name in ["uni0628", "uni062A", "uni062B", "uni0649"]:
+    for name in [g[0] for g in GENERATED]:
         gen_svg.append(f'<g transform="translate({x_off} 0)"><path fill="#eee" d="{svg_d(glyph_px[name])}"/>'
                        f'<path fill="none" stroke="#ff5a36" stroke-width="4" d="{beziers_d(centerlines[name])}"/></g>')
     gen_svg.append("</svg>")
@@ -405,7 +444,7 @@ feature mark {{ pos base uni0645.init <anchor {anchor_base[0]} {anchor_base[1]}>
         names = [hbfont.glyph_to_string(i.codepoint) for i in buf.glyph_infos]
         return names, buf
 
-    tests = {t: shape(t)[0] for t in ["مُزن", "ب ت ث ى ر", "زن"]}
+    tests = {t: shape(t)[0] for t in ["مُزن", "ب ت ث ى ر د ل ا س", "زن"]}
     report = {"word_iou_rebuilt_from_pen_and_brush": round(model["iou_word"], 4),
               "pen_path_nodes_word": model["summary"]["total_path_nodes"],
               "brush_model": bm.describe(), "glyphs": stats, "harfbuzz_shaping": tests,

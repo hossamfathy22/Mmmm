@@ -34,12 +34,12 @@ def main():
     rebuilt = Image.fromarray(np.where(rec, 255, 0).astype(np.uint8)).resize(orig.size, Image.LANCZOS)
     otf = OUT / "MuznBrush-Regular.otf"
     word = typed("مُزن", 420, otf)
-    letters = typed("ب  ت  ث  ى  ر", 300, otf)
+    letters = typed("ب ت ث ى ر د ل ا س", 260, otf)
 
     rows = [("1. uploaded image (style 1)", orig),
-            (f"2. rebuilt only from 32 pen-path nodes + brush  (IoU {model['iou_word']:.3f})", rebuilt),
+            (f"2. rebuilt from ONE smooth pen path per letter ({model['summary']['total_path_nodes']} nodes) + brush  (IoU {model['iou_word']:.3f})", rebuilt),
             ("3. typed with the generated font MuznBrush-Regular.otf (HarfBuzz/raqm shaping)", word),
-            ("4. letters NOT in the image, typed with the same font (generated)", letters)]
+            ("4. NOT in the image: sizes predicted in nuqtas, path from the closest typeface, learned brush", letters)]
     H = sum(r[1].height + 110 for r in rows) + 40
     sheet = Image.new("RGB", (W, H), (17, 17, 17))
     d = ImageDraw.Draw(sheet)

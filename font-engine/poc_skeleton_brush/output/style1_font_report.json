@@ -1,22 +1,22 @@
 {
- "word_iou_rebuilt_from_pen_and_brush": 0.969,
+ "word_iou_rebuilt_from_pen_and_brush": 0.9742,
  "pen_path_nodes_word": 32,
  "brush_model": {
-  "base_half_width_px": 61.07,
-  "extra_half_width_top_to_bottom_px": 69.71,
-  "thinning_per_curvature": -1192.3,
-  "outer_side_bulge_per_curvature": -1489.8,
-  "round_terminal_radius_px": 340.0,
-  "r2_on_training_strokes": 0.672
+  "base_half_width_px": 64.91,
+  "extra_half_width_top_to_bottom_px": 56.17,
+  "thinning_per_curvature": -1627.2,
+  "outer_side_bulge_per_curvature": -727.6,
+  "round_terminal_radius_px": 300.0,
+  "r2_on_training_strokes": 0.542
  },
  "glyphs": {
   "uni0645.init": {
    "source": "from image",
-   "outline_nodes": 26
+   "outline_nodes": 25
   },
   "uni0632.fina": {
    "source": "from image",
-   "outline_nodes": 19
+   "outline_nodes": 24
   },
   "uni0646": {
    "source": "from image",
@@ -24,33 +24,219 @@
   },
   "uni0631": {
    "source": "derived: zain without dot",
-   "outline_nodes": 15
+   "outline_nodes": 20
   },
   "uni064F": {
    "source": "from image",
-   "outline_nodes": 5
+   "outline_nodes": 6
   },
-  "measured_dot_clearance_px": 58.9,
+  "measured_dot_clearance_px": 60.8,
   "uni0628": {
-   "source": "generated: Lemonada centerline + learned brush",
-   "path_nodes": 14,
-   "outline_nodes": 34
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 7,
+   "outline_nodes": 30,
+   "predicted_nuqta_wxh": [
+    4.712,
+    2.562
+   ],
+   "achieved_nuqta_wxh": [
+    4.72,
+    2.57
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 7,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.614,
+    "mean_curvature_jump": 0.162,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 0,
+    "path_inside_ink_pct": 100.0
+   }
   },
   "uni062A": {
-   "source": "generated: Lemonada centerline + learned brush",
-   "path_nodes": 14,
-   "outline_nodes": 39
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 7,
+   "outline_nodes": 26,
+   "predicted_nuqta_wxh": [
+    4.714,
+    2.568
+   ],
+   "achieved_nuqta_wxh": [
+    4.73,
+    2.58
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 7,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.609,
+    "mean_curvature_jump": 0.162,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 0,
+    "path_inside_ink_pct": 100.0
+   }
   },
   "uni062B": {
-   "source": "generated: Lemonada centerline + learned brush",
-   "path_nodes": 14,
-   "outline_nodes": 43
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 7,
+   "outline_nodes": 30,
+   "predicted_nuqta_wxh": [
+    4.714,
+    2.567
+   ],
+   "achieved_nuqta_wxh": [
+    4.73,
+    2.57
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 7,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.608,
+    "mean_curvature_jump": 0.162,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 0,
+    "path_inside_ink_pct": 100.0
+   }
   },
   "uni0649": {
-   "source": "generated: Lemonada centerline + learned brush",
-   "path_nodes": 8,
-   "outline_nodes": 23
-  }
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 11,
+   "outline_nodes": 39,
+   "predicted_nuqta_wxh": [
+    4.716,
+    4.905
+   ],
+   "achieved_nuqta_wxh": [
+    4.69,
+    4.89
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 11,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.111,
+    "mean_curvature_jump": 0.047,
+    "segments_with_2plus_curvature_peaks": 1,
+    "handles_outside_10_90pct_of_chord": 1,
+    "path_inside_ink_pct": 97.0
+   }
+  },
+  "uni062F": {
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 7,
+   "outline_nodes": 20,
+   "predicted_nuqta_wxh": [
+    2.98,
+    3.433
+   ],
+   "achieved_nuqta_wxh": [
+    3.0,
+    3.44
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 7,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.1,
+    "mean_curvature_jump": 0.032,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 0,
+    "path_inside_ink_pct": 100.0
+   }
+  },
+  "uni0644": {
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 9,
+   "outline_nodes": 29,
+   "predicted_nuqta_wxh": [
+    3.499,
+    5.922
+   ],
+   "achieved_nuqta_wxh": [
+    3.46,
+    5.9
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 9,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.551,
+    "mean_curvature_jump": 0.12,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 0,
+    "path_inside_ink_pct": 84.6
+   }
+  },
+  "uni0627": {
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 6,
+   "outline_nodes": 14,
+   "predicted_nuqta_wxh": [
+    1.44,
+    4.809
+   ],
+   "achieved_nuqta_wxh": [
+    1.44,
+    4.82
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 6,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 1.037,
+    "mean_curvature_jump": 0.273,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 0,
+    "path_inside_ink_pct": 82.9
+   }
+  },
+  "uni0633": {
+   "source": "generated: Lalezar single pen path + predicted nuqta proportions + learned tablet brush",
+   "path_nodes": 15,
+   "outline_nodes": 45,
+   "predicted_nuqta_wxh": [
+    6.155,
+    3.854
+   ],
+   "achieved_nuqta_wxh": [
+    6.12,
+    3.83
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 15,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.074,
+    "mean_curvature_jump": 0.018,
+    "segments_with_2plus_curvature_peaks": 1,
+    "handles_outside_10_90pct_of_chord": 0,
+    "path_inside_ink_pct": 100.0
+   }
+  },
+  "proportions_donor_typefaces": [
+   [
+    "Lalezar",
+    2.89
+   ],
+   [
+    "Reem Kufi",
+    4.72
+   ],
+   [
+    "Reem Kufi Fun",
+    4.72
+   ],
+   [
+    "Jomhuria",
+    4.89
+   ],
+   [
+    "Amiri Quran",
+    4.92
+   ]
+  ]
  },
  "harfbuzz_shaping": {
   "مُزن": [
@@ -59,7 +245,15 @@
    "uni064F",
    "uni0645.init"
   ],
-  "ب ت ث ى ر": [
+  "ب ت ث ى ر د ل ا س": [
+   "uni0633",
+   "space",
+   "uni0627",
+   "space",
+   "uni0644",
+   "space",
+   "uni062F",
+   "space",
    "uni0631",
    "space",
    "uni0649",

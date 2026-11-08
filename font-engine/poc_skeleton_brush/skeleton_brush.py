@@ -523,7 +523,7 @@ def iou(a, b):
 # ----------------------------------------------------------------------------
 
 
-def analyse(image_path: Path, box, name: str, scale=2, tol=4.0, smooth_sigma=6.0):
+def analyse(image_path: Path, box, name: str, scale=2, tol=4.0, smooth_sigma=16.0, single_path=True):
     mask = load_region(image_path, box, scale)
     comps = split_components(mask)
     dist = ndimage.distance_transform_edt(mask)
@@ -545,25 +545,37 @@ def analyse(image_path: Path, box, name: str, scale=2, tol=4.0, smooth_sigma=6.0
             vis.append({"kind": "dot", "center": (cx, cy), "r": rr})
             continue
         dist_c = ndimage.distance_transform_edt(m)
-        raw, _ = extract_strokes(m, dist_c)
         strokes_out = []
-        fitted = []
-        for si, poly in enumerate(raw):
-            if si == 0:
-                poly = orient_rtl(poly)
-            p = smooth_open(resample(poly, 1.0), smooth_sigma)
-            p = extend_to_tips(p, m, start=(si == 0), end=True)
-            nodes, segs = fit_stroke(p, tol=tol, min_gap=30.0)
-            fitted.append((p, nodes, segs, sample_beziers(segs, 1.0)))
-        # A secondary stroke starts inside its parent stroke; its first part
-        # (within one brush radius of the attach point) must not "steal" ink
-        # from the parent, or both strokes truncate each other -> cracks.
-        owners = [(0, fitted[0][3])]
-        for si, f in enumerate(fitted[1:], start=1):
-            q0 = f[3]
-            r_att = float(dist_c[int(q0[0][1]), int(q0[0][0])])
-            keep_pts = np.linalg.norm(q0 - q0[0], axis=1) > 1.1 * r_att
-            owners.append((si, np.where(keep_pts[:, None], q0, np.nan)))
+        if single_path:
+            # one smooth pen path per letter (hairpins into lobes, all nodes smooth, G2 faired)
+            import pen_path as pp
+            coords, walk_info = pp.single_walk(m, dist_c)
+            p = smooth_open(resample(orient_rtl(coords), 1.0), smooth_sigma)
+            p = extend_to_tips(p, m)
+            nodes, segs = pp.fit_smooth(p, tol=tol, min_gap=30.0)
+            fitted = [(p, nodes, segs, sample_beziers(segs, 1.0))]
+            owners = [(0, fitted[0][3])]
+            entry["walk"] = walk_info
+        else:
+            raw, _ = extract_strokes(m, dist_c)
+            strokes_out = []
+            fitted = []
+            for si, poly in enumerate(raw):
+                if si == 0:
+                    poly = orient_rtl(poly)
+                p = smooth_open(resample(poly, 1.0), smooth_sigma)
+                p = extend_to_tips(p, m, start=(si == 0), end=True)
+                nodes, segs = fit_stroke(p, tol=tol, min_gap=30.0)
+                fitted.append((p, nodes, segs, sample_beziers(segs, 1.0)))
+            # A secondary stroke starts inside its parent stroke; its first part
+            # (within one brush radius of the attach point) must not "steal" ink
+            # from the parent, or both strokes truncate each other -> cracks.
+            owners = [(0, fitted[0][3])]
+            for si, f in enumerate(fitted[1:], start=1):
+                q0 = f[3]
+                r_att = float(dist_c[int(q0[0][1]), int(q0[0][0])])
+                keep_pts = np.linalg.norm(q0 - q0[0], axis=1) > 1.1 * r_att
+                owners.append((si, np.where(keep_pts[:, None], q0, np.nan)))
         for si, (p, nodes, segs, q) in enumerate(fitted):
             uq, L = arclen_u(q)
             wl, wr, _ = side_widths(q, m, owners, si)
@@ -584,6 +596,8 @@ def analyse(image_path: Path, box, name: str, scale=2, tol=4.0, smooth_sigma=6.0
                 "half_width_stats_px": {"min": float(r.min()), "max": float(r.max()), "mean": float(r.mean())},
                 "asymmetry_mean": float(np.mean((wl - wr) / (wl + wr + 1e-9))),
             })
+            if single_path:
+                strokes_out[-1]["quality"] = pp.path_quality(segs, m, wl, wr)
             vis.append({"kind": "stroke", "p": q, "wl": wl, "wr": wr, "u": uq, "nodes": nodes, "segs": segs,
                         "kl": kl, "kr": kr, "comp": ci, "stroke": si})
         entry["strokes"] = strokes_out
