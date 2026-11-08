@@ -1,0 +1,10 @@
+numpy
+scipy
+opencv-python-headless
+scikit-image
+shapely
+matplotlib
+pillow
+fonttools
+skia-pathops
+uharfbuzz

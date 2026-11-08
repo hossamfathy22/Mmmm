@@ -1,0 +1,80 @@
+{
+ "word_iou_rebuilt_from_pen_and_brush": 0.969,
+ "pen_path_nodes_word": 32,
+ "brush_model": {
+  "base_half_width_px": 61.07,
+  "extra_half_width_top_to_bottom_px": 69.71,
+  "thinning_per_curvature": -1192.3,
+  "outer_side_bulge_per_curvature": -1489.8,
+  "round_terminal_radius_px": 340.0,
+  "r2_on_training_strokes": 0.672
+ },
+ "glyphs": {
+  "uni0645.init": {
+   "source": "from image",
+   "outline_nodes": 26
+  },
+  "uni0632.fina": {
+   "source": "from image",
+   "outline_nodes": 19
+  },
+  "uni0646": {
+   "source": "from image",
+   "outline_nodes": 29
+  },
+  "uni0631": {
+   "source": "derived: zain without dot",
+   "outline_nodes": 15
+  },
+  "uni064F": {
+   "source": "from image",
+   "outline_nodes": 5
+  },
+  "measured_dot_clearance_px": 58.9,
+  "uni0628": {
+   "source": "generated: Lemonada centerline + learned brush",
+   "path_nodes": 14,
+   "outline_nodes": 34
+  },
+  "uni062A": {
+   "source": "generated: Lemonada centerline + learned brush",
+   "path_nodes": 14,
+   "outline_nodes": 39
+  },
+  "uni062B": {
+   "source": "generated: Lemonada centerline + learned brush",
+   "path_nodes": 14,
+   "outline_nodes": 43
+  },
+  "uni0649": {
+   "source": "generated: Lemonada centerline + learned brush",
+   "path_nodes": 8,
+   "outline_nodes": 23
+  }
+ },
+ "harfbuzz_shaping": {
+  "مُزن": [
+   "uni0646",
+   "uni0632.fina",
+   "uni064F",
+   "uni0645.init"
+  ],
+  "ب ت ث ى ر": [
+   "uni0631",
+   "space",
+   "uni0649",
+   "space",
+   "uni062B",
+   "space",
+   "uni062A",
+   "space",
+   "uni0628"
+  ],
+  "زن": [
+   "uni0646",
+   "uni0632"
+  ]
+ },
+ "font": "MuznBrush-Regular.otf",
+ "units_per_px2x": 1.1097
+}
