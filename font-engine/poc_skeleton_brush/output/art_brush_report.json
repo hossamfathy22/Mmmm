@@ -1,0 +1,51 @@
+{
+ "style1": {
+  "iou": 0.9994,
+  "pen_path_nodes": 18,
+  "art_brush_points": 1697,
+  "pixels_wrong": 361,
+  "pixels_ink": 591052
+ },
+ "style2": {
+  "iou": 0.9992,
+  "pen_path_nodes": 53,
+  "art_brush_points": 1736,
+  "pixels_wrong": 435,
+  "pixels_ink": 547580
+ },
+ "Amiri «مزن»": {
+  "iou": 0.9966,
+  "pen_path_nodes": 20,
+  "art_brush_points": 728,
+  "pixels_wrong": 209,
+  "pixels_ink": 61271
+ },
+ "ReemKufi «مزن»": {
+  "iou": 0.9981,
+  "pen_path_nodes": 17,
+  "art_brush_points": 591,
+  "pixels_wrong": 153,
+  "pixels_ink": 82051
+ },
+ "ArefRuqaa «مزن»": {
+  "iou": 0.998,
+  "pen_path_nodes": 16,
+  "art_brush_points": 666,
+  "pixels_wrong": 132,
+  "pixels_ink": 65669
+ },
+ "Lemonada «سلام»": {
+  "iou": 0.9993,
+  "pen_path_nodes": 35,
+  "art_brush_points": 1601,
+  "pixels_wrong": 160,
+  "pixels_ink": 240741
+ },
+ "Lalezar «قلب»": {
+  "iou": 0.9992,
+  "pen_path_nodes": 15,
+  "art_brush_points": 610,
+  "pixels_wrong": 116,
+  "pixels_ink": 143505
+ }
+}
