@@ -109,12 +109,68 @@ def single_walk(mask, dist, max_leaves=8, hairpin_cost=0.004):
                 score = cov - hairpin_cost * len(pins) - 0.03 * retrace
                 if best is None or score > best[0]:
                     best = (score, walk, pins, cov)
+    # closed eyes / counters (و ف ق م ه, and the angular style's counter): the pen
+    # goes AROUND the loop, as a calligrapher writes the head of meem or waw
+    loops = _skeleton_loops(G, keep, min_len=max(30.0, 2.0 * float(np.median(rad[keep]))))
+    for cyc in loops:
+        for a in range(n):
+            for b in range(n):
+                e1 = cyc[int(np.argmin([D[a, c] for c in cyc]))]
+                if not np.isfinite(D[a, e1]):
+                    continue
+                k0 = cyc.index(e1)
+                ring = cyc[k0:] + cyc[:k0] + [e1]
+                p_in = sb._backtrack(P[a], e1)[::-1]
+                p_out = sb._backtrack(P[b], e1) if b != a else [e1]
+                walk = p_in + ring[1:] + p_out[1:]
+                cov = (sb._disc_cover([walk], pts, rad, mask.shape, f) & small).sum() / total
+                score = cov - hairpin_cost
+                if score > best[0]:
+                    best = (score, walk, [], cov)
     _, walk, pins, cov = best
+    # more teeth / stems (seen, connected words): the pen goes up and down
+    # every tooth in the same stroke -> add a hairpin per tooth while it pays
+    cur = cov
+    for _ in range(12):
+        on = set(walk)
+        dmin, pred = dijkstra(G, indices=np.array(walk), min_only=True, return_predecessors=True)[:2]
+        cand = None
+        for leaf in leaves:
+            if leaf in on or not np.isfinite(dmin[leaf]):
+                continue
+            br = sb._backtrack(pred, leaf)[::-1]          # attach (on walk) -> leaf
+            j = walk.index(br[0])
+            new = walk[:j + 1] + br[1:] + br[::-1][1:] + walk[j + 1:]
+            c2 = (sb._disc_cover([new], pts, rad, mask.shape, f) & small).sum() / total
+            if cand is None or c2 > cand[0]:
+                cand = (c2, new, j, len(br))
+        if cand is None or cand[0] - cur < 0.003:
+            break
+        cur, walk, j, lb = cand
+        shift = 2 * (lb - 1)
+        pins = [(s_ + shift if s_ > j else s_, m_ + shift if m_ > j else m_, e_ + shift if e_ > j else e_)
+                for s_, m_, e_ in pins]
+        pins.append((j, j + lb - 1, j + 2 * (lb - 1)))
+    cov = cur
     coords = pts[walk].astype(float)
     r = rad[walk].astype(float)
     for s, mtip, e in pins:
         coords = _open_hairpin(coords, r, s, mtip, e)
     return coords, {"hairpins": len(pins), "disc_coverage": float(cov), "candidate_leaves": len(sig)}
+
+
+def _skeleton_loops(G, keep, min_len=30.0):
+    """Cycles of the skeleton longer than min_len px (ignores the tiny pixel
+    triangles that 8-connectivity creates at junctions), in traversal order."""
+    import networkx as nx
+    sub = G[keep][:, keep]
+    ids = np.nonzero(keep)[0]
+    g = nx.from_scipy_sparse_array(sub)
+    out = []
+    for cyc in nx.cycle_basis(g):
+        if len(cyc) >= min_len:
+            out.append([int(ids[c]) for c in cyc])
+    return sorted(out, key=len, reverse=True)[:2]
 
 
 def _open_hairpin(c, r, s, m, e):

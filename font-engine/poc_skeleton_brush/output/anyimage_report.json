@@ -1,0 +1,27 @@
+{
+ "Amiri «مزن»": {
+  "style": "Naskh, high contrast",
+  "iou": 0.9753,
+  "pen_path_nodes": 20
+ },
+ "ReemKufi «مزن»": {
+  "style": "geometric Kufi",
+  "iou": 0.9779,
+  "pen_path_nodes": 17
+ },
+ "ArefRuqaa «مزن»": {
+  "style": "Ruq'ah",
+  "iou": 0.9821,
+  "pen_path_nodes": 16
+ },
+ "Lemonada «سلام»": {
+  "style": "rounded, connected word with teeth",
+  "iou": 0.985,
+  "pen_path_nodes": 35
+ },
+ "Lalezar «قلب»": {
+  "style": "heavy display, connected",
+  "iou": 0.9868,
+  "pen_path_nodes": 15
+ }
+}

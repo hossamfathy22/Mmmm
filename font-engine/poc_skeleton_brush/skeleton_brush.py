@@ -363,10 +363,10 @@ def arclen_u(p):
     return s / max(s[-1], 1e-9), s[-1]
 
 
-def fit_width(u, r, tol=2.0, max_keys=24):
+def fit_width(u, r, tol=2.0, max_keys=24, smooth=2.0):
     """Compress r(u) into width keypoints (u_k, r_k) interpolated with PCHIP —
     the automated equivalent of placing points with Illustrator's Width Tool."""
-    rs = gaussian_filter1d(r, 2)
+    rs = gaussian_filter1d(r, smooth) if smooth > 0 else np.asarray(r, float)
     keys = {0, len(u) - 1}
     d = np.diff(rs)
     for i in range(1, len(d)):  # local extrema of width
