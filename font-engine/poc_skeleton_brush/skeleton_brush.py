@@ -523,7 +523,8 @@ def iou(a, b):
 # ----------------------------------------------------------------------------
 
 
-def analyse(image_path: Path, box, name: str, scale=2, tol=4.0, smooth_sigma=16.0, single_path=True):
+def analyse(image_path: Path, box, name: str, scale=2, tol=4.0, smooth_sigma=16.0, single_path=True,
+            reduce_frac=0.25):
     mask = load_region(image_path, box, scale)
     comps = split_components(mask)
     dist = ndimage.distance_transform_edt(mask)
@@ -552,7 +553,8 @@ def analyse(image_path: Path, box, name: str, scale=2, tol=4.0, smooth_sigma=16.
             coords, walk_info = pp.single_walk(m, dist_c)
             p = smooth_open(resample(orient_rtl(coords), 1.0), smooth_sigma)
             p = extend_to_tips(p, m)
-            nodes, segs = pp.fit_smooth(p, tol=tol, min_gap=30.0)
+            hw = float(np.median(ndimage.map_coordinates(dist_c, [p[:, 1], p[:, 0]], order=1)))
+            nodes, segs = pp.fit_smooth(p, tol=tol, min_gap=30.0, tol_reduce=reduce_frac * hw if reduce_frac else None)
             fitted = [(p, nodes, segs, sample_beziers(segs, 1.0))]
             owners = [(0, fitted[0][3])]
             entry["walk"] = walk_info

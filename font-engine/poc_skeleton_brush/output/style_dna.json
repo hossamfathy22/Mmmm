@@ -1,0 +1,43 @@
+{
+ "dna": {
+  "per_letter": {
+   "meem.init": {
+    "turning_per_nuqta_style_deg": 57.1,
+    "turning_per_nuqta_donor_deg": 51.0,
+    "terminal_curl_style_deg": 27.3,
+    "terminal_curl_donor_deg": 30.8
+   },
+   "zain.fina": {
+    "turning_per_nuqta_style_deg": 62.5,
+    "turning_per_nuqta_donor_deg": 72.2,
+    "terminal_curl_style_deg": 78.9,
+    "terminal_curl_donor_deg": 27.9
+   },
+   "noon.isol": {
+    "turning_per_nuqta_style_deg": 63.8,
+    "turning_per_nuqta_donor_deg": 36.0,
+    "terminal_curl_style_deg": 32.5,
+    "terminal_curl_donor_deg": 48.1
+   }
+  },
+  "curvature_gain": 1.12,
+  "terminal_curl_gain": 0.886,
+  "donor_nuqta_px": 94.33981132056604
+ },
+ "levels": {
+  "sky2": 4.96,
+  "eye1": 2.61,
+  "tooth3": 2.85,
+  "base": 1.07,
+  "earth1": -0.95,
+  "earth2": -1.53
+ },
+ "levels_y_px": {
+  "sky2": -103.69541612225896,
+  "eye1": 293.0,
+  "tooth3": 252.0,
+  "base": 552.0733944954129,
+  "earth1": 893.0,
+  "earth2": 990.7170207999463
+ }
+}

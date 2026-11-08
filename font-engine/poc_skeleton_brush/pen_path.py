@@ -66,6 +66,13 @@ def single_walk(mask, dist, max_leaves=8, hairpin_cost=0.004):
     sig = sorted(sig, key=lambda l: -info[l][0])[:max_leaves]
     if len(sig) < 2:
         sig = sorted(leaves, key=lambda l: -info[l][0])[:2]
+    if len(sig) < 2:
+        # closed shapes (an eye / ring) have fewer than two free ends: start at
+        # the existing end (or anywhere) and add the farthest point of the ring
+        a = sig[0] if sig else int(np.nonzero(keep)[0][0])
+        da = dijkstra(G, indices=a)
+        da[~np.isfinite(da)] = -1
+        sig = [a, int(np.argmax(da))]
 
     f = 4
     import cv2
@@ -163,7 +170,12 @@ def _fit_with_u(pts, t0, t1):
     return P, err, u
 
 
-def fit_smooth(p, tol=4.0, min_gap=30.0):
+def fit_smooth(p, tol=4.0, min_gap=30.0, tol_reduce=None, max_turn=110.0):
+    """Fit, then (if tol_reduce) remove every node the drawing does not need:
+    the path keeps only its start, its end and the nodes that carry a bend.
+    A node goes if one cubic can replace its two neighbours within tol_reduce
+    (chosen as a fraction of the stroke width, so the change is invisible
+    under the brush)."""
     nodes = sb.detect_nodes(p, min_gap=min_gap, corner_deg=1e9)  # no corners: all smooth
     stack = list(zip(nodes[:-1], nodes[1:]))[::-1]
     segs, data, out_nodes = [], [], [nodes[0]]
@@ -182,6 +194,37 @@ def fit_smooth(p, tol=4.0, min_gap=30.0):
         segs.append(P)
         data.append((pts, u))
         out_nodes.append(b)
+    if tol_reduce:
+        keep = out_nodes[:]
+        while len(keep) > 2:
+            best = None
+            for j in range(1, len(keep) - 1):
+                a, b = keep[j - 1], keep[j + 1]
+                pts = p[a.i:b.i + 1]
+                # drawing rules: one segment turns <= max_turn degrees and its
+                # handles never reach past the segment (no "balloon" handles)
+                d = np.diff(pts, axis=0)
+                turn = math.degrees(abs(np.diff(np.unwrap(np.arctan2(d[:, 1], d[:, 0]))).sum()))
+                if turn > max_turn:
+                    continue
+                P, err, _ = _fit_with_u(pts, a.t_out, b.t_in)
+                chord = np.linalg.norm(P[3] - P[0])
+                if max(np.linalg.norm(P[1] - P[0]), np.linalg.norm(P[3] - P[2])) > 0.9 * chord:
+                    continue
+                if best is None or err.max() < best[0]:
+                    best = (err.max(), j)
+            if best is None:
+                break
+            if best[0] > tol_reduce:
+                break
+            keep.pop(best[1])
+        segs, data = [], []
+        for a, b in zip(keep[:-1], keep[1:]):
+            pts = p[a.i:b.i + 1]
+            P, _, u = _fit_with_u(pts, a.t_out, b.t_in)
+            segs.append(P)
+            data.append((pts, u))
+        out_nodes = keep
     segs = fair_g2(segs, data)
     return out_nodes, segs
 

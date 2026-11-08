@@ -259,11 +259,15 @@ def main():
     clearance = float(np.mean(clear))
     stats["measured_dot_clearance_px"] = round(clearance, 1)
 
-    # ---- generated letters
-    #   proportions : predicted in nuqtas from meem/zain/noon (proportions.py, validated per font)
-    #   pen path    : single smooth centerline of the closest typeface in proportion space
+    # ---- generated letters: understand the style, then create (style_dna.py)
+    #   proportions : predicted in nuqtas from meem/zain/noon (proportions.py)
+    #   pen path    : similarity derivation from an uploaded letter (beh <- noon) or,
+    #                 when no uploaded letter shares its strokes, the closest typeface's
+    #                 path re-drawn with the style's curvature gain and terminal curl
     #   brush       : the tablet brush learned from the uploaded word
     import pen_path as pp
+    import style_dna as sd
+    import arabic_anatomy as aa
     from proportions import load as load_corpus, measure_image, predict_for
     corpus = load_corpus()
     user = measure_image()
@@ -271,32 +275,47 @@ def main():
     donor_name = nearest[0][0]
     donor = sb.HERE / "corpus" / (donor_name.replace(" ", "") + ".ttf")
     D, ref_y = user["nuqta_px"], user["noon_bottom_y"]
-    noon_q = [s for s in strokes if s["comp"] == noon_i][0]["q"]
-    sty_bottom = noon_q[:, 1].max()
+    style_paths = {"meem.init": [s for s in strokes if s["comp"] == meem_i][0]["q"],
+                   "zain.fina": [s for s in strokes if s["comp"] == zain_i][0]["q"],
+                   "noon.isol": [s for s in strokes if s["comp"] == noon_i][0]["q"]}
+    dna = sd.measure_dna(style_paths, D, donor)
+    lines_y, lines_nuqta = sd.reference_lines(user, preds, corpus)
+    LETTER_OF = {"uni0628": "beh", "uni062A": "teh", "uni062B": "theh", "uni0649": "alefmaksura",
+                 "uni062F": "dal", "uni0644": "lam", "uni0627": "alef", "uni0633": "seen"}
+    SRC_FORM = {"noon": "noon.isol", "zain": "zain.fina", "meem": "meem.init"}
     centerlines = {}
     from shapely.geometry import Point
+    h0 = bm.beta[0]
     for name, ch, form in GENERATED:
-        p, dots = ref_glyph(ch, donor)
+        letter = LETTER_OF[name]
+        pd_, dots_d, (bx, by, bw, bh), _ = sd.donor_path(donor, ch)
+        if letter in aa.SIMILARITY:
+            src = aa.SIMILARITY[letter][0]
+            p = style_paths[SRC_FORM[src]].copy()
+            method = f"similarity: {src} strokes re-proportioned (Sakkal rule 8) — {aa.SIMILARITY[letter][1]}"
+        else:
+            p = sd.transfer_curvature(pd_, dna["curvature_gain"], dna["terminal_curl_gain"], dna["donor_nuqta_px"])
+            method = (f"transfer: {donor_name} path re-drawn with curvature x{dna['curvature_gain']} "
+                      f"and terminal curl x{dna['terminal_curl_gain']}")
         W_t, H_t = preds[form]["w"] * D, preds[form]["h"] * D
         bottom_t = ref_y - preds[form]["bottom"] * D           # image y of the body bottom
         pw, ph = np.ptp(p[:, 0]), np.ptp(p[:, 1])
-        h0 = bm.beta[0]
+        wide = pw > 0.15 * ph
         sy = max(H_t - 2 * h0, 0.25 * H_t) / max(ph, 1)
-        sx = max(W_t - 2 * h0, 0.25 * W_t) / max(pw, 1) if pw > 0.15 * ph else sy
-        for _ in range(6):  # scale the skeleton until the brushed INK matches the predicted box
+        sx = max(W_t - 2 * h0, 0.25 * W_t) / max(pw, 1) if wide else sy
+        for _ in range(6):  # scale the pen path until the brushed INK matches the predicted box
             q = np.stack([(p[:, 0] - p[:, 0].min()) * sx + 100, (p[:, 1] - p[:, 1].max()) * sy + bottom_t - h0], 1)
             q = sb.resample(q, 1.0)
-            nodes, segs = pp.fit_smooth(q, tol=4.0, min_gap=30.0)
+            nodes, segs = pp.fit_smooth(q, tol=4.0, min_gap=30.0, tol_reduce=0.25 * h0)
             qq = sb.sample_beziers(segs, 1.0)
             wl, wr = bm.predict(qq)
             body_geom = ribbon_polygon(qq, wl, wr)
             minx, miny, maxx, maxy = body_geom.bounds
             dy = bottom_t - maxy
-            q[:, 1] += dy
-            if pw > 0.15 * ph:
+            if wide:
                 sx *= (W_t / max(maxx - minx, 1)) ** 0.8
             sy *= (H_t / max(maxy - miny, 1)) ** 0.8
-            if pw <= 0.15 * ph:
+            if not wide:
                 sx = sy
         segs = [P + np.array([0.0, dy]) for P in segs]
         qq = sb.sample_beziers(segs, 1.0)
@@ -304,10 +323,22 @@ def main():
         body_geom = ribbon_polygon(qq, wl, wr)
         cont, n = geom_to_contours(body_geom)
         minx, miny, maxx, maxy = body_geom.bounds
-        dc = [((x - p[:, 0].min()) * sx + 100, (y - p[:, 1].max()) * sy + bottom_t - h0 + dy) for x, y in dots]
-        if dc:
-            dc = spread_dots(dc, r_dot)
-            direction = -1.0 if np.mean([c[1] for c in dc]) < qq[:, 1].mean() else 1.0
+        # dots: count and side from the anatomy knowledge base (ت = 2 above, ث = 3 above ...),
+        # drawn with the style's own round dot at the style's own clearance
+        dc = []
+        if "dots" in aa.LETTERS[letter]:
+            nd, side = aa.LETTERS[letter]["dots"]
+            cx0 = (minx + maxx) / 2
+            gap = 2 * r_dot * 1.25
+            if nd == 1:
+                dc = [(cx0, 0.0)]
+            elif nd == 2:
+                dc = [(cx0 - gap / 2, 0.0), (cx0 + gap / 2, 0.0)]
+            else:  # three: two below, one on top (pyramid)
+                dc = [(cx0 - gap / 2, 0.0), (cx0 + gap / 2, 0.0), (cx0, -gap * 0.85 if side == "above" else gap * 0.85)]
+            base_y = (miny - clearance - r_dot) if side == "above" else (maxy + clearance + r_dot)
+            dc = np.array([(x, base_y + y) for x, y in dc])
+            direction = -1.0 if side == "above" else 1.0
             for _ in range(600):
                 if min(body_geom.distance(Point(cx, cy)) for cx, cy in dc) >= r_dot + clearance:
                     break
@@ -317,17 +348,29 @@ def main():
             n += 4
         glyph_px[name] = cont
         centerlines[name] = segs
-        stats[name] = {"source": f"generated: {donor_name} single pen path + predicted nuqta proportions + learned tablet brush",
+        stats[name] = {"letter": letter, "method": method, "anatomy": aa.LETTERS[letter]["parts"],
+                       "shared_parts_with_uploaded": aa.shared_parts(letter, ["meem", "zain", "noon"]),
                        "path_nodes": len(segs) + 1, "outline_nodes": n,
                        "predicted_nuqta_wxh": [preds[form]["w"], preds[form]["h"]],
                        "achieved_nuqta_wxh": [round((maxx - minx) / D, 2), round((maxy - miny) / D, 2)],
                        "path_quality": pp.path_quality(segs, np.ones((4000, 4000), bool))}
     stats["proportions_donor_typefaces"] = nearest
+    stats["style_dna"] = dna
+    stats["reference_levels_nuqta_above_noon_bottom"] = lines_nuqta
+    # everything the anatomy sheet needs, in the uploaded image's px frame
+    (OUT / "glyphs_px.json").write_text(json.dumps({
+        "contours": {k: [[[c[0], *[list(map(float, pt)) for pt in c[1:]]] for c in cont] for cont in v]
+                     for k, v in glyph_px.items()},
+        "centerlines": {k: [P.tolist() for P in v] for k, v in centerlines.items()},
+        "word_centerlines": [s["segs"] and [P.tolist() for P in s["segs"]] for s in strokes],
+        "levels_y": lines_y, "nuqta_px": D}))
+    (OUT / "style_dna.json").write_text(json.dumps({"dna": dna, "levels": lines_nuqta, "levels_y_px": lines_y},
+                                                   ensure_ascii=False, indent=1))
 
     # ---- px -> font units
     word_h = (y_bot - y_top)
     S = 900.0 / word_h
-    baseline_px = sty_bottom  # bottom of noon's centerline = baseline
+    baseline_px = lines_y["base"]  # baseline (قاعدة) from the anatomy reference levels
     to_units = lambda pt: (pt[0] * S, (baseline_px - pt[1]) * S)
 
     from fontTools.fontBuilder import FontBuilder

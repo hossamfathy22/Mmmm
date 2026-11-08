@@ -105,7 +105,9 @@ def measure_font(font_path):
         return None
     D = noon["dot_side"]           # 1 nuqta
     ref = noon["bottom"]           # vertical reference: bottom of the noon bowl
-    out = {"nuqta_px_at_em360": D}
+    out = {"nuqta_px_at_em360": D,
+           # where the baseline (قاعدة) sits above the bottom of the noon bowl, in nuqtas
+           "baseline_above_noon_bottom": -ref / D}
     for name, r in raw.items():
         if r is None:
             continue
