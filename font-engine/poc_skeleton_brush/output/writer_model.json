@@ -1,0 +1,167 @@
+{
+ "style1": {
+  "contrast": {
+   "translation_r2": 0.039,
+   "nib_angle_deg (0 = horizontal)": 74.0,
+   "rotation_r2": 0.076,
+   "expansion_r2": 0.428,
+   "median_thickness_horizontal_px": 174.9,
+   "median_thickness_vertical_px": 150.5,
+   "vertical_to_horizontal_ratio": 0.86,
+   "stress_angle_deg (direction of the thickest strokes)": 164.0,
+   "dominant_mechanism": "expansion"
+  },
+  "terminals": {
+   "component 0 (body)": {
+    "start": {
+     "shape": "ball (swells before the end)",
+     "width_at_quarter_body_from_tip": 0.75,
+     "width_at_one_body_from_tip": 1.21,
+     "leans": "centred"
+    },
+    "end": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.48,
+     "width_at_one_body_from_tip": 0.7,
+     "leans": "centred"
+    },
+    "body_thickness_px": 175.6
+   },
+   "component 1 (mark)": {
+    "start": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.95,
+     "width_at_one_body_from_tip": 0.84,
+     "leans": "centred"
+    },
+    "end": {
+     "shape": "pointed / tapered",
+     "width_at_quarter_body_from_tip": 0.26,
+     "width_at_one_body_from_tip": 1.1,
+     "leans": "centred"
+    },
+    "body_thickness_px": 66.4
+   },
+   "component 2 (body)": {
+    "start": {
+     "shape": "pointed / tapered",
+     "width_at_quarter_body_from_tip": 0.24,
+     "width_at_one_body_from_tip": 0.75,
+     "leans": "centred"
+    },
+    "end": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.47,
+     "width_at_one_body_from_tip": 1.22,
+     "leans": "centred"
+    },
+    "body_thickness_px": 217.7
+   },
+   "component 4 (body)": {
+    "start": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.49,
+     "width_at_one_body_from_tip": 0.7,
+     "leans": "centred"
+    },
+    "end": {
+     "shape": "pointed / tapered",
+     "width_at_quarter_body_from_tip": 0.15,
+     "width_at_one_body_from_tip": 0.93,
+     "leans": "centred"
+    },
+    "body_thickness_px": 173.1
+   }
+  }
+ },
+ "style2": {
+  "contrast": {
+   "translation_r2": 0.067,
+   "nib_angle_deg (0 = horizontal)": 68.0,
+   "rotation_r2": 0.156,
+   "expansion_r2": 0.357,
+   "median_thickness_horizontal_px": 132.3,
+   "median_thickness_vertical_px": 107.5,
+   "vertical_to_horizontal_ratio": 0.81,
+   "stress_angle_deg (direction of the thickest strokes)": 158.0,
+   "dominant_mechanism": "expansion"
+  },
+  "terminals": {
+   "component 0 (mark)": {
+    "start": {
+     "shape": "ball (swells before the end)",
+     "width_at_quarter_body_from_tip": 0.54,
+     "width_at_one_body_from_tip": 1.04,
+     "leans": "centred"
+    },
+    "end": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.58,
+     "width_at_one_body_from_tip": 0.79,
+     "leans": "centred"
+    },
+    "body_thickness_px": 71.3
+   },
+   "component 1 (body)": {
+    "start": {
+     "shape": "pointed / tapered",
+     "width_at_quarter_body_from_tip": 0.4,
+     "width_at_one_body_from_tip": 1.63,
+     "leans": "centred"
+    },
+    "end": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.82,
+     "width_at_one_body_from_tip": 1.02,
+     "leans": "centred"
+    },
+    "body_thickness_px": 94.6
+   },
+   "component 2 (mark)": {
+    "start": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.5,
+     "width_at_one_body_from_tip": 1.08,
+     "leans": "right"
+    },
+    "end": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.52,
+     "width_at_one_body_from_tip": 1.0,
+     "leans": "left"
+    },
+    "body_thickness_px": 84.6
+   },
+   "component 3 (body)": {
+    "start": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.57,
+     "width_at_one_body_from_tip": 0.87,
+     "leans": "left"
+    },
+    "end": {
+     "shape": "ball (swells before the end)",
+     "width_at_quarter_body_from_tip": 0.57,
+     "width_at_one_body_from_tip": 1.12,
+     "leans": "left"
+    },
+    "body_thickness_px": 130.5
+   },
+   "component 4 (body)": {
+    "start": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.51,
+     "width_at_one_body_from_tip": 1.06,
+     "leans": "right"
+    },
+    "end": {
+     "shape": "round",
+     "width_at_quarter_body_from_tip": 0.56,
+     "width_at_one_body_from_tip": 1.03,
+     "leans": "right"
+    },
+    "body_thickness_px": 96.8
+   }
+  }
+ }
+}

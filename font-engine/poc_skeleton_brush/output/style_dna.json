@@ -3,15 +3,15 @@
   "per_letter": {
    "meem.init": {
     "turning_per_nuqta_style_deg": 57.1,
-    "turning_per_nuqta_donor_deg": 51.0,
+    "turning_per_nuqta_donor_deg": 75.9,
     "terminal_curl_style_deg": 27.3,
-    "terminal_curl_donor_deg": 30.8
+    "terminal_curl_donor_deg": 22.0
    },
    "zain.fina": {
     "turning_per_nuqta_style_deg": 62.5,
-    "turning_per_nuqta_donor_deg": 72.2,
+    "turning_per_nuqta_donor_deg": 96.9,
     "terminal_curl_style_deg": 78.9,
-    "terminal_curl_donor_deg": 27.9
+    "terminal_curl_donor_deg": 31.7
    },
    "noon.isol": {
     "turning_per_nuqta_style_deg": 63.8,
@@ -20,8 +20,8 @@
     "terminal_curl_donor_deg": 48.1
    }
   },
-  "curvature_gain": 1.12,
-  "terminal_curl_gain": 0.886,
+  "curvature_gain": 0.752,
+  "terminal_curl_gain": 1.241,
   "donor_nuqta_px": 94.33981132056604
  },
  "levels": {

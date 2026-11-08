@@ -39,26 +39,28 @@
     "basin",
     "tooth"
    ],
+   "brush": "writer brush from noon (stretch between guides)",
+   "mean_stroke_thickness_px": 147.3,
    "shared_parts_with_uploaded": [
     "tooth",
     "tooth"
    ],
    "path_nodes": 6,
-   "outline_nodes": 25,
+   "outline_nodes": 31,
    "predicted_nuqta_wxh": [
     4.712,
     2.562
    ],
    "achieved_nuqta_wxh": [
-    4.68,
-    2.54
+    4.71,
+    2.56
    ],
    "path_quality": {
     "paths": 1,
     "nodes": 6,
     "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.34,
-    "mean_curvature_jump": 0.104,
+    "max_curvature_jump (G2, 0 = smooth)": 0.372,
+    "mean_curvature_jump": 0.118,
     "segments_with_2plus_curvature_peaks": 1,
     "handles_outside_10_90pct_of_chord": 0,
     "path_inside_ink_pct": 100.0
@@ -72,26 +74,28 @@
     "basin",
     "tooth"
    ],
+   "brush": "writer brush from noon (stretch between guides)",
+   "mean_stroke_thickness_px": 147.3,
    "shared_parts_with_uploaded": [
     "tooth",
     "tooth"
    ],
    "path_nodes": 6,
-   "outline_nodes": 27,
+   "outline_nodes": 39,
    "predicted_nuqta_wxh": [
     4.714,
     2.568
    ],
    "achieved_nuqta_wxh": [
-    4.68,
-    2.55
+    4.71,
+    2.57
    ],
    "path_quality": {
     "paths": 1,
     "nodes": 6,
     "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.328,
-    "mean_curvature_jump": 0.106,
+    "max_curvature_jump (G2, 0 = smooth)": 0.363,
+    "mean_curvature_jump": 0.11,
     "segments_with_2plus_curvature_peaks": 1,
     "handles_outside_10_90pct_of_chord": 0,
     "path_inside_ink_pct": 100.0
@@ -105,26 +109,28 @@
     "basin",
     "tooth"
    ],
+   "brush": "writer brush from noon (stretch between guides)",
+   "mean_stroke_thickness_px": 147.3,
    "shared_parts_with_uploaded": [
     "tooth",
     "tooth"
    ],
    "path_nodes": 6,
-   "outline_nodes": 31,
+   "outline_nodes": 41,
    "predicted_nuqta_wxh": [
     4.714,
     2.567
    ],
    "achieved_nuqta_wxh": [
-    4.68,
-    2.55
+    4.71,
+    2.57
    ],
    "path_quality": {
     "paths": 1,
     "nodes": 6,
     "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.326,
-    "mean_curvature_jump": 0.106,
+    "max_curvature_jump (G2, 0 = smooth)": 0.361,
+    "mean_curvature_jump": 0.11,
     "segments_with_2plus_curvature_peaks": 1,
     "handles_outside_10_90pct_of_chord": 0,
     "path_inside_ink_pct": 100.0
@@ -132,160 +138,170 @@
   },
   "uni0649": {
    "letter": "alefmaksura",
-   "method": "transfer: Lalezar path re-drawn with curvature x1.12 and terminal curl x0.886",
+   "method": "transfer: Lalezar path re-drawn with curvature x0.752 and terminal curl x1.241",
    "anatomy": [
     "head",
     "belly",
     "tail"
    ],
+   "brush": "writer brush from noon (stretch between guides)",
+   "mean_stroke_thickness_px": 136.5,
    "shared_parts_with_uploaded": [
     "head",
     "tail"
    ],
-   "path_nodes": 7,
-   "outline_nodes": 31,
+   "path_nodes": 6,
+   "outline_nodes": 27,
    "predicted_nuqta_wxh": [
     4.716,
     4.905
    ],
    "achieved_nuqta_wxh": [
-    4.69,
-    4.88
-   ],
-   "path_quality": {
-    "paths": 1,
-    "nodes": 7,
-    "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.44,
-    "mean_curvature_jump": 0.251,
-    "segments_with_2plus_curvature_peaks": 1,
-    "handles_outside_10_90pct_of_chord": 0,
-    "path_inside_ink_pct": 97.3
-   }
-  },
-  "uni062F": {
-   "letter": "dal",
-   "method": "transfer: Lalezar path re-drawn with curvature x1.12 and terminal curl x0.886",
-   "anatomy": [
-    "head",
-    "arm",
-    "link"
-   ],
-   "shared_parts_with_uploaded": [
-    "head"
-   ],
-   "path_nodes": 4,
-   "outline_nodes": 17,
-   "predicted_nuqta_wxh": [
-    2.98,
-    3.433
-   ],
-   "achieved_nuqta_wxh": [
-    2.99,
-    3.44
-   ],
-   "path_quality": {
-    "paths": 1,
-    "nodes": 4,
-    "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.528,
-    "mean_curvature_jump": 0.413,
-    "segments_with_2plus_curvature_peaks": 1,
-    "handles_outside_10_90pct_of_chord": 0,
-    "path_inside_ink_pct": 100.0
-   }
-  },
-  "uni0644": {
-   "letter": "lam",
-   "method": "transfer: Lalezar path re-drawn with curvature x1.12 and terminal curl x0.886",
-   "anatomy": [
-    "stem",
-    "bowl"
-   ],
-   "shared_parts_with_uploaded": [
-    "bowl"
-   ],
-   "path_nodes": 6,
-   "outline_nodes": 26,
-   "predicted_nuqta_wxh": [
-    3.499,
-    5.922
-   ],
-   "achieved_nuqta_wxh": [
-    3.46,
-    5.9
+    4.72,
+    4.9
    ],
    "path_quality": {
     "paths": 1,
     "nodes": 6,
     "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.459,
-    "mean_curvature_jump": 0.246,
+    "max_curvature_jump (G2, 0 = smooth)": 0.387,
+    "mean_curvature_jump": 0.244,
     "segments_with_2plus_curvature_peaks": 0,
     "handles_outside_10_90pct_of_chord": 0,
-    "path_inside_ink_pct": 84.4
+    "path_inside_ink_pct": 96.8
    }
   },
-  "uni0627": {
-   "letter": "alef",
-   "method": "transfer: Lalezar path re-drawn with curvature x1.12 and terminal curl x0.886",
+  "uni062F": {
+   "letter": "dal",
+   "method": "transfer: Lalezar path re-drawn with curvature x0.752 and terminal curl x1.241",
    "anatomy": [
-    "stem"
+    "head",
+    "arm",
+    "link"
    ],
-   "shared_parts_with_uploaded": [],
-   "path_nodes": 4,
-   "outline_nodes": 16,
+   "brush": "writer brush from zain (stretch between guides)",
+   "mean_stroke_thickness_px": 143.8,
+   "shared_parts_with_uploaded": [
+    "head"
+   ],
+   "path_nodes": 7,
+   "outline_nodes": 32,
    "predicted_nuqta_wxh": [
-    1.44,
-    4.809
+    2.98,
+    3.433
    ],
    "achieved_nuqta_wxh": [
-    1.43,
-    4.82
+    2.98,
+    3.4
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 7,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.105,
+    "mean_curvature_jump": 0.024,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 1,
+    "path_inside_ink_pct": 100.0
+   }
+  },
+  "uni0644": {
+   "letter": "lam",
+   "method": "transfer: Lalezar path re-drawn with curvature x0.752 and terminal curl x1.241",
+   "anatomy": [
+    "stem",
+    "bowl"
+   ],
+   "brush": "writer brush from zain (stretch between guides)",
+   "mean_stroke_thickness_px": 167.4,
+   "shared_parts_with_uploaded": [
+    "bowl"
+   ],
+   "path_nodes": 4,
+   "outline_nodes": 30,
+   "predicted_nuqta_wxh": [
+    3.499,
+    5.922
+   ],
+   "achieved_nuqta_wxh": [
+    3.5,
+    5.92
    ],
    "path_quality": {
     "paths": 1,
     "nodes": 4,
     "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.664,
-    "mean_curvature_jump": 0.333,
-    "segments_with_2plus_curvature_peaks": 0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.541,
+    "mean_curvature_jump": 0.372,
+    "segments_with_2plus_curvature_peaks": 1,
     "handles_outside_10_90pct_of_chord": 0,
-    "path_inside_ink_pct": 82.5
+    "path_inside_ink_pct": 83.6
+   }
+  },
+  "uni0627": {
+   "letter": "alef",
+   "method": "transfer: Lalezar path re-drawn with curvature x0.752 and terminal curl x1.241",
+   "anatomy": [
+    "stem"
+   ],
+   "brush": "writer brush from zain (stretch between guides)",
+   "mean_stroke_thickness_px": 146.0,
+   "shared_parts_with_uploaded": [],
+   "path_nodes": 5,
+   "outline_nodes": 27,
+   "predicted_nuqta_wxh": [
+    1.44,
+    4.809
+   ],
+   "achieved_nuqta_wxh": [
+    1.47,
+    4.76
+   ],
+   "path_quality": {
+    "paths": 1,
+    "nodes": 5,
+    "max_kink_deg (G1, 0 = smooth)": 0.0,
+    "max_curvature_jump (G2, 0 = smooth)": 0.0,
+    "mean_curvature_jump": 0.0,
+    "segments_with_2plus_curvature_peaks": 0,
+    "handles_outside_10_90pct_of_chord": 3,
+    "path_inside_ink_pct": 77.7
    }
   },
   "uni0633": {
    "letter": "seen",
-   "method": "transfer: Lalezar path re-drawn with curvature x1.12 and terminal curl x0.886",
+   "method": "transfer: Lalezar path re-drawn with curvature x0.752 and terminal curl x1.241",
    "anatomy": [
     "tooth",
     "tooth",
     "tooth",
     "bowl"
    ],
+   "brush": "writer brush from noon (stretch between guides)",
+   "mean_stroke_thickness_px": 138.0,
    "shared_parts_with_uploaded": [
     "tooth",
     "tooth",
     "tooth",
     "bowl"
    ],
-   "path_nodes": 12,
-   "outline_nodes": 41,
+   "path_nodes": 8,
+   "outline_nodes": 36,
    "predicted_nuqta_wxh": [
     6.155,
     3.854
    ],
    "achieved_nuqta_wxh": [
-    6.11,
-    3.82
+    6.15,
+    3.85
    ],
    "path_quality": {
     "paths": 1,
-    "nodes": 12,
+    "nodes": 8,
     "max_kink_deg (G1, 0 = smooth)": 0.0,
-    "max_curvature_jump (G2, 0 = smooth)": 0.036,
-    "mean_curvature_jump": 0.016,
-    "segments_with_2plus_curvature_peaks": 1,
+    "max_curvature_jump (G2, 0 = smooth)": 0.235,
+    "mean_curvature_jump": 0.095,
+    "segments_with_2plus_curvature_peaks": 4,
     "handles_outside_10_90pct_of_chord": 0,
     "path_inside_ink_pct": 100.0
    }
@@ -316,15 +332,15 @@
    "per_letter": {
     "meem.init": {
      "turning_per_nuqta_style_deg": 57.1,
-     "turning_per_nuqta_donor_deg": 51.0,
+     "turning_per_nuqta_donor_deg": 75.9,
      "terminal_curl_style_deg": 27.3,
-     "terminal_curl_donor_deg": 30.8
+     "terminal_curl_donor_deg": 22.0
     },
     "zain.fina": {
      "turning_per_nuqta_style_deg": 62.5,
-     "turning_per_nuqta_donor_deg": 72.2,
+     "turning_per_nuqta_donor_deg": 96.9,
      "terminal_curl_style_deg": 78.9,
-     "terminal_curl_donor_deg": 27.9
+     "terminal_curl_donor_deg": 31.7
     },
     "noon.isol": {
      "turning_per_nuqta_style_deg": 63.8,
@@ -333,8 +349,8 @@
      "terminal_curl_donor_deg": 48.1
     }
    },
-   "curvature_gain": 1.12,
-   "terminal_curl_gain": 0.886,
+   "curvature_gain": 0.752,
+   "terminal_curl_gain": 1.241,
    "donor_nuqta_px": 94.33981132056604
   },
   "reference_levels_nuqta_above_noon_bottom": {

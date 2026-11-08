@@ -280,6 +280,46 @@ def main():
                    "noon.isol": [s for s in strokes if s["comp"] == noon_i][0]["q"]}
     dna = sd.measure_dna(style_paths, D, donor)
     lines_y, lines_nuqta = sd.reference_lines(user, preds, corpus)
+    # ---- the writer's brush (writer_model.py / exact_brush.py): exact widths of
+    # the uploaded strokes; "stretch between guides" keeps each terminal's real
+    # size and shape, only the body adapts to the new letter's length
+    import exact_brush as eb
+    src_w = {}
+    for key, ci in (("noon", noon_i), ("zain", zain_i), ("meem", meem_i)):
+        q_src = [s for s in strokes if s["comp"] == ci][0]["q"]
+        wl_s, wr_s, _ = eb.measure(q_src, comps[ci]["mask"])
+        s_src = np.r_[0, np.cumsum(np.linalg.norm(np.diff(q_src, axis=0), axis=1))]
+        src_w[key] = (s_src, wl_s, wr_s)
+    BRUSH_SRC = {"beh": "noon", "teh": "noon", "theh": "noon", "alefmaksura": "noon", "seen": "noon",
+                 "alef": "zain", "dal": "zain", "lam": "zain"}
+    from writer_model import contrast_analysis
+    _ca = contrast_analysis([(st["q"], *eb.measure(st["q"], comps[st["comp"]]["mask"])[:2])
+                             for st in strokes if comps[st["comp"]]["kind"] == "body"], y_top, y_bot)
+    v_ratio = _ca.get("vertical_to_horizontal_ratio", 1.0) or 1.0
+
+    def writer_widths(qq, letter, full_profile):
+        s_src, wl_s, wr_s = src_w[BRUSH_SRC[letter]]
+        L = s_src[-1]
+        s_new = np.r_[0, np.cumsum(np.linalg.norm(np.diff(qq, axis=0), axis=1))]
+        Ln = s_new[-1]
+        body = float(np.median((wl_s + wr_s)[len(wl_s) // 5: -len(wl_s) // 5]))
+        g = min(1.5 * body, 0.3 * min(L, Ln))                    # guides: terminal zones
+        sm = np.where(s_new < g, s_new, np.where(s_new > Ln - g, L - (Ln - s_new),
+                      g + (s_new - g) * (L - 2 * g) / max(Ln - 2 * g, 1e-6)))
+        wl_n, wr_n = np.interp(sm, s_src, wl_s), np.interp(sm, s_src, wr_s)
+        if not full_profile:  # body = the writer's typical body width, terminals = real ones
+            mid = (s_new > g) & (s_new < Ln - g)
+            bl, br = np.median(wl_s[len(wl_s) // 5: -len(wl_s) // 5]), np.median(wr_s[len(wr_s) // 5: -len(wr_s) // 5])
+            ramp = np.clip(np.minimum(s_new - g, Ln - g - s_new) / max(0.5 * g, 1), 0, 1)
+            wl_n = np.where(mid, (1 - ramp) * wl_n + ramp * bl, wl_n)
+            wr_n = np.where(mid, (1 - ramp) * wr_n + ramp * br, wr_n)
+            # translation contrast measured on the writer: vertical travel is thinner
+            T = sb._tangents(qq)
+            vert = np.abs(T[:, 1])
+            f = 1 - (1 - v_ratio) * vert
+            wl_n, wr_n = wl_n * f, wr_n * f
+        return np.clip(wl_n, 1, None), np.clip(wr_n, 1, None)
+
     LETTER_OF = {"uni0628": "beh", "uni062A": "teh", "uni062B": "theh", "uni0649": "alefmaksura",
                  "uni062F": "dal", "uni0644": "lam", "uni0627": "alef", "uni0633": "seen"}
     SRC_FORM = {"noon": "noon.isol", "zain": "zain.fina", "meem": "meem.init"}
@@ -308,7 +348,7 @@ def main():
             q = sb.resample(q, 1.0)
             nodes, segs = pp.fit_smooth(q, tol=4.0, min_gap=30.0, tol_reduce=0.25 * h0)
             qq = sb.sample_beziers(segs, 1.0)
-            wl, wr = bm.predict(qq)
+            wl, wr = writer_widths(qq, letter, letter in aa.SIMILARITY)
             body_geom = ribbon_polygon(qq, wl, wr)
             minx, miny, maxx, maxy = body_geom.bounds
             dy = bottom_t - maxy
@@ -319,7 +359,7 @@ def main():
                 sx = sy
         segs = [P + np.array([0.0, dy]) for P in segs]
         qq = sb.sample_beziers(segs, 1.0)
-        wl, wr = bm.predict(qq)
+        wl, wr = writer_widths(qq, letter, letter in aa.SIMILARITY)
         body_geom = ribbon_polygon(qq, wl, wr)
         cont, n = geom_to_contours(body_geom)
         minx, miny, maxx, maxy = body_geom.bounds
@@ -348,7 +388,10 @@ def main():
             n += 4
         glyph_px[name] = cont
         centerlines[name] = segs
+        ink_len = np.r_[0, np.cumsum(np.linalg.norm(np.diff(qq, axis=0), axis=1))][-1]
         stats[name] = {"letter": letter, "method": method, "anatomy": aa.LETTERS[letter]["parts"],
+                       "brush": f"writer brush from {BRUSH_SRC[letter]} (stretch between guides)",
+                       "mean_stroke_thickness_px": round(float(body_geom.area / max(ink_len, 1)), 1),
                        "shared_parts_with_uploaded": aa.shared_parts(letter, ["meem", "zain", "noon"]),
                        "path_nodes": len(segs) + 1, "outline_nodes": n,
                        "predicted_nuqta_wxh": [preds[form]["w"], preds[form]["h"]],
