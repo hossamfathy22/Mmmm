@@ -39,7 +39,7 @@ def main():
     rows = [("1. uploaded image (style 1)", orig),
             (f"2. rebuilt from ONE smooth pen path per letter ({model['summary']['total_path_nodes']} nodes) + brush  (IoU {model['iou_word']:.3f})", rebuilt),
             ("3. typed with the generated font MuznBrush-Regular.otf (HarfBuzz/raqm shaping)", word),
-            ("4. NOT in the image: sizes predicted in nuqtas, path from the closest typeface, learned brush", letters)]
+            ("4. NOT in the image: composed from PARTS of the uploaded noon and zain (tooth, bowl, head, neck, tail)", letters)]
     H = sum(r[1].height + 110 for r in rows) + 40
     sheet = Image.new("RGB", (W, H), (17, 17, 17))
     d = ImageDraw.Draw(sheet)

@@ -397,6 +397,19 @@ def main():
                        "predicted_nuqta_wxh": [preds[form]["w"], preds[form]["h"]],
                        "achieved_nuqta_wxh": [round((maxx - minx) / D, 2), round((maxy - miny) / D, 2)],
                        "path_quality": pp.path_quality(segs, np.ones((4000, 4000), bool))}
+    # ---- composition from PARTS of the uploaded letters (compose.py) replaces
+    # the donor-based paths: the user's own tooth, bowl, head, neck and tail
+    import compose as cp
+    _S, comp_out, _, _ = cp.compose_style("style1")
+    NAME_OF = {"beh": "uni0628", "teh": "uni062A", "theh": "uni062B", "alefmaksura": "uni0649", "dal": "uni062F",
+               "lam": "uni0644", "alef": "uni0627", "seen": "uni0633", "reh": "uni0631"}
+    for letter, o in comp_out.items():
+        name = NAME_OF[letter]
+        cont, n = geom_to_contours(o["geom"])
+        glyph_px[name] = cont
+        centerlines[name] = o["segs"]
+        stats[name] = {"letter": letter, "method": "composed from the uploaded letters: " + o["how"],
+                       "path_nodes": len(o["segs"]) + 1, "outline_nodes": n}
     stats["proportions_donor_typefaces"] = nearest
     stats["style_dna"] = dna
     stats["reference_levels_nuqta_above_noon_bottom"] = lines_nuqta

@@ -1,0 +1,78 @@
+{
+ "style1": {
+  "reh": {
+   "recipe": "zain without its dot",
+   "path_nodes": 4
+  },
+  "dal": {
+   "recipe": "zain head + neck shortened to 55% + zain tail",
+   "path_nodes": 4
+  },
+  "beh": {
+   "recipe": "the noon body itself; only the dots differ",
+   "path_nodes": 6
+  },
+  "teh": {
+   "recipe": "the noon body itself; only the dots differ",
+   "path_nodes": 6
+  },
+  "theh": {
+   "recipe": "the noon body itself; only the dots differ",
+   "path_nodes": 6
+  },
+  "alef": {
+   "recipe": "zain head + zain neck stretched to the alef height",
+   "path_nodes": 4
+  },
+  "lam": {
+   "recipe": "stem (zain head + stretched neck) + noon bowl",
+   "path_nodes": 5
+  },
+  "alefmaksura": {
+   "recipe": "zain head + short neck + noon bowl",
+   "path_nodes": 5
+  },
+  "seen": {
+   "recipe": "two teeth (noon's tooth at 80%) + noon (tooth + bowl)",
+   "path_nodes": 11
+  }
+ },
+ "style2": {
+  "reh": {
+   "recipe": "zain without its dot",
+   "path_nodes": 9
+  },
+  "dal": {
+   "recipe": "zain head + neck shortened to 55% + zain tail",
+   "path_nodes": 8
+  },
+  "beh": {
+   "recipe": "the noon body itself; only the dots differ",
+   "path_nodes": 8
+  },
+  "teh": {
+   "recipe": "the noon body itself; only the dots differ",
+   "path_nodes": 8
+  },
+  "theh": {
+   "recipe": "the noon body itself; only the dots differ",
+   "path_nodes": 8
+  },
+  "alef": {
+   "recipe": "zain head + zain neck stretched to the alef height",
+   "path_nodes": 3
+  },
+  "lam": {
+   "recipe": "stem (zain head + stretched neck) + noon bowl",
+   "path_nodes": 5
+  },
+  "alefmaksura": {
+   "recipe": "zain head + short neck + noon bowl",
+   "path_nodes": 5
+  },
+  "seen": {
+   "recipe": "two teeth (noon's tooth at 80%) + noon (tooth + bowl)",
+   "path_nodes": 12
+  }
+ }
+}
