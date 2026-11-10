@@ -50,6 +50,18 @@ def integrate(p0, th, step=1.0):
     return p0 + np.vstack([[0, 0], np.cumsum(np.stack([np.cos(th), np.sin(th)], 1) * step, axis=0)])
 
 
+def ductus_orient(P):
+    """Writing direction (Sakkal's chart): the pen starts at the HIGHER end of
+    the stroke; when both ends are about level, at the right one. (Image
+    coordinates: smaller y = higher.) Fixes hah / ain / yeh, whose tails end
+    on the right and were being drawn backwards."""
+    a, b = P[0], P[-1]
+    h = max(np.ptp(P[:, 1]), 1e-6)
+    if abs(a[1] - b[1]) > 0.25 * h:
+        return P if a[1] < b[1] else P[::-1]
+    return P if a[0] >= b[0] else P[::-1]
+
+
 def wrap(a):
     return (a + np.pi) % (2 * np.pi) - np.pi
 
@@ -64,11 +76,8 @@ class CurveStyle:
         for key, form in PAIRS.items():
             if key in exclude:
                 continue
-            U = dense(R.S["strokes"][key][0])
-            N = R.ref[form] * R.k
-            Uc = nr.Restyler._r64(U) - [0, R.base]
-            Uc[:, 0] -= Uc[:, 0].mean()
-            N = dense(sd.orient_like(N, Uc))
+            U = dense(ductus_orient(R.S["strokes"][key][0]))
+            N = dense(ductus_orient(R.ref[form] * R.k))
             pairs[key] = (N, U)
         self.pairs = pairs
         # entry and exit motifs: mean extra direction of the writer over the zone
@@ -127,7 +136,7 @@ class CurveStyle:
 
     def styled(self, form):
         R = self.R
-        N = dense(R.ref[form] * R.k)
+        N = dense(ductus_orient(R.ref[form] * R.k))
         G = self.apply_path(N)
         G += [N[:, 0].mean() - G[:, 0].mean(), N[:, 1].max() - G[:, 1].max()]
         return G + [0, R.base], N + [0, R.base]
@@ -206,6 +215,11 @@ def main():
         dx = x - lo
         axs[0].plot(N[:, 0] + dx, N[:, 1], color="black", lw=2)
         axs[1].plot(part.q[:, 0] + dx, part.q[:, 1], color="#ff5a36", lw=2.5)
+        for ax_, P_ in ((axs[0], N), (axs[1], part.q)):      # where the pen starts, and its direction
+            ax_.plot(P_[0, 0] + dx, P_[0, 1], "o", color="#6a2fb5", ms=9)
+            k_ = min(len(P_) - 1, 60)
+            ax_.annotate("", xy=(P_[k_, 0] + dx, P_[k_, 1]), xytext=(P_[k_ - 12, 0] + dx, P_[k_ - 12, 1]),
+                         arrowprops=dict(arrowstyle="-|>", color="#6a2fb5", lw=2))
         for pg in ([g] if g.geom_type == "Polygon" else list(g.geoms)):
             px, py = pg.exterior.xy
             axs[2].fill(np.array(px) + dx, py, color="#ff5a36", lw=0)
