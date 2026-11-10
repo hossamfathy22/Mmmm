@@ -1,0 +1,132 @@
+{
+ "style1": {
+  "brush": {
+   "nib_shape": "soft square",
+   "nib_half_width_px_original": 47.7,
+   "nib_aspect": 0.91,
+   "nib_angle_deg": 89.0,
+   "pressure_top_to_bottom": 0.99,
+   "pressure_in_bends": 0.05,
+   "start": "pointed",
+   "start_length_in_nib_widths": 3.42,
+   "end": "pointed",
+   "end_length_in_nib_widths": 3.24
+  },
+  "history": [
+   {
+    "step": "brush on middle-of-ink paths",
+    "word_iou": 0.8444
+   },
+   {
+    "step": "round 1: paths moved",
+    "word_iou": 0.9348
+   },
+   {
+    "step": "round 1: brush refitted",
+    "word_iou": 0.9339
+   },
+   {
+    "step": "round 2: paths moved",
+    "word_iou": 0.9372
+   },
+   {
+    "step": "round 2: brush refitted",
+    "word_iou": 0.937
+   },
+   {
+    "step": "round 3: paths moved",
+    "word_iou": 0.9372
+   },
+   {
+    "step": "round 3: brush refitted",
+    "word_iou": 0.9355
+   }
+  ],
+  "per_letter_iou": {
+   "meem": 0.9328,
+   "zain": 0.9543,
+   "noon": 0.922
+  },
+  "word_iou": 0.9355,
+  "hold_out": {
+   "meem": {
+    "held_out_iou_plain_path": 0.7962,
+    "held_out_iou_path_refitted": 0.9313
+   },
+   "zain": {
+    "held_out_iou_plain_path": 0.7603,
+    "held_out_iou_path_refitted": 0.931
+   },
+   "noon": {
+    "held_out_iou_plain_path": 0.8122,
+    "held_out_iou_path_refitted": 0.9142
+   }
+  },
+  "mean_hold_out_plain_path": 0.7896
+ },
+ "style2": {
+  "brush": {
+   "nib_shape": "rectangle",
+   "nib_half_width_px_original": 30.3,
+   "nib_aspect": 0.93,
+   "nib_angle_deg": 120.0,
+   "pressure_top_to_bottom": 1.1,
+   "pressure_in_bends": -0.07,
+   "start": "pointed",
+   "start_length_in_nib_widths": 1.53,
+   "end": "pointed",
+   "end_length_in_nib_widths": 0.91
+  },
+  "history": [
+   {
+    "step": "brush on middle-of-ink paths",
+    "word_iou": 0.6114
+   },
+   {
+    "step": "round 1: paths moved",
+    "word_iou": 0.7269
+   },
+   {
+    "step": "round 1: brush refitted",
+    "word_iou": 0.7342
+   },
+   {
+    "step": "round 2: paths moved",
+    "word_iou": 0.7422
+   },
+   {
+    "step": "round 2: brush refitted",
+    "word_iou": 0.7402
+   },
+   {
+    "step": "round 3: paths moved",
+    "word_iou": 0.7461
+   },
+   {
+    "step": "round 3: brush refitted",
+    "word_iou": 0.7456
+   }
+  ],
+  "per_letter_iou": {
+   "meem": 0.6781,
+   "zain": 0.8604,
+   "noon": 0.9375
+  },
+  "word_iou": 0.7456,
+  "hold_out": {
+   "meem": {
+    "held_out_iou_plain_path": 0.4901,
+    "held_out_iou_path_refitted": 0.6292
+   },
+   "zain": {
+    "held_out_iou_plain_path": 0.6715,
+    "held_out_iou_path_refitted": 0.8332
+   },
+   "noon": {
+    "held_out_iou_plain_path": 0.5981,
+    "held_out_iou_path_refitted": 0.8392
+   }
+  },
+  "mean_hold_out_plain_path": 0.5866
+ }
+}
