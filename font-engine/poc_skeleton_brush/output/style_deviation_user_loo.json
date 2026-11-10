@@ -1,0 +1,20 @@
+{
+ "meem.init": {
+  "deviation_transfer": 1.294,
+  "scaled_normal_only": 1.292,
+  "template_blend": 1.522,
+  "nearest_font": 1.433
+ },
+ "zain.fina": {
+  "deviation_transfer": 0.604,
+  "scaled_normal_only": 0.591,
+  "template_blend": 0.742,
+  "nearest_font": 0.577
+ },
+ "noon.isol": {
+  "deviation_transfer": 1.125,
+  "scaled_normal_only": 1.078,
+  "template_blend": 1.332,
+  "nearest_font": 0.861
+ }
+}

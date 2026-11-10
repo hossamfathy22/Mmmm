@@ -1,0 +1,104 @@
+{
+ "corpus_benchmark_err_nuqta": {
+  "beh": {
+   "deviation_transfer": 0.589,
+   "template_blend": 0.546,
+   "nearest_font": 0.543
+  },
+  "dal": {
+   "deviation_transfer": 0.576,
+   "template_blend": 0.576,
+   "nearest_font": 0.571
+  },
+  "reh": {
+   "deviation_transfer": 0.565,
+   "template_blend": 0.363,
+   "nearest_font": 0.449
+  },
+  "alef": {
+   "deviation_transfer": 0.631,
+   "template_blend": 1.018,
+   "nearest_font": 0.534
+  },
+  "lam": {
+   "deviation_transfer": 0.772,
+   "template_blend": 0.702,
+   "nearest_font": 0.674
+  },
+  "alefmaksura": {
+   "deviation_transfer": 0.846,
+   "template_blend": 0.676,
+   "nearest_font": 0.722
+  },
+  "seen": {
+   "deviation_transfer": 0.892,
+   "template_blend": 0.652,
+   "nearest_font": 0.678
+  }
+ },
+ "how_the_writer_changed_each_letter": {
+  "meem.init": {
+   "width_scale": 0.86,
+   "height_scale": 0.32,
+   "mean_local_shift_nuqta": 0.61,
+   "total_turning_writer_vs_normal_deg": [
+    423.0,
+    553.0
+   ],
+   "path_length_change_pct": 21.6,
+   "start_direction_writer_vs_normal_deg": [
+    -23.0,
+    -60.0
+   ],
+   "end_direction_writer_vs_normal_deg": [
+    -71.0,
+    172.0
+   ]
+  },
+  "zain.fina": {
+   "width_scale": 0.93,
+   "height_scale": 0.54,
+   "mean_local_shift_nuqta": 0.37,
+   "total_turning_writer_vs_normal_deg": [
+    325.0,
+    210.0
+   ],
+   "path_length_change_pct": 8.3,
+   "start_direction_writer_vs_normal_deg": [
+    -107.0,
+    115.0
+   ],
+   "end_direction_writer_vs_normal_deg": [
+    -99.0,
+    173.0
+   ]
+  },
+  "noon.isol": {
+   "width_scale": 0.45,
+   "height_scale": 0.44,
+   "mean_local_shift_nuqta": 0.5,
+   "total_turning_writer_vs_normal_deg": [
+    452.0,
+    238.0
+   ],
+   "path_length_change_pct": 37.2,
+   "start_direction_writer_vs_normal_deg": [
+    -74.0,
+    94.0
+   ],
+   "end_direction_writer_vs_normal_deg": [
+    -37.0,
+    -68.0
+   ]
+  }
+ },
+ "corpus_benchmark_partwise_err_nuqta": {
+  "beh.isol": 0.597,
+  "dal.isol": 0.753,
+  "reh.isol": 0.63,
+  "alef.isol": 0.873,
+  "lam.isol": 0.89,
+  "alefmaksura.isol": 0.864,
+  "seen.isol": 0.92
+ }
+}

@@ -1,0 +1,456 @@
+{
+ "engine": "pen path + art brush, Arabic anatomy, nuqta proportions",
+ "images": [
+  {
+   "image": "input/muzn_two_styles.jpg",
+   "region": "style1",
+   "word": "مُزن",
+   "learned_at": "2026-11-10",
+   "reconstruction_iou_art_brush": 0.9994,
+   "brush": {
+    "selected_tool": "tablet",
+    "held_out_iou_per_tool": {
+     "tablet": 0.789,
+     "qalam": 0.719,
+     "monoline": 0.727
+    },
+    "contrast": {
+     "translation_r2": 0.039,
+     "nib_angle_deg (0 = horizontal)": 74.0,
+     "rotation_r2": 0.076,
+     "expansion_r2": 0.428,
+     "median_thickness_horizontal_px": 174.9,
+     "median_thickness_vertical_px": 150.5,
+     "vertical_to_horizontal_ratio": 0.86,
+     "stress_angle_deg (direction of the thickest strokes)": 164.0,
+     "dominant_mechanism": "expansion"
+    }
+   },
+   "letters": {
+    "terminals": {
+     "component 0 (body)": {
+      "start": {
+       "shape": "ball (swells before the end)",
+       "width_at_quarter_body_from_tip": 0.75,
+       "width_at_one_body_from_tip": 1.21,
+       "leans": "centred"
+      },
+      "end": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.48,
+       "width_at_one_body_from_tip": 0.7,
+       "leans": "centred"
+      },
+      "body_thickness_px": 175.6
+     },
+     "component 1 (mark)": {
+      "start": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.95,
+       "width_at_one_body_from_tip": 0.84,
+       "leans": "centred"
+      },
+      "end": {
+       "shape": "pointed / tapered",
+       "width_at_quarter_body_from_tip": 0.26,
+       "width_at_one_body_from_tip": 1.1,
+       "leans": "centred"
+      },
+      "body_thickness_px": 66.4
+     },
+     "component 2 (body)": {
+      "start": {
+       "shape": "pointed / tapered",
+       "width_at_quarter_body_from_tip": 0.24,
+       "width_at_one_body_from_tip": 0.75,
+       "leans": "centred"
+      },
+      "end": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.47,
+       "width_at_one_body_from_tip": 1.22,
+       "leans": "centred"
+      },
+      "body_thickness_px": 217.7
+     },
+     "component 4 (body)": {
+      "start": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.49,
+       "width_at_one_body_from_tip": 0.7,
+       "leans": "centred"
+      },
+      "end": {
+       "shape": "pointed / tapered",
+       "width_at_quarter_body_from_tip": 0.15,
+       "width_at_one_body_from_tip": 0.93,
+       "leans": "centred"
+      },
+      "body_thickness_px": 173.1
+     }
+    },
+    "deviation_from_normal": {
+     "meem.init": {
+      "width_scale": 0.86,
+      "height_scale": 0.32,
+      "mean_local_shift_nuqta": 0.61,
+      "total_turning_writer_vs_normal_deg": [
+       423.0,
+       553.0
+      ],
+      "path_length_change_pct": 21.6,
+      "start_direction_writer_vs_normal_deg": [
+       -23.0,
+       -60.0
+      ],
+      "end_direction_writer_vs_normal_deg": [
+       -71.0,
+       172.0
+      ]
+     },
+     "zain.fina": {
+      "width_scale": 0.93,
+      "height_scale": 0.54,
+      "mean_local_shift_nuqta": 0.37,
+      "total_turning_writer_vs_normal_deg": [
+       325.0,
+       210.0
+      ],
+      "path_length_change_pct": 8.3,
+      "start_direction_writer_vs_normal_deg": [
+       -107.0,
+       115.0
+      ],
+      "end_direction_writer_vs_normal_deg": [
+       -99.0,
+       173.0
+      ]
+     },
+     "noon.isol": {
+      "width_scale": 0.45,
+      "height_scale": 0.44,
+      "mean_local_shift_nuqta": 0.5,
+      "total_turning_writer_vs_normal_deg": [
+       452.0,
+       238.0
+      ],
+      "path_length_change_pct": 37.2,
+      "start_direction_writer_vs_normal_deg": [
+       -74.0,
+       94.0
+      ],
+      "end_direction_writer_vs_normal_deg": [
+       -37.0,
+       -68.0
+      ]
+     }
+    },
+    "pen_nodes_total": 18
+   },
+   "parts": [
+    "noon.tooth",
+    "noon.bowl",
+    "zain.head",
+    "zain.neck",
+    "zain.tail",
+    "meem.end"
+   ],
+   "proportions": {
+    "uploaded_letters_in_nuqtas": {
+     "meem.init": {
+      "w": 3.464792496934629,
+      "h": 2.806244607962465,
+      "top": 2.6104601004302,
+      "bottom": -0.195784507532265,
+      "weight": 1.219126031181009
+     },
+     "zain.fina": {
+      "w": 3.0910220734639413,
+      "h": 3.6843084599253504,
+      "top": 2.735050241587096,
+      "bottom": -0.9492582183382546,
+      "weight": 1.1991210425125771
+     },
+     "noon.isol": {
+      "w": 3.4944568162576997,
+      "h": 2.8537075188793777,
+      "top": 2.8537075188793777,
+      "bottom": 0.0,
+      "weight": 1.0167098626338573
+     },
+     "nuqta_px": 168.55266239368632,
+     "noon_bottom_y": 733
+    },
+    "predicted_missing_letters_nuqtas": {
+     "beh.isol": {
+      "w": 4.712,
+      "h": 2.562,
+      "top": 2.56,
+      "bottom": 0.177
+     },
+     "teh.isol": {
+      "w": 4.714,
+      "h": 2.568,
+      "top": 2.568,
+      "bottom": 0.177
+     },
+     "theh.isol": {
+      "w": 4.714,
+      "h": 2.567,
+      "top": 2.567,
+      "bottom": 0.177
+     },
+     "alefmaksura.isol": {
+      "w": 4.716,
+      "h": 4.905,
+      "top": 4.43,
+      "bottom": -0.277
+     },
+     "reh.isol": {
+      "w": 2.526,
+      "h": 3.702,
+      "top": 2.067,
+      "bottom": -1.335
+     },
+     "dal.isol": {
+      "w": 2.98,
+      "h": 3.433,
+      "top": 3.389,
+      "bottom": 0.045
+     },
+     "waw.isol": {
+      "w": 2.76,
+      "h": 4.13,
+      "top": 2.696,
+      "bottom": -1.139
+     },
+     "lam.isol": {
+      "w": 3.499,
+      "h": 5.922,
+      "top": 4.964,
+      "bottom": -0.156
+     },
+     "alef.isol": {
+      "w": 1.44,
+      "h": 4.809,
+      "top": 4.692,
+      "bottom": 0.201
+     },
+     "heh.isol": {
+      "w": 2.613,
+      "h": 3.468,
+      "top": 3.568,
+      "bottom": 0.127
+     },
+     "ain.isol": {
+      "w": 3.636,
+      "h": 5.307,
+      "top": 3.573,
+      "bottom": -1.366
+     },
+     "seen.isol": {
+      "w": 6.155,
+      "h": 3.854,
+      "top": 2.619,
+      "bottom": -0.565
+     },
+     "beh.init": {
+      "w": 2.088,
+      "h": 2.642,
+      "top": 2.533,
+      "bottom": 0.078
+     },
+     "beh.medi": {
+      "w": 2.65,
+      "h": 1.974,
+      "top": 1.821,
+      "bottom": 0.068
+     },
+     "beh.fina": {
+      "w": 5.058,
+      "h": 2.393,
+      "top": 2.298,
+      "bottom": 0.108
+     },
+     "noon.fina": {
+      "w": 3.966,
+      "h": 3.303,
+      "top": 1.868,
+      "bottom": -0.716
+     },
+     "meem.isol": {
+      "w": 3.369,
+      "h": 4.466,
+      "top": 3.055,
+      "bottom": -1.187
+     },
+     "yeh.isol": {
+      "w": 4.716,
+      "h": 4.901,
+      "top": 4.291,
+      "bottom": -0.41
+     },
+     "hah.isol": {
+      "w": 3.905,
+      "h": 4.955,
+      "top": 3.118,
+      "bottom": -1.529
+     },
+     "sad.isol": {
+      "w": 7.417,
+      "h": 4.423,
+      "top": 3.332,
+      "bottom": -0.623
+     }
+    },
+    "closest_typefaces": [
+     [
+      "Lalezar",
+      2.89
+     ],
+     [
+      "Reem Kufi",
+      4.72
+     ],
+     [
+      "Reem Kufi Fun",
+      4.72
+     ],
+     [
+      "Jomhuria",
+      4.89
+     ],
+     [
+      "Amiri Quran",
+      4.92
+     ]
+    ]
+   }
+  },
+  {
+   "image": "input/muzn_two_styles.jpg",
+   "region": "style2",
+   "word": "مُزن",
+   "learned_at": "2026-11-10",
+   "reconstruction_iou_art_brush": 0.9992,
+   "brush": {
+    "selected_tool": "tablet",
+    "held_out_iou_per_tool": {
+     "tablet": 0.681,
+     "qalam": 0.614,
+     "monoline": 0.634
+    },
+    "contrast": {
+     "translation_r2": 0.067,
+     "nib_angle_deg (0 = horizontal)": 68.0,
+     "rotation_r2": 0.156,
+     "expansion_r2": 0.357,
+     "median_thickness_horizontal_px": 132.3,
+     "median_thickness_vertical_px": 107.5,
+     "vertical_to_horizontal_ratio": 0.81,
+     "stress_angle_deg (direction of the thickest strokes)": 158.0,
+     "dominant_mechanism": "expansion"
+    }
+   },
+   "letters": {
+    "terminals": {
+     "component 0 (mark)": {
+      "start": {
+       "shape": "ball (swells before the end)",
+       "width_at_quarter_body_from_tip": 0.54,
+       "width_at_one_body_from_tip": 1.04,
+       "leans": "centred"
+      },
+      "end": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.58,
+       "width_at_one_body_from_tip": 0.79,
+       "leans": "centred"
+      },
+      "body_thickness_px": 71.3
+     },
+     "component 1 (body)": {
+      "start": {
+       "shape": "pointed / tapered",
+       "width_at_quarter_body_from_tip": 0.4,
+       "width_at_one_body_from_tip": 1.63,
+       "leans": "centred"
+      },
+      "end": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.82,
+       "width_at_one_body_from_tip": 1.02,
+       "leans": "centred"
+      },
+      "body_thickness_px": 94.6
+     },
+     "component 2 (mark)": {
+      "start": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.5,
+       "width_at_one_body_from_tip": 1.08,
+       "leans": "right"
+      },
+      "end": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.52,
+       "width_at_one_body_from_tip": 1.0,
+       "leans": "left"
+      },
+      "body_thickness_px": 84.6
+     },
+     "component 3 (body)": {
+      "start": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.57,
+       "width_at_one_body_from_tip": 0.87,
+       "leans": "left"
+      },
+      "end": {
+       "shape": "ball (swells before the end)",
+       "width_at_quarter_body_from_tip": 0.57,
+       "width_at_one_body_from_tip": 1.12,
+       "leans": "left"
+      },
+      "body_thickness_px": 130.5
+     },
+     "component 4 (body)": {
+      "start": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.51,
+       "width_at_one_body_from_tip": 1.06,
+       "leans": "right"
+      },
+      "end": {
+       "shape": "round",
+       "width_at_quarter_body_from_tip": 0.56,
+       "width_at_one_body_from_tip": 1.03,
+       "leans": "right"
+      },
+      "body_thickness_px": 96.8
+     }
+    },
+    "deviation_from_normal": null,
+    "pen_nodes_total": 53
+   },
+   "parts": [
+    "noon.tooth",
+    "noon.bowl",
+    "zain.head",
+    "zain.neck",
+    "zain.tail",
+    "meem.end"
+   ],
+   "proportions": {
+    "uploaded_letters_in_nuqtas": null,
+    "predicted_missing_letters_nuqtas": null,
+    "closest_typefaces": null
+   }
+  }
+ ],
+ "letters_seen": [
+  "meem.init",
+  "noon.isol",
+  "zain.fina"
+ ]
+}
