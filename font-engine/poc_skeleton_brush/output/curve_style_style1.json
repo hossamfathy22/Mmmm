@@ -1,0 +1,112 @@
+{
+ "leave_one_out_noon_heights": {
+  "noon": {
+   "styled_err": 0.616,
+   "plain_naskh_err": 0.321
+  },
+  "zain": {
+   "styled_err": 0.192,
+   "plain_naskh_err": 0.358
+  },
+  "meem": {
+   "styled_err": 0.486,
+   "plain_naskh_err": 0.539
+  }
+ },
+ "operator": {
+  "entry_extra_turn_deg": 35.0,
+  "exit_extra_turn_deg": 88.0,
+  "body_softness": 0.08,
+  "bend_gain": 1.0,
+  "length_ratio": 1.99,
+  "width_scale": 0.98,
+  "height_scale": 0.78
+ },
+ "letters": {
+  "alef": {
+   "score": -0.9,
+   "shape_p": 1.0,
+   "path_p": 0.82
+  },
+  "beh": {
+   "score": -2.26,
+   "shape_p": 1.0,
+   "path_p": 0.38
+  },
+  "hah": {
+   "score": -10.05,
+   "shape_p": 0.8,
+   "path_p": 0.02
+  },
+  "dal": {
+   "score": -2.65,
+   "shape_p": 0.97,
+   "path_p": 0.3
+  },
+  "reh": {
+   "score": -4.84,
+   "shape_p": 1.0,
+   "path_p": 0.1
+  },
+  "seen": {
+   "score": -4.09,
+   "shape_p": 0.86,
+   "path_p": 0.17
+  },
+  "sad": {
+   "score": -2.29,
+   "shape_p": 1.0,
+   "path_p": 0.42
+  },
+  "tah": {
+   "score": -2.02,
+   "shape_p": 1.0,
+   "path_p": 0.43
+  },
+  "ain": {
+   "score": -2.89,
+   "shape_p": 0.67,
+   "path_p": 0.56
+  },
+  "feh": {
+   "score": -4.53,
+   "shape_p": 1.0,
+   "path_p": 0.16
+  },
+  "qaf": {
+   "score": -5.94,
+   "shape_p": 0.82,
+   "path_p": 0.07
+  },
+  "kaf": {
+   "score": -3.15,
+   "shape_p": 1.0,
+   "path_p": 0.25
+  },
+  "lam": {
+   "score": -2.99,
+   "shape_p": 1.0,
+   "path_p": 0.29
+  },
+  "meem": {
+   "score": -8.71,
+   "shape_p": 1.0,
+   "path_p": 0.02
+  },
+  "heh": {
+   "score": -3.97,
+   "shape_p": 0.99,
+   "path_p": 0.15
+  },
+  "waw": {
+   "score": -3.74,
+   "shape_p": 0.96,
+   "path_p": 0.21
+  },
+  "yeh": {
+   "score": -4.72,
+   "shape_p": 1.0,
+   "path_p": 0.12
+  }
+ }
+}
