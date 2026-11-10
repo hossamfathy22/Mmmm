@@ -1,0 +1,322 @@
+{
+ "reh": {
+  "best_recipe_params": {},
+  "recipe_err": 0.522,
+  "blend_err": 0.363,
+  "nearest_err": 0.449,
+  "all_params": [
+   [
+    {},
+    0.522
+   ]
+  ],
+  "winner": "blend"
+ },
+ "beh": {
+  "best_recipe_params": {},
+  "recipe_err": 1.712,
+  "blend_err": 0.546,
+  "nearest_err": 0.543,
+  "all_params": [
+   [
+    {},
+    1.712
+   ]
+  ],
+  "winner": "nearest"
+ },
+ "dal": {
+  "best_recipe_params": {
+   "neck": 0.55
+  },
+  "recipe_err": 1.3,
+  "blend_err": 0.576,
+  "nearest_err": 0.571,
+  "all_params": [
+   [
+    {
+     "neck": 0.3
+    },
+    1.643
+   ],
+   [
+    {
+     "neck": 0.45
+    },
+    1.356
+   ],
+   [
+    {
+     "neck": 0.55
+    },
+    1.3
+   ],
+   [
+    {
+     "neck": 0.7
+    },
+    1.38
+   ],
+   [
+    {
+     "neck": 0.85
+    },
+    1.718
+   ]
+  ],
+  "winner": "nearest"
+ },
+ "alef": {
+  "best_recipe_params": {
+   "head": "zain_head",
+   "height": 1.2
+  },
+  "recipe_err": 4.005,
+  "blend_err": 1.018,
+  "nearest_err": 0.534,
+  "all_params": [
+   [
+    {
+     "head": "zain_head",
+     "height": 1.2
+    },
+    4.005
+   ],
+   [
+    {
+     "head": "zain_head",
+     "height": 1.5
+    },
+    5.009
+   ],
+   [
+    {
+     "head": "zain_head",
+     "height": 1.8
+    },
+    5.883
+   ],
+   [
+    {
+     "head": "zain_head",
+     "height": 2.1
+    },
+    6.691
+   ],
+   [
+    {
+     "head": "noon_tooth_mirrored",
+     "height": 1.2
+    },
+    4.294
+   ],
+   [
+    {
+     "head": "noon_tooth_mirrored",
+     "height": 1.5
+    },
+    4.758
+   ],
+   [
+    {
+     "head": "noon_tooth_mirrored",
+     "height": 1.8
+    },
+    5.356
+   ],
+   [
+    {
+     "head": "noon_tooth_mirrored",
+     "height": 2.1
+    },
+    5.937
+   ]
+  ],
+  "winner": "nearest"
+ },
+ "lam": {
+  "best_recipe_params": {
+   "height": 1.2,
+   "bowl": 0.8
+  },
+  "recipe_err": 3.121,
+  "blend_err": 0.702,
+  "nearest_err": 0.674,
+  "all_params": [
+   [
+    {
+     "height": 1.2,
+     "bowl": 0.8
+    },
+    3.121
+   ],
+   [
+    {
+     "height": 1.2,
+     "bowl": 1.0
+    },
+    3.48
+   ],
+   [
+    {
+     "height": 1.2,
+     "bowl": 1.2
+    },
+    3.863
+   ],
+   [
+    {
+     "height": 1.6,
+     "bowl": 0.8
+    },
+    4.502
+   ],
+   [
+    {
+     "height": 1.6,
+     "bowl": 1.0
+    },
+    4.869
+   ],
+   [
+    {
+     "height": 1.6,
+     "bowl": 1.2
+    },
+    5.237
+   ],
+   [
+    {
+     "height": 2.0,
+     "bowl": 0.8
+    },
+    5.827
+   ],
+   [
+    {
+     "height": 2.0,
+     "bowl": 1.0
+    },
+    6.23
+   ],
+   [
+    {
+     "height": 2.0,
+     "bowl": 1.2
+    },
+    6.593
+   ]
+  ],
+  "winner": "nearest"
+ },
+ "alefmaksura": {
+  "best_recipe_params": {
+   "neck": 0.6,
+   "bowl": 0.9
+  },
+  "recipe_err": 1.704,
+  "blend_err": 0.676,
+  "nearest_err": 0.722,
+  "all_params": [
+   [
+    {
+     "neck": 0.3,
+     "bowl": 0.9
+    },
+    2.203
+   ],
+   [
+    {
+     "neck": 0.3,
+     "bowl": 1.0
+    },
+    2.283
+   ],
+   [
+    {
+     "neck": 0.3,
+     "bowl": 1.2
+    },
+    2.46
+   ],
+   [
+    {
+     "neck": 0.45,
+     "bowl": 0.9
+    },
+    1.871
+   ],
+   [
+    {
+     "neck": 0.45,
+     "bowl": 1.0
+    },
+    1.955
+   ],
+   [
+    {
+     "neck": 0.45,
+     "bowl": 1.2
+    },
+    2.242
+   ],
+   [
+    {
+     "neck": 0.6,
+     "bowl": 0.9
+    },
+    1.704
+   ],
+   [
+    {
+     "neck": 0.6,
+     "bowl": 1.0
+    },
+    1.768
+   ],
+   [
+    {
+     "neck": 0.6,
+     "bowl": 1.2
+    },
+    2.121
+   ]
+  ],
+  "winner": "blend"
+ },
+ "seen": {
+  "best_recipe_params": {
+   "tooth": 0.4
+  },
+  "recipe_err": 3.306,
+  "blend_err": 0.652,
+  "nearest_err": 0.678,
+  "all_params": [
+   [
+    {
+     "tooth": 0.4
+    },
+    3.306
+   ],
+   [
+    {
+     "tooth": 0.55
+    },
+    3.911
+   ],
+   [
+    {
+     "tooth": 0.7
+    },
+    4.484
+   ],
+   [
+    {
+     "tooth": 0.85
+    },
+    5.059
+   ]
+  ],
+  "winner": "blend"
+ }
+}

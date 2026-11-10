@@ -1,0 +1,25 @@
+{
+ "alef": [
+  "A: zain head + long neck",
+  "B: noon tooth start MIRRORED + long neck (user's idea)",
+  "C: noon tooth start + long neck"
+ ],
+ "dal": [
+  "A: zain head + neck x0.4 + zain tail",
+  "B: zain head + neck x0.55 + zain tail",
+  "C: zain head + neck x0.7 + zain tail"
+ ],
+ "lam": [
+  "A: zain head + neck to alef height + noon bowl",
+  "B: mirrored noon tooth + long neck + noon bowl"
+ ],
+ "alefmaksura": [
+  "A: zain head + short neck + noon bowl",
+  "B: mirrored noon tooth + short neck + noon bowl"
+ ],
+ "seen": [
+  "A: teeth = noon's tooth",
+  "B: teeth = zain's head (up and back)",
+  "C: teeth = meem's ending (up and back)"
+ ]
+}
