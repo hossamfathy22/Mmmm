@@ -1,0 +1,25 @@
+{
+ "held_out_font_accuracy": 0.8643,
+ "per_letter_accuracy": {
+  "alef": 0.96,
+  "beh": 0.869,
+  "hah": 0.822,
+  "dal": 0.846,
+  "reh": 0.881,
+  "seen": 0.864,
+  "sad": 0.892,
+  "tah": 0.91,
+  "ain": 0.874,
+  "feh": 0.876,
+  "qaf": 0.799,
+  "kaf": 0.86,
+  "lam": 0.866,
+  "meem": 0.932,
+  "noon": 0.821,
+  "heh": 0.832,
+  "waw": 0.883,
+  "yeh": 0.779
+ },
+ "samples": 14035,
+ "fonts": 52
+}

@@ -410,6 +410,35 @@ def main():
         centerlines[name] = o["segs"]
         stats[name] = {"letter": letter, "method": "composed from the uploaded letters: " + o["how"],
                        "path_nodes": len(o["segs"]) + 1, "outline_nodes": n}
+    # ---- letters designed automatically (auto_design.py): thousands of
+    # compositions of the writer's stroke parts, judged by two eyes. They
+    # replace the hand recipes; reh stays "zain without its dot" (user's rule).
+    EXTRA = {}
+    if (OUT / "auto_design_style1.json").exists():
+        import auto_sheet as ash
+        _ctx, auto_out, _ = ash.build_full("style1")
+        plan = [("alef", "ا", None), ("beh", "ب", "beh"), ("beh", "ت", "teh"), ("beh", "ث", "theh"),
+                ("hah", "ح", None), ("hah", "خ", "khah"), ("dal", "د", None), ("dal", "ذ", "thal"),
+                ("seen", "س", None), ("seen", "ش", "sheen"), ("sad", "ص", None), ("sad", "ض", "dad"),
+                ("tah", "ط", None), ("tah", "ظ", "zah"), ("ain", "ع", None), ("ain", "غ", "ghain"),
+                ("feh", "ف", "feh"), ("qaf", "ق", "qaf"), ("kaf", "ك", None), ("lam", "ل", None),
+                ("meem", "م", None), ("heh", "ه", None), ("waw", "و", None), ("yeh", "ى", None), ("yeh", "ي", "yeh")]
+        for body, ch, dot_letter in plan:
+            if body not in auto_out:
+                continue
+            o = auto_out[body]
+            ds = cp.dots_for(dot_letter, o["body"], _S) if dot_letter else []
+            cont, n = geom_to_contours(unary_union([o["body"]] + ds))
+            name = "uni%04X" % ord(ch)
+            glyph_px[name] = cont
+            h0_ = float(np.median(o["part"].wl + o["part"].wr)) / 2
+            _, centerlines[name] = pp.fit_smooth(o["part"].q, tol=4.0, min_gap=30.0, tol_reduce=0.25 * h0_)
+            EXTRA[name] = ch
+            stats[name] = {"letter": body, "method": "auto-designed from parts: " + " + ".join(
+                               f"{g_['src']}[{g_['a']:.2f}-{g_['b']:.2f}]" + ("R" if g_["rev"] else "") + ("M" if g_["mir"] else "")
+                               for g_ in o["genes"]),
+                           "eye_shape_p": round(o["info"]["p"], 2), "eye_path_p": round(o["info"].get("p_path", 0), 2),
+                           "path_nodes": len(centerlines[name]) + 1, "outline_nodes": n}
     stats["proportions_donor_typefaces"] = nearest
     stats["style_dna"] = dna
     stats["reference_levels_nuqta_above_noon_bottom"] = lines_nuqta
@@ -434,9 +463,11 @@ def main():
     from fontTools.pens.boundsPen import BoundsPen
     from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 
+    gen_names = [g[0] for g in GENERATED] + [n_ for n_ in EXTRA if n_ not in [g[0] for g in GENERATED]
+                                               and n_ not in ("uni0645", "uni0632", "uni0646", "uni0631")]
     order = [".notdef", "space", "uni0645", "uni0645.init", "uni0632", "uni0632.fina", "uni0646",
-             "uni0631"] + [g[0] for g in GENERATED] + ["uni064F"]
-    glyph_px["uni0645"] = glyph_px["uni0645.init"]   # placeholder isolated meem (not in image)
+             "uni0631"] + gen_names + ["uni064F"]
+    glyph_px.setdefault("uni0645", glyph_px["uni0645.init"])   # isolated meem: auto-designed if available
     glyph_px["uni0632"] = glyph_px["uni0632.fina"]   # isolated zain ~ final zain in this style
     charstrings, metrics, bounds = {}, {}, {}
     lsb_rsb = 40
@@ -488,6 +519,7 @@ def main():
     fb.setupGlyphOrder(order)
     cmap = {0x20: "space", 0x645: "uni0645", 0x632: "uni0632", 0x646: "uni0646", 0x631: "uni0631", 0x64F: "uni064F"}
     cmap.update({ord(ch): g for g, ch, _ in GENERATED})
+    cmap.update({ord(ch): n_ for n_, ch in EXTRA.items()})
     fb.setupCharacterMap(cmap)
     fb.setupCFF("MuznBrush-Regular", {"FullName": "Muzn Brush Regular"}, charstrings, {})
     fb.setupHorizontalMetrics(metrics)
@@ -501,7 +533,7 @@ def main():
     fea = f"""
 languagesystem DFLT dflt;
 languagesystem arab dflt;
-@BASES = [uni0645 uni0645.init uni0632 uni0632.fina uni0646 uni0631 {" ".join(g[0] for g in GENERATED)}];
+@BASES = [uni0645 uni0645.init uni0632 uni0632.fina uni0646 uni0631 {" ".join(gen_names)}];
 table GDEF {{ GlyphClassDef @BASES, , [uni064F], ; }} GDEF;
 feature init {{ sub uni0645 by uni0645.init; }} init;
 feature fina {{ sub uni0632 by uni0632.fina; }} fina;
@@ -543,7 +575,7 @@ feature mark {{ pos base uni0645.init <anchor {anchor_base[0]} {anchor_base[1]}>
         names = [hbfont.glyph_to_string(i.codepoint) for i in buf.glyph_infos]
         return names, buf
 
-    tests = {t: shape(t)[0] for t in ["مُزن", "ب ت ث ى ر د ل ا س", "زن"]}
+    tests = {t: shape(t)[0] for t in ["مُزن", "ا ب ت ث ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ى ي", "زن"]}
     report = {"word_iou_rebuilt_from_pen_and_brush": round(model["iou_word"], 4),
               "pen_path_nodes_word": model["summary"]["total_path_nodes"],
               "brush_model": bm.describe(), "glyphs": stats, "harfbuzz_shaping": tests,

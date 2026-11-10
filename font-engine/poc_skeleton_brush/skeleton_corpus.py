@@ -26,7 +26,10 @@ N_PTS = 64
 ZWJ = "‍"
 FORMS = {"meem.init": "م" + ZWJ, "zain.fina": ZWJ + "ز", "noon.isol": "ن",
          "beh.isol": "ب", "dal.isol": "د", "reh.isol": "ر", "alef.isol": "ا", "lam.isol": "ل",
-         "alefmaksura.isol": "ى", "seen.isol": "س"}
+         "alefmaksura.isol": "ى", "seen.isol": "س",
+         # every basic body (rasm), for the path-based second eye
+         "hah.isol": "ح", "sad.isol": "ص", "tah.isol": "ط", "ain.isol": "ع", "feh.isol": "ف", "qaf.isol": "ق",
+         "kaf.isol": "ك", "meem.isol": "م", "heh.isol": "ه", "waw.isol": "و"}
 SIZE = 420
 
 

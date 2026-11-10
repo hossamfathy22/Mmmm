@@ -73,6 +73,12 @@ LETTERS = {
     "noon": dict(ch="ن", rasm="noon", joins_left=True, descends=True, parts=["tooth", "bowl"], dots=(1, "above")),
     "heh": dict(ch="ه", rasm="heh", joins_left=True, descends=False, parts=["eye"]),
     "waw": dict(ch="و", rasm="waw", joins_left=False, descends=True, parts=["head", "eye", "tail"]),
+    "khah": dict(ch="خ", rasm="hah", joins_left=True, descends=True, parts=["head", "arm", "belly", "tail"], dots=(1, "above")),
+    "thal": dict(ch="ذ", rasm="dal", joins_left=False, descends=False, parts=["head", "arm", "link"], dots=(1, "above")),
+    "sheen": dict(ch="ش", rasm="seen", joins_left=True, descends=True, parts=["tooth", "tooth", "tooth", "bowl"], dots=(3, "above")),
+    "dad": dict(ch="ض", rasm="sad", joins_left=True, descends=True, parts=["almond", "tooth", "bowl"], dots=(1, "above")),
+    "zah": dict(ch="ظ", rasm="tah", joins_left=True, descends=False, parts=["stem", "almond", "link"], dots=(1, "above")),
+    "ghain": dict(ch="غ", rasm="ain", joins_left=True, descends=True, parts=["brow", "head", "belly", "tail"], dots=(1, "above")),
     "alefmaksura": dict(ch="ى", rasm="yeh", joins_left=True, descends=True, parts=["head", "belly", "tail"]),
     "yeh": dict(ch="ي", rasm="yeh", joins_left=True, descends=True, parts=["head", "belly", "tail"], dots=(2, "below")),
 }

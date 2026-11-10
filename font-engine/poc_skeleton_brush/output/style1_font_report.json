@@ -35,51 +35,203 @@
   "measured_dot_clearance_px": 58.1,
   "uni0628": {
    "letter": "beh",
-   "method": "composed from the uploaded letters: the noon body itself; only the dots differ",
-   "path_nodes": 6,
-   "outline_nodes": 31
-  },
-  "uni062A": {
-   "letter": "teh",
-   "method": "composed from the uploaded letters: the noon body itself; only the dots differ",
-   "path_nodes": 6,
-   "outline_nodes": 35
-  },
-  "uni062B": {
-   "letter": "theh",
-   "method": "composed from the uploaded letters: the noon body itself; only the dots differ",
-   "path_nodes": 6,
-   "outline_nodes": 39
-  },
-  "uni0649": {
-   "letter": "alefmaksura",
-   "method": "composed from the uploaded letters: zain head + short neck + noon bowl",
-   "path_nodes": 5,
-   "outline_nodes": 25
-  },
-  "uni062F": {
-   "letter": "dal",
-   "method": "composed from the uploaded letters: zain head + neck shortened to 55% + zain tail",
+   "method": "auto-designed from parts: noon[0.37-0.76]RM",
+   "eye_shape_p": 0.95,
+   "eye_path_p": 0.55,
    "path_nodes": 4,
    "outline_nodes": 21
   },
+  "uni062A": {
+   "letter": "beh",
+   "method": "auto-designed from parts: noon[0.37-0.76]RM",
+   "eye_shape_p": 0.95,
+   "eye_path_p": 0.55,
+   "path_nodes": 4,
+   "outline_nodes": 25
+  },
+  "uni062B": {
+   "letter": "beh",
+   "method": "auto-designed from parts: noon[0.37-0.76]RM",
+   "eye_shape_p": 0.95,
+   "eye_path_p": 0.55,
+   "path_nodes": 4,
+   "outline_nodes": 29
+  },
+  "uni0649": {
+   "letter": "yeh",
+   "method": "auto-designed from parts: zain[0.00-0.99] + meem[0.23-0.37]",
+   "eye_shape_p": 0.99,
+   "eye_path_p": 0.21,
+   "path_nodes": 4,
+   "outline_nodes": 24
+  },
+  "uni062F": {
+   "letter": "dal",
+   "method": "auto-designed from parts: noon[0.53-1.00]RM",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.34,
+   "path_nodes": 4,
+   "outline_nodes": 12
+  },
   "uni0644": {
    "letter": "lam",
-   "method": "composed from the uploaded letters: stem (zain head + stretched neck) + noon bowl",
-   "path_nodes": 5,
-   "outline_nodes": 27
+   "method": "auto-designed from parts: zain[0.25-1.00]R",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.55,
+   "path_nodes": 3,
+   "outline_nodes": 30
   },
   "uni0627": {
    "letter": "alef",
-   "method": "composed from the uploaded letters: zain head + zain neck stretched to the alef height",
-   "path_nodes": 4,
-   "outline_nodes": 16
+   "method": "auto-designed from parts: zain[0.27-0.53]R",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.81,
+   "path_nodes": 2,
+   "outline_nodes": 39
   },
   "uni0633": {
    "letter": "seen",
-   "method": "composed from the uploaded letters: two teeth (noon's tooth at 80%) + noon (tooth + bowl)",
-   "path_nodes": 11,
-   "outline_nodes": 35
+   "method": "auto-designed from parts: meem[0.56-0.87] + noon[0.14-0.79]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.41,
+   "path_nodes": 6,
+   "outline_nodes": 26
+  },
+  "uni062D": {
+   "letter": "hah",
+   "method": "auto-designed from parts: meem[0.29-0.72] + zain[0.70-1.00]R",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.46,
+   "path_nodes": 5,
+   "outline_nodes": 30
+  },
+  "uni062E": {
+   "letter": "hah",
+   "method": "auto-designed from parts: meem[0.29-0.72] + zain[0.70-1.00]R",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.46,
+   "path_nodes": 5,
+   "outline_nodes": 34
+  },
+  "uni0630": {
+   "letter": "dal",
+   "method": "auto-designed from parts: noon[0.53-1.00]RM",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.34,
+   "path_nodes": 4,
+   "outline_nodes": 16
+  },
+  "uni0634": {
+   "letter": "seen",
+   "method": "auto-designed from parts: meem[0.56-0.87] + noon[0.14-0.79]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.41,
+   "path_nodes": 6,
+   "outline_nodes": 38
+  },
+  "uni0635": {
+   "letter": "sad",
+   "method": "auto-designed from parts: meem[0.00-0.43] + noon[0.24-0.77]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.51,
+   "path_nodes": 6,
+   "outline_nodes": 24
+  },
+  "uni0636": {
+   "letter": "sad",
+   "method": "auto-designed from parts: meem[0.00-0.43] + noon[0.24-0.77]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.51,
+   "path_nodes": 6,
+   "outline_nodes": 26
+  },
+  "uni0637": {
+   "letter": "tah",
+   "method": "auto-designed from parts: noon[0.59-1.00]R + noon[0.26-0.99]M + zain[0.17-0.73]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.41,
+   "path_nodes": 7,
+   "outline_nodes": 36
+  },
+  "uni0638": {
+   "letter": "tah",
+   "method": "auto-designed from parts: noon[0.59-1.00]R + noon[0.26-0.99]M + zain[0.17-0.73]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.41,
+   "path_nodes": 7,
+   "outline_nodes": 42
+  },
+  "uni0639": {
+   "letter": "ain",
+   "method": "auto-designed from parts: meem[0.00-0.66]R + noon[0.52-0.83]R + zain[0.59-0.79]M",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.42,
+   "path_nodes": 7,
+   "outline_nodes": 38
+  },
+  "uni063A": {
+   "letter": "ain",
+   "method": "auto-designed from parts: meem[0.00-0.66]R + noon[0.52-0.83]R + zain[0.59-0.79]M",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.42,
+   "path_nodes": 7,
+   "outline_nodes": 42
+  },
+  "uni0641": {
+   "letter": "feh",
+   "method": "auto-designed from parts: noon[0.00-0.72]R",
+   "eye_shape_p": 0.99,
+   "eye_path_p": 0.26,
+   "path_nodes": 5,
+   "outline_nodes": 30
+  },
+  "uni0642": {
+   "letter": "qaf",
+   "method": "auto-designed from parts: zain[0.37-0.95]R + meem[0.35-1.00]",
+   "eye_shape_p": 0.99,
+   "eye_path_p": 0.21,
+   "path_nodes": 7,
+   "outline_nodes": 31
+  },
+  "uni0643": {
+   "letter": "kaf",
+   "method": "auto-designed from parts: noon[0.27-0.76]",
+   "eye_shape_p": 0.99,
+   "eye_path_p": 0.39,
+   "path_nodes": 3,
+   "outline_nodes": 19
+  },
+  "uni0645": {
+   "letter": "meem",
+   "method": "auto-designed from parts: meem[0.00-0.75]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.34,
+   "path_nodes": 4,
+   "outline_nodes": 14
+  },
+  "uni0647": {
+   "letter": "heh",
+   "method": "auto-designed from parts: zain[0.76-1.00]R + noon[0.49-0.87]",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.4,
+   "path_nodes": 5,
+   "outline_nodes": 13
+  },
+  "uni0648": {
+   "letter": "waw",
+   "method": "auto-designed from parts: meem[0.00-0.39] + noon[0.66-0.90]R",
+   "eye_shape_p": 1.0,
+   "eye_path_p": 0.35,
+   "path_nodes": 5,
+   "outline_nodes": 13
+  },
+  "uni064A": {
+   "letter": "yeh",
+   "method": "auto-designed from parts: zain[0.00-0.99] + meem[0.23-0.37]",
+   "eye_shape_p": 0.99,
+   "eye_path_p": 0.21,
+   "path_nodes": 4,
+   "outline_nodes": 32
   },
   "proportions_donor_typefaces": [
    [
@@ -144,24 +296,62 @@
    "uni064F",
    "uni0645.init"
   ],
-  "ب ت ث ى ر د ل ا س": [
-   "uni0633",
+  "ا ب ت ث ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ى ي": [
+   "uni064A",
    "space",
-   "uni0627",
+   "uni0649",
+   "space",
+   "uni0648",
+   "space",
+   "uni0647",
+   "space",
+   "uni0646",
+   "space",
+   "uni0645",
    "space",
    "uni0644",
    "space",
-   "uni062F",
+   "uni0643",
+   "space",
+   "uni0642",
+   "space",
+   "uni0641",
+   "space",
+   "uni063A",
+   "space",
+   "uni0639",
+   "space",
+   "uni0638",
+   "space",
+   "uni0637",
+   "space",
+   "uni0636",
+   "space",
+   "uni0635",
+   "space",
+   "uni0634",
+   "space",
+   "uni0633",
+   "space",
+   "uni0632",
    "space",
    "uni0631",
    "space",
-   "uni0649",
+   "uni0630",
+   "space",
+   "uni062F",
+   "space",
+   "uni062E",
+   "space",
+   "uni062D",
    "space",
    "uni062B",
    "space",
    "uni062A",
    "space",
-   "uni0628"
+   "uni0628",
+   "space",
+   "uni0627"
   ],
   "زن": [
    "uni0646",

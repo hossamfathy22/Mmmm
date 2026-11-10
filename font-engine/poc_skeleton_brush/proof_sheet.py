@@ -34,12 +34,14 @@ def main():
     rebuilt = Image.fromarray(np.where(rec, 255, 0).astype(np.uint8)).resize(orig.size, Image.LANCZOS)
     otf = OUT / "MuznBrush-Regular.otf"
     word = typed("مُزن", 420, otf)
-    letters = typed("ب ت ث ى ر د ل ا س", 260, otf)
+    letters = typed("ا ب ت ث ح خ د ذ ر ز س ش ص ض", 200, otf)
+    letters2 = typed("ط ظ ع غ ف ق ك ل م ن ه و ى ي", 200, otf)
 
     rows = [("1. uploaded image (style 1)", orig),
             (f"2. rebuilt from ONE smooth pen path per letter ({model['summary']['total_path_nodes']} nodes) + brush  (IoU {model['iou_word']:.3f})", rebuilt),
             ("3. typed with the generated font MuznBrush-Regular.otf (HarfBuzz/raqm shaping)", word),
-            ("4. NOT in the image: composed from PARTS of the uploaded noon and zain (tooth, bowl, head, neck, tail)", letters)]
+            ("4. The alphabet (isolated letters), designed automatically from parts of the uploaded letters", letters),
+            ("", letters2)]
     H = sum(r[1].height + 110 for r in rows) + 40
     sheet = Image.new("RGB", (W, H), (17, 17, 17))
     d = ImageDraw.Draw(sheet)
