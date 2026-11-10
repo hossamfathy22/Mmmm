@@ -1,0 +1,247 @@
+{
+ "leave_one_out": {
+  "noon": {
+   "restyled_err_noon_heights": 0.347,
+   "plain_naskh_err_noon_heights": 0.321,
+   "pieces": [
+    "zain.arc0 x1.47 rot-143",
+    "zain.arc1 x0.42 rot+17",
+    "meem.arc3RM x6.63 rot-15",
+    "zain.arc0RM x0.81 rot+150"
+   ]
+  },
+  "zain": {
+   "restyled_err_noon_heights": 0.309,
+   "plain_naskh_err_noon_heights": 0.357,
+   "pieces": [
+    "noon.arc0 x0.31 rot-177",
+    "noon.arc1 x1.03 rot+17",
+    "noon.arc2 x0.43 rot-15"
+   ]
+  },
+  "meem": {
+   "restyled_err_noon_heights": 0.522,
+   "plain_naskh_err_noon_heights": 0.539,
+   "pieces": [
+    "zain.arc0R x0.88 rot-169",
+    "noon.arc3 x0.23 rot-9",
+    "noon.arc3RM x0.25 rot+17",
+    "noon.arc1 x0.20 rot+20",
+    "zain.arc2 x0.96 rot-87"
+   ]
+  }
+ },
+ "letters": {
+  "alef": {
+   "score": -5.64,
+   "shape_p": 0.79,
+   "path_p": 0.69,
+   "pieces": [
+    "meem.arc0M x0.31 rot+56",
+    "noon.arc0R x1.25 rot-160",
+    "noon.arc0RM x0.34 rot+161"
+   ],
+   "auto_search_score": -0.766
+  },
+  "beh": {
+   "score": -4.22,
+   "shape_p": 1.0,
+   "path_p": 0.24,
+   "pieces": [
+    "noon.arc0 x0.48 rot-166",
+    "noon.arc1 x1.30 rot+47",
+    "noon.arc2 x0.98 rot+3",
+    "noon.arc3 x0.32 rot-31"
+   ],
+   "auto_search_score": -1.69
+  },
+  "hah": {
+   "score": -6.97,
+   "shape_p": 0.98,
+   "path_p": 0.16,
+   "pieces": [
+    "zain.arc2RM x0.98 rot+49",
+    "zain.arc1RM x0.67 rot-22",
+    "meem.arc1 x2.01 rot+51",
+    "meem.arc2R x0.68 rot-155",
+    "meem.arc1 x2.20 rot+97"
+   ],
+   "auto_search_score": -2.514
+  },
+  "dal": {
+   "score": -7.69,
+   "shape_p": 0.89,
+   "path_p": 0.07,
+   "pieces": [
+    "meem.arc4R x0.30 rot-62",
+    "meem.arc1RM x1.22 rot-46",
+    "noon.arc1 x0.56 rot+41",
+    "noon.arc2 x0.30 rot+11"
+   ],
+   "auto_search_score": -2.504
+  },
+  "reh": {
+   "score": -6.98,
+   "shape_p": 1.0,
+   "path_p": 0.22,
+   "pieces": [
+    "noon.arc0 x0.69 rot-171",
+    "zain.arc1 x0.48 rot+10",
+    "zain.arc2 x0.58 rot-46"
+   ],
+   "auto_search_score": -2.306
+  },
+  "seen": {
+   "score": -6.04,
+   "shape_p": 0.96,
+   "path_p": 0.14,
+   "pieces": [
+    "noon.arc1 x0.33 rot+41",
+    "zain.arc1 x0.28 rot+5",
+    "meem.arc4 x0.42 rot-1",
+    "zain.arc1 x0.65 rot+3",
+    "noon.arc2 x0.79 rot+15",
+    "noon.arc3 x0.50 rot-38"
+   ],
+   "auto_search_score": -2.649
+  },
+  "sad": {
+   "score": -27.71,
+   "shape_p": 0.0,
+   "path_p": 0.06,
+   "pieces": [
+    "noon.arc1M x1.21 rot-75",
+    "noon.arc1 x0.87 rot+29",
+    "zain.arc2 x2.07 rot-91",
+    "noon.arc2 x1.22 rot+47"
+   ],
+   "auto_search_score": -2.181
+  },
+  "tah": {
+   "score": -4.9,
+   "shape_p": 1.0,
+   "path_p": 0.3,
+   "pieces": [
+    "noon.arc0 x1.29 rot-158",
+    "meem.arc0RM x0.47 rot+64",
+    "noon.arc2M x1.16 rot+10",
+    "meem.arc1M x2.81 rot-113"
+   ],
+   "auto_search_score": -2.531
+  },
+  "ain": {
+   "score": -7.07,
+   "shape_p": 0.91,
+   "path_p": 0.11,
+   "pieces": [
+    "zain.arc2RM x1.15 rot+46",
+    "zain.arc1RM x0.60 rot-17",
+    "noon.arc3 x1.54 rot-17",
+    "noon.arc1 x0.72 rot+42",
+    "meem.arc1 x1.01 rot+49"
+   ],
+   "auto_search_score": -2.245
+  },
+  "feh": {
+   "score": -9.27,
+   "shape_p": 0.37,
+   "path_p": 0.08,
+   "pieces": [
+    "noon.arc2R x0.43 rot+21",
+    "noon.arc2 x0.30 rot+45",
+    "meem.arc1RM x0.88 rot-46",
+    "noon.arc1 x1.62 rot+45",
+    "noon.arc2 x1.06 rot+29"
+   ],
+   "auto_search_score": -2.961
+  },
+  "qaf": {
+   "score": -9.03,
+   "shape_p": 0.18,
+   "path_p": 0.12,
+   "pieces": [
+    "meem.arc3 x5.67 rot-36",
+    "noon.arc2 x0.37 rot+66",
+    "meem.arc2 x0.77 rot-107",
+    "noon.arc1 x1.02 rot+31",
+    "noon.arc2 x0.78 rot+13",
+    "noon.arc3 x0.58 rot-35"
+   ],
+   "auto_search_score": -3.713
+  },
+  "kaf": {
+   "score": -23.99,
+   "shape_p": 0.0,
+   "path_p": 0.15,
+   "pieces": [
+    "noon.arc0 x0.44 rot-161",
+    "noon.arc0 x1.30 rot-164",
+    "noon.arc1 x0.85 rot+41",
+    "zain.arc2 x0.81 rot-42"
+   ],
+   "auto_search_score": -2.123
+  },
+  "lam": {
+   "score": -8.12,
+   "shape_p": 0.81,
+   "path_p": 0.15,
+   "pieces": [
+    "noon.arc0 x1.56 rot-160",
+    "noon.arc1 x0.89 rot+28",
+    "noon.arc2 x0.65 rot+15",
+    "noon.arc3 x0.48 rot-36"
+   ],
+   "auto_search_score": -1.939
+  },
+  "meem": {
+   "score": -11.7,
+   "shape_p": 0.06,
+   "path_p": 0.1,
+   "pieces": [
+    "meem.arc4RM x0.73 rot+30",
+    "meem.arc1 x0.59 rot+29",
+    "meem.arc2 x1.02 rot-45",
+    "meem.arc0R x1.18 rot-62"
+   ],
+   "auto_search_score": -2.763
+  },
+  "heh": {
+   "score": -9.18,
+   "shape_p": 0.05,
+   "path_p": 0.29,
+   "pieces": [
+    "noon.arc3R x0.58 rot-10",
+    "noon.arc2R x0.32 rot+15",
+    "meem.arc3R x4.29 rot+13",
+    "noon.arc3M x0.55 rot+25"
+   ],
+   "auto_search_score": -2.617
+  },
+  "waw": {
+   "score": -15.96,
+   "shape_p": 0.05,
+   "path_p": 0.02,
+   "pieces": [
+    "noon.arc3RM x0.35 rot+20",
+    "noon.arc1 x0.30 rot+66",
+    "meem.arc2 x0.52 rot-128",
+    "zain.arc1 x0.51 rot+11",
+    "zain.arc2 x0.46 rot-51"
+   ],
+   "auto_search_score": -2.774
+  },
+  "yeh": {
+   "score": -8.29,
+   "shape_p": 0.99,
+   "path_p": 0.12,
+   "pieces": [
+    "meem.arc4 x1.33 rot-43",
+    "zain.arc0 x1.36 rot+172",
+    "noon.arc1 x1.00 rot+44",
+    "noon.arc2 x0.84 rot+16",
+    "noon.arc3 x0.58 rot-33"
+   ],
+   "auto_search_score": -3.907
+  }
+ }
+}
