@@ -1,0 +1,104 @@
+{
+ "alef": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ },
+ "beh": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 0.96,
+  "shape_p_single_path": 0.96
+ },
+ "hah": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 2,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ },
+ "dal": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 0.97,
+  "shape_p_single_path": 0.93
+ },
+ "reh": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 0.94,
+  "shape_p_single_path": 0.77
+ },
+ "seen": {
+  "strokes_found": 3,
+  "strokes_in_sakkal": 3,
+  "shape_p": 0.18,
+  "shape_p_single_path": 0.99
+ },
+ "sad": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 2,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ },
+ "tah": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 2,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ },
+ "ain": {
+  "strokes_found": 2,
+  "strokes_in_sakkal": 2,
+  "shape_p": 0.72,
+  "shape_p_single_path": 0.99
+ },
+ "feh": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ },
+ "qaf": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 0.92,
+  "shape_p_single_path": 1.0
+ },
+ "kaf": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 2,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ },
+ "lam": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ },
+ "meem": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 0.98,
+  "shape_p_single_path": 0.94
+ },
+ "heh": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 1.0,
+  "shape_p_single_path": 0.99
+ },
+ "waw": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 0.2,
+  "shape_p_single_path": 0.06
+ },
+ "yeh": {
+  "strokes_found": 1,
+  "strokes_in_sakkal": 1,
+  "shape_p": 1.0,
+  "shape_p_single_path": 1.0
+ }
+}
