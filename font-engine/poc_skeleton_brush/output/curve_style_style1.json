@@ -1,112 +1,281 @@
 {
  "leave_one_out_noon_heights": {
   "noon": {
-   "styled_err": 0.546,
+   "styled_err": 0.629,
    "plain_naskh_err": 0.321
   },
   "zain": {
-   "styled_err": 0.287,
+   "styled_err": 0.197,
    "plain_naskh_err": 0.358
   },
   "meem": {
-   "styled_err": 0.51,
+   "styled_err": 0.553,
    "plain_naskh_err": 0.539
   }
  },
  "operator": {
-  "entry_extra_turn_deg": 28.0,
-  "exit_extra_turn_deg": -25.0,
-  "body_softness": 0.08,
+  "entry_extra_turn_deg": 35.0,
+  "exit_extra_turn_deg": 88.0,
+  "body_softness": 0.04,
   "bend_gain": 1.0,
   "length_ratio": 1.99,
-  "width_scale": 1.0,
-  "height_scale": 0.66
+  "width_scale": 0.97,
+  "height_scale": 0.95
  },
  "letters": {
   "alef": {
-   "score": -0.97,
+   "score": -2.37,
    "shape_p": 1.0,
-   "path_p": 0.84
+   "path_p": 0.8
   },
   "beh": {
-   "score": -3.05,
-   "shape_p": 0.95,
-   "path_p": 0.31
+   "score": -1.77,
+   "shape_p": 0.96,
+   "path_p": 0.47
   },
   "hah": {
-   "score": -2.22,
-   "shape_p": 0.96,
-   "path_p": 0.66
+   "score": -5.09,
+   "shape_p": 1.0,
+   "path_p": 0.14
   },
   "dal": {
-   "score": -2.84,
-   "shape_p": 1.0,
-   "path_p": 0.31
+   "score": -5.18,
+   "shape_p": 0.93,
+   "path_p": 0.1
   },
   "reh": {
-   "score": -4.14,
-   "shape_p": 0.99,
-   "path_p": 0.25
+   "score": -5.93,
+   "shape_p": 0.77,
+   "path_p": 0.12
   },
   "seen": {
-   "score": -5.54,
-   "shape_p": 0.46,
-   "path_p": 0.17
-  },
-  "sad": {
-   "score": -4.17,
-   "shape_p": 1.0,
-   "path_p": 0.2
-  },
-  "tah": {
-   "score": -2.48,
-   "shape_p": 1.0,
-   "path_p": 0.41
-  },
-  "ain": {
-   "score": -3.84,
-   "shape_p": 0.81,
-   "path_p": 0.37
-  },
-  "feh": {
-   "score": -4.63,
-   "shape_p": 1.0,
+   "score": -4.55,
+   "shape_p": 0.99,
    "path_p": 0.19
   },
+  "sad": {
+   "score": -4.54,
+   "shape_p": 1.0,
+   "path_p": 0.13
+  },
+  "tah": {
+   "score": -2.72,
+   "shape_p": 1.0,
+   "path_p": 0.43
+  },
+  "ain": {
+   "score": -2.81,
+   "shape_p": 0.99,
+   "path_p": 0.53
+  },
+  "feh": {
+   "score": -5.07,
+   "shape_p": 1.0,
+   "path_p": 0.16
+  },
   "qaf": {
-   "score": -8.11,
-   "shape_p": 0.54,
-   "path_p": 0.04
+   "score": -4.33,
+   "shape_p": 1.0,
+   "path_p": 0.13
   },
   "kaf": {
-   "score": -2.82,
+   "score": -4.2,
    "shape_p": 1.0,
-   "path_p": 0.35
+   "path_p": 0.21
   },
   "lam": {
-   "score": -7.87,
-   "shape_p": 0.23,
-   "path_p": 0.17
+   "score": -3.49,
+   "shape_p": 1.0,
+   "path_p": 0.29
   },
   "meem": {
-   "score": -9.36,
-   "shape_p": 1.0,
-   "path_p": 0.02
+   "score": -4.91,
+   "shape_p": 0.94,
+   "path_p": 0.16
   },
   "heh": {
-   "score": -4.34,
-   "shape_p": 0.58,
-   "path_p": 0.23
+   "score": -4.63,
+   "shape_p": 0.99,
+   "path_p": 0.14
   },
   "waw": {
-   "score": -4.81,
-   "shape_p": 1.0,
-   "path_p": 0.15
+   "score": -16.58,
+   "shape_p": 0.06,
+   "path_p": 0.01
   },
   "yeh": {
-   "score": -3.35,
+   "score": -5.71,
    "shape_p": 1.0,
-   "path_p": 0.28
+   "path_p": 0.11
+  }
+ },
+ "ductus_check": {
+  "alef": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "beh": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "hah": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 2
+  },
+  "dal": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "reh": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "seen": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 3
+  },
+  "sad": {
+   "naskh": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "styled": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "strokes_in_formal_naskh": 2
+  },
+  "tah": {
+   "naskh": {
+    "start_ok": true,
+    "eye_clockwise": false
+   },
+   "styled": {
+    "start_ok": true,
+    "eye_clockwise": false
+   },
+   "strokes_in_formal_naskh": 2
+  },
+  "ain": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 2
+  },
+  "feh": {
+   "naskh": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "styled": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "qaf": {
+   "naskh": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "styled": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "kaf": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 2
+  },
+  "lam": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "meem": {
+   "naskh": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "styled": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "heh": {
+   "naskh": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "styled": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "waw": {
+   "naskh": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "styled": {
+    "start_ok": true,
+    "eye_clockwise": true
+   },
+   "strokes_in_formal_naskh": 1
+  },
+  "yeh": {
+   "naskh": {
+    "start_ok": true
+   },
+   "styled": {
+    "start_ok": true
+   },
+   "strokes_in_formal_naskh": 1
   }
  }
 }

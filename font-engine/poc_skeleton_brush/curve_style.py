@@ -31,8 +31,10 @@ import compose as cp
 import naskh_restyle as nr
 import skeleton_brush as sb
 import style_deviation as sd
+from ductus import DUCTUS, check, orient
 
 PAIRS = {"noon": "noon.isol", "zain": "zain.fina", "meem": "meem.init"}
+LETTER_OF_KEY = {"noon": "noon", "zain": "zain", "meem": "meem.init"}
 
 
 def dense(P, step=1.0):
@@ -76,19 +78,22 @@ class CurveStyle:
         for key, form in PAIRS.items():
             if key in exclude:
                 continue
-            U = dense(ductus_orient(R.S["strokes"][key][0]))
-            N = dense(ductus_orient(R.ref[form] * R.k))
+            U = dense(orient(R.S["strokes"][key][0], LETTER_OF_KEY[key]))
+            N = dense(orient(R.ref[form] * R.k, LETTER_OF_KEY[key]))
             pairs[key] = (N, U)
         self.pairs = pairs
         # entry and exit motifs: mean extra direction of the writer over the zone
         ent, ext = [], []
-        for N, U in pairs.values():
+        self.entry_by, self.exit_by = {}, {}
+        for key_, (N, U) in pairs.items():
             tn, tu = theta(N), theta(U)
             n = min(self.Ls, len(tn) // 2, len(tu) // 2)
             d0 = wrap(tu[:n] - tn[:n])
             d1 = wrap(tu[-n:] - tn[-n:])
             ent.append(np.pad(np.unwrap(d0), (0, self.Ls - n), mode="edge"))
             ext.append(np.pad(np.unwrap(d1), (self.Ls - n, 0), mode="edge"))
+            self.entry_by[key_] = gaussian_filter1d(ent[-1], 6)
+            self.exit_by[key_] = gaussian_filter1d(ext[-1], 6)
         self.entry = gaussian_filter1d(np.mean(ent, axis=0), 6)
         self.exit = gaussian_filter1d(np.mean(ext, axis=0), 6)
         # body softness / gain / length ratio: grid search on the known pairs
@@ -98,14 +103,15 @@ class CurveStyle:
             for gain in (0.8, 1.0, 1.25, 1.5):
                 self.sigma, self.gain = sig, gain
                 self.sx = self.sy = 1.0
-                e = np.mean([self._err(self.apply_path(N), U) for N, U in pairs.values()])
+                e = np.mean([self._err(self.apply_path(N, self.entry_by[k_], self.exit_by[k_]), U)
+                             for k_, (N, U) in pairs.items()])
                 if best is None or e < best[0]:
                     best = (e, sig, gain)
         _, self.sigma, self.gain = best
         self.sx = self.sy = 1.0
         gx, gy = [], []
-        for N, U in pairs.values():
-            G = self.apply_path(N)
+        for k_, (N, U) in pairs.items():
+            G = self.apply_path(N, self.entry_by[k_], self.exit_by[k_])
             gx.append(np.ptp(U[:, 0]) / max(np.ptp(G[:, 0]), 1))
             gy.append(np.ptp(U[:, 1]) / max(np.ptp(G[:, 1]), 1))
         self.sx, self.sy = float(np.exp(np.mean(np.log(gx)))), float(np.exp(np.mean(np.log(gy))))
@@ -113,8 +119,10 @@ class CurveStyle:
     def _err(self, G, U):
         return nr.path_err(G, U, self.unit)
 
-    def apply_path(self, N):
+    def apply_path(self, N, entry=None, exit_=None):
         """Naskh path (px, dense) -> styled path."""
+        entry = self.entry if entry is None else entry
+        exit_ = self.exit if exit_ is None else exit_
         # stretch the path to the writer's typical length, keep its direction function
         n_new = max(int(len(N) * self.len_ratio), 2 * 8)
         th = theta(N)
@@ -128,40 +136,45 @@ class CurveStyle:
         n = min(self.Ls, len(th) // 2)
         w = np.linspace(1, 0, n) ** 2 * (3 - 2 * np.linspace(1, 0, n))
         out = body.copy()
-        out[:n] += w * self.entry[:n]
-        out[-n:] += w[::-1] * self.exit[-n:]
+        out[:n] += w * entry[:n]
+        out[-n:] += w[::-1] * exit_[-n:]
         G = integrate(np.zeros(2), out)
         G = G * [self.sx, self.sy]
         return dense(G)
 
-    def styled(self, form):
+    def styled(self, form, letter):
+        """Entry and exit come from the uploaded letter that shares that part
+        (ductus table); a plain end gets no exit change."""
         R = self.R
-        N = dense(ductus_orient(R.ref[form] * R.k))
-        G = self.apply_path(N)
+        d = DUCTUS[letter]
+        N = dense(orient(R.ref[form] * R.k, letter))
+        entry = self.entry_by.get(d["entry"], self.entry)
+        exit_ = np.zeros(self.Ls) if d["exit"] is None else self.exit_by.get(d["exit"], self.exit)
+        G = self.apply_path(N, entry, exit_)
         G += [N[:, 0].mean() - G[:, 0].mean(), N[:, 1].max() - G[:, 1].max()]
         return G + [0, R.base], N + [0, R.base]
 
-    def brush(self, G):
-        """Writer's brush: mean of the uploaded strokes' half-widths, real
-        terminals kept (stretch between guides), symmetric about the path."""
+    def brush(self, G, letter):
+        """The writer's real brush (the 99.9 % one): left and right widths of
+        the uploaded stroke that shares this letter's ending, terminals kept
+        at their real size, body stretched between them."""
+        d = DUCTUS[letter]
+        key = d["exit"] or d["entry"]
+        if key not in self.R.S["strokes"]:
+            key = "noon"
+        q, wl, wr = self.R.S["strokes"][key]
+        if not np.allclose(orient(q, LETTER_OF_KEY[key])[0], q[0]):       # stroke stored the other way round
+            q, wl, wr = q[::-1], wr[::-1], wl[::-1]
+        s = np.r_[0, np.cumsum(np.linalg.norm(np.diff(q, axis=0), axis=1))]
+        L = s[-1]
         s_new = np.r_[0, np.cumsum(np.linalg.norm(np.diff(G, axis=0), axis=1))]
         Ln = s_new[-1]
-        ws = []
-        for key in PAIRS:
-            q, wl, wr = self.R.S["strokes"][key]
-            w = (wl + wr) / 2
-            s = np.r_[0, np.cumsum(np.linalg.norm(np.diff(q, axis=0), axis=1))]
-            L = s[-1]
-            g = min(1.2 * np.median(w), 0.3 * min(L, Ln))
-            sm = np.where(s_new < g, s_new, np.where(s_new > Ln - g, L - (Ln - s_new),
-                          g + (s_new - g) * (L - 2 * g) / max(Ln - 2 * g, 1e-6)))
-            ws.append(np.interp(sm, s, w))
-        w = gaussian_filter1d(np.mean(ws, axis=0), 8, mode="nearest")
-        cap_n = int(min(len(w) // 4, np.median(w)))
-        t = np.linspace(0, 1, cap_n)
-        w[:cap_n] = np.minimum(w[:cap_n], np.median(w) * np.sqrt(1 - (1 - t) ** 2) + 1)
-        w[-cap_n:] = np.minimum(w[-cap_n:], np.median(w) * np.sqrt(1 - (1 - t[::-1]) ** 2) + 1)
-        return cp.Part(G, w, w.copy(), "styled", True, True)
+        g = min(1.5 * np.median(wl + wr) / 2 * 2, 0.3 * min(L, Ln))
+        sm = np.where(s_new < g, s_new, np.where(s_new > Ln - g, L - (Ln - s_new),
+                      g + (s_new - g) * (L - 2 * g) / max(Ln - 2 * g, 1e-6)))
+        wl_n = gaussian_filter1d(np.interp(sm, s, wl), 4, mode="nearest")
+        wr_n = gaussian_filter1d(np.interp(sm, s, wr), 4, mode="nearest")
+        return cp.Part(G, np.clip(wl_n, 1, None), np.clip(wr_n, 1, None), "styled", True, True)
 
     def describe(self):
         return {"entry_extra_turn_deg": round(float(np.degrees(self.entry[0])), 0),
@@ -175,8 +188,7 @@ def main():
     loo = {}
     for key, form in PAIRS.items():
         C = CurveStyle(style, exclude=(key,))
-        full = CurveStyle.__new__(CurveStyle)
-        G, N = C.styled(form)
+        G, N = C.styled(form, LETTER_OF_KEY[key])
         U = C.R.S["strokes"][key][0]
         loo[key] = {"styled_err": round(nr.path_err(G, U, C.unit), 3), "plain_naskh_err": round(nr.path_err(N, U, C.unit), 3)}
         print("LOO", key, loo[key])
@@ -184,17 +196,18 @@ def main():
     print("style operator:", C.describe())
     ctxq = ad.Ctx(style)
     eye, peye = ad.Eye(ctxq), ad.PathEye(ctxq)
-    res, parts = {}, {}
+    res, parts, ductus_report = {}, {}, {}
     for t in ad.TARGETS:
         form = {"yeh": "alefmaksura.isol"}.get(t, t + ".isol")
-        G, N = C.styled(form)
-        part = C.brush(G)
+        G, N = C.styled(form, t)
+        part = C.brush(G, t)
+        ductus_report[t] = {"naskh": check(N, t), "styled": check(G, t), "strokes_in_formal_naskh": DUCTUS[t]["strokes"]}
         (s, info), = ad.score_batch([nr.quarter(part)], [None], t, ctxq, eye, peye)
         res[t] = {"score": round(float(s), 2), "shape_p": round(info["p"], 2), "path_p": round(info["p_path"], 2)}
         parts[t] = (part, N)
         print(f"{t:6s} score {res[t]['score']:7.2f} shape {res[t]['shape_p']} path {res[t]['path_p']}")
     (sb.OUT / f"curve_style_{style}.json").write_text(json.dumps({"leave_one_out_noon_heights": loo, "operator": C.describe(),
-                                                                  "letters": res}, ensure_ascii=False, indent=1))
+                                                                  "letters": res, "ductus_check": ductus_report}, ensure_ascii=False, indent=1))
     # sheet in the layout of the user's diagram: Naskh skeleton -> styled skeleton -> brushed
     import matplotlib
     matplotlib.use("Agg")
@@ -239,6 +252,8 @@ def main():
         ax.set_title(title, fontsize=15, loc="left")
     fig.tight_layout()
     fig.savefig(sb.OUT / f"{style}_CURVE_STYLE.png", dpi=55)
+    bad = {t: r for t, r in ductus_report.items() if not all(v for k, v in r["styled"].items())}
+    print("ductus check: letters obeying the table:", len(ductus_report) - len(bad), "of", len(ductus_report), "| failing:", list(bad))
     print("saved", sb.OUT / f"{style}_CURVE_STYLE.png")
 
 
