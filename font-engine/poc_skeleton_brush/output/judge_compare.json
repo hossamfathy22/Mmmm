@@ -1,0 +1,191 @@
+{
+ "thr_uploaded_letters": 2.39,
+ "without judge": {
+  "eye_accepts": "17/17",
+  "path_eye_accepts": "4/17",
+  "within_style_tolerance": "6/17",
+  "median_d_style": 4.9,
+  "seen_iou_vs_user_seen": 0.585,
+  "letters": {
+   "alef": {
+    "eye_p": 1.0,
+    "path_p": 0.81,
+    "d_style": 6.14
+   },
+   "beh": {
+    "eye_p": 0.95,
+    "path_p": 0.55,
+    "d_style": 6.13
+   },
+   "hah": {
+    "eye_p": 1.0,
+    "path_p": 0.46,
+    "d_style": 1.88
+   },
+   "dal": {
+    "eye_p": 1.0,
+    "path_p": 0.34,
+    "d_style": 1.6
+   },
+   "reh": {
+    "eye_p": 1.0,
+    "path_p": 0.38,
+    "d_style": 5.36
+   },
+   "seen": {
+    "eye_p": 1.0,
+    "path_p": 0.41,
+    "d_style": 5.4
+   },
+   "sad": {
+    "eye_p": 1.0,
+    "path_p": 0.51,
+    "d_style": 5.2
+   },
+   "tah": {
+    "eye_p": 1.0,
+    "path_p": 0.41,
+    "d_style": 1.79
+   },
+   "ain": {
+    "eye_p": 1.0,
+    "path_p": 0.42,
+    "d_style": 4.9
+   },
+   "feh": {
+    "eye_p": 0.99,
+    "path_p": 0.26,
+    "d_style": 2.22
+   },
+   "qaf": {
+    "eye_p": 0.99,
+    "path_p": 0.21,
+    "d_style": 3.0
+   },
+   "kaf": {
+    "eye_p": 0.99,
+    "path_p": 0.39,
+    "d_style": 5.53
+   },
+   "lam": {
+    "eye_p": 1.0,
+    "path_p": 0.55,
+    "d_style": 1.3
+   },
+   "meem": {
+    "eye_p": 1.0,
+    "path_p": 0.34,
+    "d_style": 2.57
+   },
+   "heh": {
+    "eye_p": 1.0,
+    "path_p": 0.4,
+    "d_style": 5.55
+   },
+   "waw": {
+    "eye_p": 1.0,
+    "path_p": 0.35,
+    "d_style": 5.23
+   },
+   "yeh": {
+    "eye_p": 0.99,
+    "path_p": 0.21,
+    "d_style": 1.03
+   }
+  }
+ },
+ "with judge": {
+  "eye_accepts": "17/17",
+  "path_eye_accepts": "4/17",
+  "within_style_tolerance": "16/17",
+  "median_d_style": 1.55,
+  "seen_iou_vs_user_seen": 0.482,
+  "letters": {
+   "alef": {
+    "eye_p": 1.0,
+    "path_p": 0.76,
+    "d_style": 1.38
+   },
+   "beh": {
+    "eye_p": 0.98,
+    "path_p": 0.56,
+    "d_style": 2.68
+   },
+   "hah": {
+    "eye_p": 1.0,
+    "path_p": 0.44,
+    "d_style": 1.42
+   },
+   "dal": {
+    "eye_p": 1.0,
+    "path_p": 0.33,
+    "d_style": 1.31
+   },
+   "reh": {
+    "eye_p": 1.0,
+    "path_p": 0.28,
+    "d_style": 2.06
+   },
+   "seen": {
+    "eye_p": 1.0,
+    "path_p": 0.43,
+    "d_style": 2.25
+   },
+   "sad": {
+    "eye_p": 1.0,
+    "path_p": 0.51,
+    "d_style": 2.29
+   },
+   "tah": {
+    "eye_p": 1.0,
+    "path_p": 0.43,
+    "d_style": 2.34
+   },
+   "ain": {
+    "eye_p": 1.0,
+    "path_p": 0.41,
+    "d_style": 0.47
+   },
+   "feh": {
+    "eye_p": 0.98,
+    "path_p": 0.26,
+    "d_style": 1.66
+   },
+   "qaf": {
+    "eye_p": 0.96,
+    "path_p": 0.19,
+    "d_style": 1.74
+   },
+   "kaf": {
+    "eye_p": 0.99,
+    "path_p": 0.39,
+    "d_style": 0.94
+   },
+   "lam": {
+    "eye_p": 1.0,
+    "path_p": 0.56,
+    "d_style": 1.27
+   },
+   "meem": {
+    "eye_p": 1.0,
+    "path_p": 0.3,
+    "d_style": 1.41
+   },
+   "heh": {
+    "eye_p": 1.0,
+    "path_p": 0.33,
+    "d_style": 2.34
+   },
+   "waw": {
+    "eye_p": 1.0,
+    "path_p": 0.33,
+    "d_style": 1.55
+   },
+   "yeh": {
+    "eye_p": 0.99,
+    "path_p": 0.23,
+    "d_style": 1.14
+   }
+  }
+ }
+}
