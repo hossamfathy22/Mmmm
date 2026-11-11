@@ -27,6 +27,7 @@ import sys
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
+from scipy import ndimage
 
 import compose as cp
 import legibility as lg
@@ -58,6 +59,27 @@ class Ctx:
         self.noon_h = (np.ptp(np.nonzero(noon)[0]) + 1) / scale
         self.cap = "round" if style == "style1" else "flat"
         self.bridge = max(3, 40 // scale)
+        # the writer's real terminals: width profile (tip -> inside, as a multiple of the body
+        # width) at the start and at the end of each uploaded stroke. A cut end of a new letter
+        # gets the terminal of the stroke it was cut from, instead of a blunt cap.
+        self.writer_terminals = False   # tested: hurts legibility and the ground-truth seen (see README)
+        self.term_len = 1.0
+        self.terms = {}
+        for k, (q, wl, wr) in self.strokes.items():
+            w = ndimage.gaussian_filter1d(wl + wr, 2.0)
+            n = len(w)
+            body = float(np.median(w[n // 5: -n // 5]))
+            s_ = np.r_[0, np.cumsum(np.linalg.norm(np.diff(q, axis=0), axis=1))]
+            prof = {}
+            for which, ww, ss in (("start", w, s_), ("end", w[::-1], s_[-1] - s_[::-1])):
+                # the tip only: at most one stroke width from the end (a longer thin run is
+                # structure, e.g. the noon's tooth, not terminal), blended into the body
+                lim = int(np.searchsorted(ss, self.term_len * body))
+                j = next((i for i in range(lim) if ww[i] >= 0.95 * body), lim)
+                m = np.clip(ww[:j + 1] / body, 0.05, 1.5)
+                r = np.clip((np.arange(j + 1) - 0.6 * j) / max(0.4 * j, 1), 0, 1)
+                prof[which] = (ss[:j + 1].copy(), m * (1 - r) + r)
+            self.terms[k] = prof
         # natural cut points: extrema of x and y along each stroke
         self.cuts = {}
         for k, (q, _, _) in self.strokes.items():
@@ -124,6 +146,29 @@ def reverse(p):
     return out
 
 
+def writer_terminal(p, prof, at):
+    """Give a cut end the writer's own terminal: the width multiplier profile of a real
+    stroke end (tip -> inside), laid along the new end by arc length; the cut is made
+    symmetric first, the path is not changed."""
+    s_t, mult = prof
+    if len(s_t) < 3:
+        return p
+    out = p.copy()
+    q = out.q if at == "start" else out.q[::-1]
+    s_ = np.r_[0, np.cumsum(np.linalg.norm(np.diff(q, axis=0), axis=1))]
+    L = s_t[-1]
+    sel = s_ <= L
+    if sel.sum() < 3 or sel.sum() > 0.45 * len(q):
+        return p
+    f = np.interp(s_[sel], s_t, mult)
+    wl, wr = (out.wl, out.wr) if at == "start" else (out.wl[::-1], out.wr[::-1])
+    wl, wr = wl.copy(), wr.copy()
+    mid = (wl[sel] + wr[sel]) / 2
+    wl[sel], wr[sel] = mid * f, mid * f
+    out.wl, out.wr = (wl, wr) if at == "start" else (wl[::-1], wr[::-1])
+    return out
+
+
 def build(genes, ctx):
     parts = []
     for g in genes:
@@ -142,6 +187,12 @@ def build(genes, ctx):
         out = cp.attach(out, p, max(br, 2))
     k = int(min(2 * ctx.bridge, len(out.q) // 3))
     ramp = np.linspace(1, 0, k)
+    if getattr(ctx, "writer_terminals", False):
+        g0, g1 = genes[0], genes[-1]
+        if not out.start_term:
+            out = writer_terminal(out, ctx.terms[g0["src"]]["end" if g0["rev"] else "start"], "start")
+        if not out.end_term:
+            out = writer_terminal(out, ctx.terms[g1["src"]]["start" if g1["rev"] else "end"], "end")
     if not out.start_term:          # a cut end: make the brush symmetric there, then round it
         mid = (out.wl[:k] + out.wr[:k]) / 2
         out.wl[:k] = ramp * mid + (1 - ramp) * out.wl[:k]
@@ -318,7 +369,7 @@ def candidate_features(part, ctx):
     y1 = ys.max() + 1
     h, w = y1 - ys.min(), xs.max() + 1 - xs.min()
     feats = [lg.featurize(m, y1 + t * ctx.noon_h, ctx.noon_h) for t in OFFSETS]
-    return np.array(feats, np.float32), ratio, kink, w, h, float(raster.origin[1] + y1)
+    return np.array(feats, np.float32), ratio, kink, w, h, float(raster.origin[1] + y1), m
 
 
 def score_batch(parts, genes_list, target, ctx, eye, peye=None):
@@ -345,7 +396,7 @@ def score_batch(parts, genes_list, target, ctx, eye, peye=None):
     for i, mt in enumerate(meta):
         if mt is None:
             continue
-        k, ratio, kink, w, h, ink_bottom = mt
+        k, ratio, kink, w, h, ink_bottom, mask = mt
         genes = genes_list[i]
         pen = 1.0 * max(0.0, dn[k] - 1.0)
         p_path, d_path = 1.0, 0.0
@@ -361,8 +412,14 @@ def score_batch(parts, genes_list, target, ctx, eye, peye=None):
         if genes is not None:
             pen += 0.15 * (len(genes) - 1)
             pen += 0.3 * sum(abs(math.log(g["sx"])) + abs(math.log(g["sy"])) + abs(g["rot"]) / 25 for g in genes)
+        d_style = None
+        if getattr(ctx, "judge", None) is not None:
+            # the style judge (letter_dna.py): stray from the uploaded letters' style more
+            # than a real designer's letter strays from its own font -> penalty
+            d_style = ctx.judge.distance(mask)
+            pen += ctx.judge_weight * max(0.0, d_style - ctx.judge_thr)
         s = 2.0 * math.log(max(pb[k], 1e-4)) + 2.0 * math.log(max(p_path, 1e-4)) - pen
-        out[i] = (s, dict(p=float(pb[k]), p_path=p_path, d_path=d_path, nn=float(dn[k]), overlap_ratio=float(ratio), kink=float(kink),
+        out[i] = (s, dict(d_style=d_style, p=float(pb[k]), p_path=p_path, d_path=d_path, nn=float(dn[k]), overlap_ratio=float(ratio), kink=float(kink),
                           bottom_vs_baseline=float(OFFSETS[best_t[k]]), penalty=float(pen)))
     return out
 
@@ -372,8 +429,19 @@ def score_batch(parts, genes_list, target, ctx, eye, peye=None):
 # ----------------------------------------------------------------------------
 
 
-def design(target, style="style1", n0=2500, gens=7, keep=40, kids=400, seed=0):
+def add_judge(ctx, weight=1.0):
+    import letter_dna as ld
+    refs = [raster(cp.Part(*ctx.strokes[k], k, True, True))[0] for k in SRC]
+    ctx.judge, ctx.judge_weight = ld.StyleJudge(refs, ctx.noon_h), weight
+    # tolerance = how far the uploaded letters themselves are from their own style mean
+    ctx.judge_thr = max(1.0, max(ctx.judge.distance(m) for m in refs))
+    return ctx
+
+
+def design(target, style="style1", n0=2500, gens=7, keep=40, kids=400, seed=0, judge=0.0):
     ctx = Ctx(style)
+    if judge:
+        add_judge(ctx, judge)
     eye = Eye(ctx)
     peye = PathEye(ctx)
     rng = np.random.default_rng(seed + lg.NAMES.index(target))
@@ -423,12 +491,13 @@ def _job(args):
 
 def main():
     style = sys.argv[1] if len(sys.argv) > 1 else "style1"
+    judge = float(sys.argv[2]) if len(sys.argv) > 2 else 0.0      # weight of the style judge
     Eye(Ctx(style))                      # train / cache the eye once before forking
     with ProcessPoolExecutor(max_workers=4) as ex:
-        res = list(ex.map(_job, [(t, style) for t in TARGETS]))
+        res = list(ex.map(_job, [(t, style, 2500, 7, 40, 400, 0, judge) for t in TARGETS]))
     hand = score_hand(style)
     out = {"style": style, "auto": {r["target"]: r for r in res}, "hand_recipes_same_eye": hand}
-    (sb.OUT / f"auto_design_{style}.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))
+    (sb.OUT / f"auto_design_{style}{'_judge' if judge else ''}.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))
     for r in res:
         if "error" in r:
             print(r["target"], "ERROR", r["error"])

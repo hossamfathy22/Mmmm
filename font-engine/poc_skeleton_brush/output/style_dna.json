@@ -1,268 +1,43 @@
 {
- "what": "Arabic half -> rank of its own Latin partner among 8 Latin halves (1 = best, chance mean 4.5)",
- "rank_of_own_partner": {
-  "direct": 1,
-  "yashm": 1,
-  "haliz": 1,
-  "karashab": 1,
-  "kivano": 1,
-  "makita": 1,
-  "mootanroo": 1,
-  "sirang": 1
- },
- "top1": "8/8",
- "top3": "8/8",
- "mean_rank": 1.0,
- "feature_agreement_latin_vs_arabic_spearman": {
-  "weight": 0.93,
-  "contrast": 0.88,
-  "width_cv": 0.79,
-  "slant": 0.94,
-  "straight": 0.9,
-  "corners": 0.93,
-  "dir_h": 0.79,
-  "dir_v": 0.52,
-  "dir_d": 0.86,
-  "taper": 0.64,
-  "curv_soft": 0.98
- },
- "feature_importance_mean_rank_loss_when_removed": {
-  "weight": 0.125,
-  "contrast": 0.125,
-  "width_cv": 0.0,
-  "slant": 0.125,
-  "straight": 0.0,
-  "corners": 0.0,
-  "dir_h": 0.0,
-  "dir_v": 0.0,
-  "dir_d": 0.0,
-  "taper": 0.0,
-  "curv_soft": 0.0
- },
  "dna": {
-  "direct": {
-   "latin": {
-    "weight": 0.0336,
-    "contrast": 1.0381,
-    "width_cv": 0.0225,
-    "slant": -0.0,
-    "straight": 0.7172,
-    "corners": 0.5358,
-    "dir_h": 0.4381,
-    "dir_v": 0.3686,
-    "dir_d": 0.1932,
-    "taper": 1.0,
-    "curv_soft": 0.0419
+  "per_letter": {
+   "meem.init": {
+    "turning_per_nuqta_style_deg": 57.1,
+    "turning_per_nuqta_donor_deg": 75.9,
+    "terminal_curl_style_deg": 27.3,
+    "terminal_curl_donor_deg": 22.0
    },
-   "arabic": {
-    "weight": 0.0336,
-    "contrast": 1.0381,
-    "width_cv": 0.0243,
-    "slant": -0.0,
-    "straight": 0.7165,
-    "corners": 0.6306,
-    "dir_h": 0.4743,
-    "dir_v": 0.3075,
-    "dir_d": 0.2182,
-    "taper": 1.0,
-    "curv_soft": 0.0459
+   "zain.fina": {
+    "turning_per_nuqta_style_deg": 62.5,
+    "turning_per_nuqta_donor_deg": 96.9,
+    "terminal_curl_style_deg": 78.9,
+    "terminal_curl_donor_deg": 31.7
+   },
+   "noon.isol": {
+    "turning_per_nuqta_style_deg": 63.8,
+    "turning_per_nuqta_donor_deg": 36.0,
+    "terminal_curl_style_deg": 32.5,
+    "terminal_curl_donor_deg": 48.1
    }
   },
-  "yashm": {
-   "latin": {
-    "weight": 0.0473,
-    "contrast": 2.3326,
-    "width_cv": 0.2657,
-    "slant": -12.0518,
-    "straight": 0.544,
-    "corners": 0.1635,
-    "dir_h": 0.1191,
-    "dir_v": 0.4051,
-    "dir_d": 0.4757,
-    "taper": 1.1552,
-    "curv_soft": 0.0347
-   },
-   "arabic": {
-    "weight": 0.0451,
-    "contrast": 2.2472,
-    "width_cv": 0.2408,
-    "slant": -14.5662,
-    "straight": 0.5344,
-    "corners": 0.1675,
-    "dir_h": 0.2423,
-    "dir_v": 0.2387,
-    "dir_d": 0.519,
-    "taper": 0.9614,
-    "curv_soft": 0.0332
-   }
-  },
-  "haliz": {
-   "latin": {
-    "weight": 0.0564,
-    "contrast": 1.4545,
-    "width_cv": 0.1473,
-    "slant": -0.0,
-    "straight": 0.7675,
-    "corners": 1.033,
-    "dir_h": 0.4397,
-    "dir_v": 0.4086,
-    "dir_d": 0.1517,
-    "taper": 1.1028,
-    "curv_soft": 0.0726
-   },
-   "arabic": {
-    "weight": 0.0498,
-    "contrast": 1.4545,
-    "width_cv": 0.1734,
-    "slant": -0.0,
-    "straight": 0.7832,
-    "corners": 0.8605,
-    "dir_h": 0.4777,
-    "dir_v": 0.348,
-    "dir_d": 0.1743,
-    "taper": 0.9852,
-    "curv_soft": 0.0694
-   }
-  },
-  "karashab": {
-   "latin": {
-    "weight": 0.0493,
-    "contrast": 1.82,
-    "width_cv": 0.2479,
-    "slant": -10.0629,
-    "straight": 0.747,
-    "corners": 1.116,
-    "dir_h": 0.4281,
-    "dir_v": 0.4352,
-    "dir_d": 0.1367,
-    "taper": 0.9539,
-    "curv_soft": 0.0804
-   },
-   "arabic": {
-    "weight": 0.0496,
-    "contrast": 1.75,
-    "width_cv": 0.2122,
-    "slant": -9.7943,
-    "straight": 0.7934,
-    "corners": 0.8885,
-    "dir_h": 0.5538,
-    "dir_v": 0.3203,
-    "dir_d": 0.1259,
-    "taper": 0.9426,
-    "curv_soft": 0.0814
-   }
-  },
-  "kivano": {
-   "latin": {
-    "weight": 0.0755,
-    "contrast": 2.4375,
-    "width_cv": 0.3171,
-    "slant": -0.0,
-    "straight": 0.6801,
-    "corners": 0.7343,
-    "dir_h": 0.1982,
-    "dir_v": 0.4599,
-    "dir_d": 0.3418,
-    "taper": 1.0392,
-    "curv_soft": 0.0604
-   },
-   "arabic": {
-    "weight": 0.0779,
-    "contrast": 1.9157,
-    "width_cv": 0.1662,
-    "slant": -3.8376,
-    "straight": 0.714,
-    "corners": 0.5767,
-    "dir_h": 0.3907,
-    "dir_v": 0.3121,
-    "dir_d": 0.2972,
-    "taper": 0.9532,
-    "curv_soft": 0.0526
-   }
-  },
-  "makita": {
-   "latin": {
-    "weight": 0.0888,
-    "contrast": 3.1939,
-    "width_cv": 0.4131,
-    "slant": -20.1088,
-    "straight": 0.7327,
-    "corners": 0.9966,
-    "dir_h": 0.3755,
-    "dir_v": 0.2207,
-    "dir_d": 0.4038,
-    "taper": 0.986,
-    "curv_soft": 0.0792
-   },
-   "arabic": {
-    "weight": 0.0932,
-    "contrast": 2.1538,
-    "width_cv": 0.2593,
-    "slant": -20.1345,
-    "straight": 0.7946,
-    "corners": 0.5971,
-    "dir_h": 0.5457,
-    "dir_v": 0.1503,
-    "dir_d": 0.304,
-    "taper": 0.8894,
-    "curv_soft": 0.07
-   }
-  },
-  "mootanroo": {
-   "latin": {
-    "weight": 0.0518,
-    "contrast": 3.1136,
-    "width_cv": 0.3607,
-    "slant": -0.0,
-    "straight": 0.3753,
-    "corners": 0.3298,
-    "dir_h": 0.1783,
-    "dir_v": 0.4163,
-    "dir_d": 0.4054,
-    "taper": 1.1565,
-    "curv_soft": 0.0343
-   },
-   "arabic": {
-    "weight": 0.0432,
-    "contrast": 3.3425,
-    "width_cv": 0.3718,
-    "slant": -0.0,
-    "straight": 0.4728,
-    "corners": 0.3645,
-    "dir_h": 0.2557,
-    "dir_v": 0.3829,
-    "dir_d": 0.3614,
-    "taper": 1.0166,
-    "curv_soft": 0.0356
-   }
-  },
-  "sirang": {
-   "latin": {
-    "weight": 0.0471,
-    "contrast": 6.8118,
-    "width_cv": 0.5633,
-    "slant": -14.068,
-    "straight": 0.5779,
-    "corners": 0.4092,
-    "dir_h": 0.1773,
-    "dir_v": 0.4073,
-    "dir_d": 0.4154,
-    "taper": 1.0312,
-    "curv_soft": 0.0391
-   },
-   "arabic": {
-    "weight": 0.0379,
-    "contrast": 5.4975,
-    "width_cv": 0.296,
-    "slant": -14.064,
-    "straight": 0.6936,
-    "corners": 0.374,
-    "dir_h": 0.3453,
-    "dir_v": 0.3846,
-    "dir_d": 0.2701,
-    "taper": 0.9107,
-    "curv_soft": 0.0444
-   }
-  }
+  "curvature_gain": 0.752,
+  "terminal_curl_gain": 1.241,
+  "donor_nuqta_px": 94.33981132056604
+ },
+ "levels": {
+  "sky2": 4.96,
+  "eye1": 2.61,
+  "tooth3": 2.85,
+  "base": 1.07,
+  "earth1": -0.95,
+  "earth2": -1.53
+ },
+ "levels_y_px": {
+  "sky2": -103.69541612225896,
+  "eye1": 293.0,
+  "tooth3": 252.0,
+  "base": 552.0733944954129,
+  "earth1": 893.0,
+  "earth2": 990.7170207999463
  }
 }

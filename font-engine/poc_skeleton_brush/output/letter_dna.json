@@ -1,0 +1,177 @@
+{
+ "fonts": 52,
+ "chance_mean_rank": 26.5,
+ "real_designer_letters": {
+  "queries": 832,
+  "top1": 0.305,
+  "top5": 0.603,
+  "median_rank": 3.0,
+  "mean_rank": 6.51
+ },
+ "per_letter_median_rank": {
+  "ا": 12.0,
+  "ب": 3.0,
+  "ت": 3.0,
+  "د": 3.0,
+  "ر": 2.0,
+  "س": 2.0,
+  "ص": 3.0,
+  "ط": 4.0,
+  "ع": 4.0,
+  "ف": 2.0,
+  "ق": 2.0,
+  "ك": 8.0,
+  "ل": 4.5,
+  "ه": 5.0,
+  "و": 2.5,
+  "ى": 3.0
+ },
+ "generated_letters_vs_word": {
+  "letters": 16,
+  "top1": 0.438,
+  "top5": 0.562,
+  "median_rank": 2.5,
+  "mean_rank": 13.12,
+  "of": 53,
+  "per_letter": {
+   "ا": {
+    "rank_of_muzn": 34,
+    "nearest_styles": [
+     "Lemonada",
+     "Zain",
+     "Almarai"
+    ]
+   },
+   "ب": {
+    "rank_of_muzn": 35,
+    "nearest_styles": [
+     "Lemonada",
+     "Zain",
+     "PlaypenSansArabic"
+    ]
+   },
+   "ت": {
+    "rank_of_muzn": 35,
+    "nearest_styles": [
+     "Lemonada",
+     "Zain",
+     "Rubik"
+    ]
+   },
+   "د": {
+    "rank_of_muzn": 1,
+    "nearest_styles": [
+     "__muzn__",
+     "Rakkas",
+     "Lalezar"
+    ]
+   },
+   "ر": {
+    "rank_of_muzn": 1,
+    "nearest_styles": [
+     "__muzn__",
+     "ArefRuqaa",
+     "Rakkas"
+    ]
+   },
+   "س": {
+    "rank_of_muzn": 36,
+    "nearest_styles": [
+     "Lemonada",
+     "Zain",
+     "AlanSans"
+    ]
+   },
+   "ص": {
+    "rank_of_muzn": 1,
+    "nearest_styles": [
+     "__muzn__",
+     "Oi",
+     "Lalezar"
+    ]
+   },
+   "ط": {
+    "rank_of_muzn": 1,
+    "nearest_styles": [
+     "__muzn__",
+     "Lalezar",
+     "Rakkas"
+    ]
+   },
+   "ع": {
+    "rank_of_muzn": 10,
+    "nearest_styles": [
+     "Lemonada",
+     "Zain",
+     "Lalezar"
+    ]
+   },
+   "ف": {
+    "rank_of_muzn": 19,
+    "nearest_styles": [
+     "Lemonada",
+     "Zain",
+     "Marhey"
+    ]
+   },
+   "ق": {
+    "rank_of_muzn": 1,
+    "nearest_styles": [
+     "__muzn__",
+     "Oi",
+     "BadeenDisplay"
+    ]
+   },
+   "ك": {
+    "rank_of_muzn": 29,
+    "nearest_styles": [
+     "Lemonada",
+     "Zain",
+     "PlaypenSansArabic"
+    ]
+   },
+   "ل": {
+    "rank_of_muzn": 1,
+    "nearest_styles": [
+     "__muzn__",
+     "Lalezar",
+     "Oi"
+    ]
+   },
+   "ه": {
+    "rank_of_muzn": 3,
+    "nearest_styles": [
+     "Oi",
+     "BadeenDisplay",
+     "__muzn__"
+    ]
+   },
+   "و": {
+    "rank_of_muzn": 2,
+    "nearest_styles": [
+     "Oi",
+     "__muzn__",
+     "BadeenDisplay"
+    ]
+   },
+   "ى": {
+    "rank_of_muzn": 1,
+    "nearest_styles": [
+     "__muzn__",
+     "Lalezar",
+     "Rakkas"
+    ]
+   }
+  }
+ },
+ "feature_weights": {
+  "weight": 0.778,
+  "contrast": 0.65,
+  "width_cv": 0.772,
+  "straight": 0.233,
+  "corners": 0.27,
+  "taper": 0.064,
+  "curv_soft": 0.301,
+  "slant": 0.06
+ }
+}
