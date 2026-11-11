@@ -1,0 +1,66 @@
+{
+ "direct": {
+  "iou": 0.9975,
+  "pen_path_nodes": 50,
+  "art_brush_points": 716,
+  "pixels_wrong": 142,
+  "pixels_ink": 56563,
+  "seconds": 10
+ },
+ "haliz": {
+  "iou": 0.999,
+  "pen_path_nodes": 45,
+  "art_brush_points": 410,
+  "pixels_wrong": 50,
+  "pixels_ink": 48647,
+  "seconds": 6
+ },
+ "karashab": {
+  "iou": 0.999,
+  "pen_path_nodes": 65,
+  "art_brush_points": 1304,
+  "pixels_wrong": 70,
+  "pixels_ink": 73473,
+  "seconds": 9
+ },
+ "kivano": {
+  "iou": 0.9988,
+  "pen_path_nodes": 54,
+  "art_brush_points": 1631,
+  "pixels_wrong": 232,
+  "pixels_ink": 189014,
+  "seconds": 16
+ },
+ "makita": {
+  "iou": 0.9979,
+  "pen_path_nodes": 73,
+  "art_brush_points": 1260,
+  "pixels_wrong": 297,
+  "pixels_ink": 141506,
+  "seconds": 52
+ },
+ "mootanroo": {
+  "iou": 0.9959,
+  "pen_path_nodes": 98,
+  "art_brush_points": 1732,
+  "pixels_wrong": 340,
+  "pixels_ink": 83478,
+  "seconds": 12
+ },
+ "sirang": {
+  "iou": 0.9974,
+  "pen_path_nodes": 63,
+  "art_brush_points": 2217,
+  "pixels_wrong": 327,
+  "pixels_ink": 126285,
+  "seconds": 10
+ },
+ "yashm": {
+  "iou": 0.9964,
+  "pen_path_nodes": 63,
+  "art_brush_points": 1947,
+  "pixels_wrong": 437,
+  "pixels_ink": 120527,
+  "seconds": 10
+ }
+}
