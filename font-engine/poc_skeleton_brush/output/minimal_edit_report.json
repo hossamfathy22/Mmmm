@@ -1,0 +1,381 @@
+{
+ "seen": {
+  "chosen": {
+   "edit": "noon + 1 tooth copies (size 0.65, spacing 1.0 lobe)",
+   "edit_size": 35918.01,
+   "eye_p": 0.62
+  },
+  "candidates_tried": 24,
+  "all": [
+   {
+    "edit": "noon + 1 tooth copies (size 0.5, spacing 0.6 lobe)",
+    "edit_size": 24269.258,
+    "eye_p": 0.02
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.5, spacing 0.8 lobe)",
+    "edit_size": 24269.258,
+    "eye_p": 0.05
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.5, spacing 1.0 lobe)",
+    "edit_size": 24269.258,
+    "eye_p": 0.38
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.65, spacing 0.6 lobe)",
+    "edit_size": 35918.01,
+    "eye_p": 0.01
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.65, spacing 0.8 lobe)",
+    "edit_size": 35918.01,
+    "eye_p": 0.3
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.65, spacing 1.0 lobe)",
+    "edit_size": 35918.01,
+    "eye_p": 0.62
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.5, spacing 0.6 lobe)",
+    "edit_size": 48538.517,
+    "eye_p": 0.61
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.5, spacing 0.8 lobe)",
+    "edit_size": 48538.517,
+    "eye_p": 0.88
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.5, spacing 1.0 lobe)",
+    "edit_size": 48538.517,
+    "eye_p": 1.0
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.8, spacing 0.6 lobe)",
+    "edit_size": 49033.151,
+    "eye_p": 0.03
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.8, spacing 0.8 lobe)",
+    "edit_size": 49033.151,
+    "eye_p": 0.39
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.8, spacing 1.0 lobe)",
+    "edit_size": 49033.151,
+    "eye_p": 0.65
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 1.0, spacing 0.6 lobe)",
+    "edit_size": 68504.529,
+    "eye_p": 0.01
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 1.0, spacing 0.8 lobe)",
+    "edit_size": 68504.529,
+    "eye_p": 0.06
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 1.0, spacing 1.0 lobe)",
+    "edit_size": 68504.529,
+    "eye_p": 0.12
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.65, spacing 0.6 lobe)",
+    "edit_size": 71836.019,
+    "eye_p": 0.68
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.65, spacing 0.8 lobe)",
+    "edit_size": 71836.019,
+    "eye_p": 0.99
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.65, spacing 1.0 lobe)",
+    "edit_size": 71836.019,
+    "eye_p": 1.0
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.8, spacing 0.6 lobe)",
+    "edit_size": 98066.303,
+    "eye_p": 0.61
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.8, spacing 0.8 lobe)",
+    "edit_size": 98066.303,
+    "eye_p": 0.96
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.8, spacing 1.0 lobe)",
+    "edit_size": 98066.303,
+    "eye_p": 0.98
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 1.0, spacing 0.6 lobe)",
+    "edit_size": 137009.059,
+    "eye_p": 0.04
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 1.0, spacing 0.8 lobe)",
+    "edit_size": 137009.059,
+    "eye_p": 0.03
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 1.0, spacing 1.0 lobe)",
+    "edit_size": 137009.059,
+    "eye_p": 0.6
+   }
+  ]
+ },
+ "beh": {
+  "chosen": {
+   "edit": "noon path widened x1.0, flattened x0.55",
+   "edit_size": 0.598,
+   "eye_p": 0.27
+  },
+  "candidates_tried": 16,
+  "all": [
+   {
+    "edit": "noon path widened x1.0, flattened x1.0",
+    "edit_size": 0.0,
+    "eye_p": 0.05
+   },
+   {
+    "edit": "noon path widened x1.0, flattened x0.85",
+    "edit_size": 0.163,
+    "eye_p": 0.04
+   },
+   {
+    "edit": "noon path widened x1.2, flattened x1.0",
+    "edit_size": 0.182,
+    "eye_p": 0.04
+   },
+   {
+    "edit": "noon path widened x1.4, flattened x1.0",
+    "edit_size": 0.336,
+    "eye_p": 0.09
+   },
+   {
+    "edit": "noon path widened x1.2, flattened x0.85",
+    "edit_size": 0.345,
+    "eye_p": 0.24
+   },
+   {
+    "edit": "noon path widened x1.0, flattened x0.7",
+    "edit_size": 0.357,
+    "eye_p": 0.13
+   },
+   {
+    "edit": "noon path widened x1.6, flattened x1.0",
+    "edit_size": 0.47,
+    "eye_p": 0.03
+   },
+   {
+    "edit": "noon path widened x1.4, flattened x0.85",
+    "edit_size": 0.499,
+    "eye_p": 0.06
+   },
+   {
+    "edit": "noon path widened x1.2, flattened x0.7",
+    "edit_size": 0.539,
+    "eye_p": 0.2
+   },
+   {
+    "edit": "noon path widened x1.0, flattened x0.55",
+    "edit_size": 0.598,
+    "eye_p": 0.27
+   },
+   {
+    "edit": "noon path widened x1.6, flattened x0.85",
+    "edit_size": 0.633,
+    "eye_p": 0.07
+   },
+   {
+    "edit": "noon path widened x1.4, flattened x0.7",
+    "edit_size": 0.693,
+    "eye_p": 0.11
+   },
+   {
+    "edit": "noon path widened x1.2, flattened x0.55",
+    "edit_size": 0.78,
+    "eye_p": 0.17
+   },
+   {
+    "edit": "noon path widened x1.6, flattened x0.7",
+    "edit_size": 0.827,
+    "eye_p": 0.23
+   },
+   {
+    "edit": "noon path widened x1.4, flattened x0.55",
+    "edit_size": 0.934,
+    "eye_p": 0.22
+   },
+   {
+    "edit": "noon path widened x1.6, flattened x0.55",
+    "edit_size": 1.068,
+    "eye_p": 0.04
+   }
+  ]
+ },
+ "dal": {
+  "chosen": {
+   "edit": "zain with neck x1.0",
+   "edit_size": 0.0,
+   "eye_p": 0.0
+  },
+  "candidates_tried": 6,
+  "all": [
+   {
+    "edit": "zain with neck x1.0",
+    "edit_size": 0.0,
+    "eye_p": 0.0
+   },
+   {
+    "edit": "zain with neck x0.85",
+    "edit_size": 0.15,
+    "eye_p": 0.0
+   },
+   {
+    "edit": "zain with neck x0.7",
+    "edit_size": 0.3,
+    "eye_p": 0.0
+   },
+   {
+    "edit": "zain with neck x0.55",
+    "edit_size": 0.45,
+    "eye_p": 0.0
+   },
+   {
+    "edit": "zain with neck x0.4",
+    "edit_size": 0.6,
+    "eye_p": 0.0
+   },
+   {
+    "edit": "zain with neck x0.3",
+    "edit_size": 0.7,
+    "eye_p": 0.0
+   }
+  ]
+ },
+ "reh": {
+  "chosen": {
+   "edit": "zain without its dot",
+   "edit_size": 0.0,
+   "eye_p": 1.0
+  },
+  "candidates_tried": 1,
+  "all": [
+   {
+    "edit": "zain without its dot",
+    "edit_size": 0.0,
+    "eye_p": 1.0
+   }
+  ]
+ },
+ "seen_ground_truth": {
+  "chosen_edit_iou": 0.637,
+  "untouched_noon_iou": 0.626,
+  "best_previous_generator_iou": 0.585,
+  "all_edits_iou (not used for the choice)": [
+   {
+    "edit": "noon + 1 tooth copies (size 0.5, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.639
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.5, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.64
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.5, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.637
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.65, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.643
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.65, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.644
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.65, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.637
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.5, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.631
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.5, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.615
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.5, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.599
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.8, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.655
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.8, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.651
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 0.8, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.646
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 1.0, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.672
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 1.0, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.676
+   },
+   {
+    "edit": "noon + 1 tooth copies (size 1.0, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.659
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.65, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.63
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.65, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.613
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.65, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.59
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.8, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.636
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.8, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.612
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 0.8, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.584
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 1.0, spacing 0.6 lobe)",
+    "iou_vs_user_seen": 0.647
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 1.0, spacing 0.8 lobe)",
+    "iou_vs_user_seen": 0.611
+   },
+   {
+    "edit": "noon + 2 tooth copies (size 1.0, spacing 1.0 lobe)",
+    "iou_vs_user_seen": 0.576
+   }
+  ],
+  "best_possible_in_family": 0.676
+ }
+}
