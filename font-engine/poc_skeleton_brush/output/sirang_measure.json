@@ -1,0 +1,130 @@
+{
+ "arabic": {
+  "grid_px": {
+   "top_of_ink": 123.0,
+   "x_height_line": 159.5,
+   "baseline": 225.0,
+   "bottom_of_ink": 249.0,
+   "x_height": 65.5,
+   "descender": 24.0,
+   "above_x_height": 36.5
+  },
+  "slant_deg": -14.0,
+  "pen": {
+   "hairline": 4.77,
+   "stem": 23.0,
+   "stem_median": 19.18,
+   "contrast_stem_over_hairline": 4.82
+  },
+  "stem_over_x_height": 0.351,
+  "stems_on_middle_line": {
+   "count": 8,
+   "widths": [
+    23.2,
+    22.8,
+    23.2,
+    23.2,
+    23.0,
+    23.2,
+    23.2,
+    23.2
+   ],
+   "spacing": [
+    91.2,
+    51.0,
+    43.2,
+    43.1,
+    57.9,
+    45.8,
+    43.2
+   ]
+  },
+  "dots": [
+   {
+    "diameter": 25.2,
+    "roundness": 0.91,
+    "center": [
+     332.6,
+     135.4
+    ]
+   }
+  ],
+  "hairline_bars": [
+   {
+    "thickness": 4.2,
+    "length": 65.0,
+    "y": 132.3
+   },
+   {
+    "thickness": 4.43,
+    "length": 47.8,
+    "y": 242.6
+   }
+  ]
+ },
+ "latin": {
+  "grid_px": {
+   "top_of_ink": 309.0,
+   "x_height_line": 344.2,
+   "baseline": 412.5,
+   "bottom_of_ink": 435.0,
+   "x_height": 68.2,
+   "descender": 22.5,
+   "above_x_height": 35.2
+  },
+  "slant_deg": -14.06,
+  "pen": {
+   "hairline": 4.19,
+   "stem": 23.01,
+   "stem_median": 19.76,
+   "contrast_stem_over_hairline": 5.48
+  },
+  "stem_over_x_height": 0.337,
+  "stems_on_middle_line": {
+   "count": 9,
+   "widths": [
+    36.0,
+    23.2,
+    23.2,
+    25.2,
+    24.0,
+    23.0,
+    23.2,
+    25.0,
+    24.2
+   ],
+   "spacing": [
+    42.6,
+    36.8,
+    43.2,
+    48.4,
+    37.2,
+    45.4,
+    33.4,
+    48.6
+   ]
+  },
+  "dots": [
+   {
+    "diameter": 25.1,
+    "roundness": 0.92,
+    "center": [
+     272.6,
+     321.5
+    ]
+   }
+  ],
+  "hairline_bars": []
+ },
+ "arabic_vs_latin": {
+  "x_height": "65.5 vs 68.2",
+  "slant_deg": "-14.0 vs -14.06",
+  "stem": "23.0 vs 23.01",
+  "hairline": "4.77 vs 4.19",
+  "contrast": "4.82 vs 5.48",
+  "stem_over_x_height": "0.351 vs 0.337",
+  "median_stem_spacing": "45.8 vs 42.900000000000006",
+  "dot_diameter": "[25.2] vs [25.1]",
+  "descender": "24.0 vs 22.5"
+ }
+}
