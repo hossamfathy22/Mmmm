@@ -18,7 +18,7 @@ stroke-direction charts the user supplied.
 DUCTUS = {
     "alef": dict(start="top", strokes=1, loop=False, entry="zain", exit=None),
     "beh": dict(start="right", strokes=1, loop=False, entry="noon", exit="noon"),
-    "hah": dict(start="top", strokes=2, loop=False, entry="zain", exit="zain"),
+    "hah": dict(start="top", strokes=1, loop=False, entry="zain", exit="zain"),
     "dal": dict(start="top", strokes=1, loop=False, entry="zain", exit=None),
     "reh": dict(start="top", strokes=1, loop=False, entry="zain", exit="zain"),
     "seen": dict(start="right", strokes=3, loop=False, entry="noon", exit="noon"),

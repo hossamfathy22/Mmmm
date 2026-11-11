@@ -1,0 +1,20 @@
+{
+ "diagram_to_word_scale": 10.02,
+ "seen_size_px_2x": [
+  801,
+  691
+ ],
+ "ground_truth_test_iou_vs_user_seen": {
+  "the word's noon used as seen (no generation)": 0.626,
+  "hand recipe: 2 teeth + noon (compose.py)": 0.551,
+  "automatic search over parts (auto_design.py)": 0.585,
+  "Naskh path restyled, one stroke (curve_style.py)": 0.324,
+  "Sakkal strokes: each tooth its own stroke (strokes_sakkal.py)": 0.336
+ },
+ "engine_on_real_seen": {
+  "pen_path_nodes": 6,
+  "hairpins": 1,
+  "art_brush_iou": 0.9993,
+  "median_stroke_width_px": 151.5
+ }
+}
