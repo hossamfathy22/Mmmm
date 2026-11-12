@@ -9,6 +9,9 @@ For every logo the engine measures *how* its parts are shaped, not only how big 
   overshoot              how far round bottoms dip below the flat ones
   seen_drop              how much lower the inner teeth of a run are
   group_gap              white between letters that do not join
+  angular, corner_r      from the skeleton: share of the turning done at corners, and their outer radius
+  tail_drop, tail_reach  for letters of the ر family in the logo's own text: how far the tail goes
+                         below the baseline (0 = it rests on the baseline) and how far it reaches
 Each value comes with its evidence (how many samples) so the report can say where it came from.
 """
 from __future__ import annotations
@@ -246,4 +249,42 @@ def measure_features(lines: List[Line], readings: List[Reading], src: int, k: fl
         "انخفاض الأسنان الداخلية عن ارتفاع الحروف", "px")
     gg = _group_gap(L, R)
     put("group_gap", gg * k if gg is not None else None, 1, "الأبيض بين حرفين غير متصلين", "px")
+    from .skeleton import read_skeleton
+    sk = read_skeleton(L)
+    turns = sum(1 for g in sk.segments if g.kind in ("corner", "curve"))
+    corners = sum(1 for g in sk.segments if g.kind == "corner")
+    if turns >= 3:
+        put("angular", sk.angular, turns, "نصيب الزوايا من كل انعطاف في الهيكل (0 منحنيات، 1 زوايا)")
+    if corners >= 2 and sk.corner_r == sk.corner_r:
+        put("corner_r", sk.corner_r * k, corners, "نصف قطر الزاوية على الحافة الخارجية", "px")
+    if "tail_reach" not in out:
+        drops, reach = _reh_tails(L, R)
+        if drops:
+            put("tail_drop", _median(drops), len(drops), "نزول ذيل الراء والزاي والواو تحت السطر ÷ النزول (0 على السطر)")
+            put("tail_reach", _median(reach), len(reach), "امتداد الذيل إلى اليسار بوحدة الجذع")
     return out
+
+
+def _reh_tails(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
+    """Letters of the ر family in the logo's own text: the lowest point and the left reach of the
+    ink that hangs from their stem. A tail that does not drop rests on the baseline."""
+    drops, reach = [], []
+    X, U = L.x_height, L.stem
+    D = max(L.descender, 0.45 * X)
+    for u in R.units:
+        if u.letter not in "رزژو" or not u.stems:
+            continue
+        s = L.stems[u.stems[-1]]
+        c0, c1 = int(max(0, L.col_of_x(s.x - 5 * U))), int(min(L.lab.shape[1] - 1, L.col_of_x(s.x + U / 2)))
+        m = L.lab[:, c0:c1 + 1] == s.comp
+        if not m.any():
+            continue
+        rows, cols = np.nonzero(m)
+        low = L.y_of_row(rows.max())
+        foot = rows >= L.row_of_y(0.3 * X)
+        if not foot.any():
+            continue
+        left = L.x_of_col(c0 + cols[foot].min())
+        drops.append(max(0.0, -low) / D)
+        reach.append((s.x - left) / U)
+    return drops, reach

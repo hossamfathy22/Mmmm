@@ -6,6 +6,7 @@ the letter grows to the left (negative x), baseline is y = 0.
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -47,7 +48,19 @@ def _e(form: str) -> bool:
 
 
 def _x(form: str) -> bool:
-    return form in ("I", "M")
+    return form in ("I", "M") and "no_exit" not in JOIN.get()
+
+
+# How a letter joins, when the logo joins some letters differently from the baseline join:
+# "no_exit"   the letter keeps its joining shape but leaves nothing at the baseline for the next one
+# "top_entry" the letter is reached by a bar at the top of the previous tooth (ر ز ژ in a logo whose
+#             tails rest on the baseline, as in a geometric kufi)
+JOIN: ContextVar = ContextVar("khatt_join", default=frozenset())
+
+
+def top_joins(st: Style) -> bool:
+    """A logo that draws with corners and whose ر tails rest on the baseline joins ر from the top."""
+    return st.angular >= 0.5 and st.tail_drop < 0.3
 
 
 # ---------------------------------------------------------------- marks (dots, dashes, hamza)
@@ -117,6 +130,8 @@ def bowl_down(st: Style, r: float, top: float, width: float, left_top: float) ->
     """Arm at x = r goes down below the baseline, across, and up on the left (ن ل ق س ص ي)."""
     D, h, X = st.descender, st.hair, st.x_height
     Lx, yb, k = r - width, -D + h / 2, 0.08 * X
+    if st.angular >= 0.5:      # a logo that turns with corners: a square cup
+        return _named(g.angular_stroke(st, [(r, top), (r, yb), (Lx, yb), (Lx, left_top)], st.corner_r), "كأس سفلي")
     return _named(g.stroke(st, g.path(
         g.line((r, top), (r, k)),
         g.cubic((r, k), (r, -0.72 * D), (r - 0.2 * width, yb), (r - 0.5 * width, yb)),
@@ -134,7 +149,11 @@ def tail(st: Style, r: float, top: float) -> g.Shape:
         if sh is not None:
             parts.insert(0, sh)
         return parts
-    D, h = st.descender, st.hair
+    D, h = st.descender * st.tail_drop, st.hair
+    if st.angular >= 0.5:      # down, a corner, and a flat foot to the left (as far as the logo's)
+        yb = -D + h / 2 if D > h else h / 2
+        foot = r - st.tail_reach * st.stem
+        return _named(g.angular_stroke(st, [(r, top), (r, yb), (foot, yb)], st.corner_r), "ذيل")
     U = st.stem * st.tail_reach / 3.05           # horizontal scale of the sweep, from the logo
     yb = -D + h / 2
     return _named(g.stroke(st, g.path(
@@ -147,6 +166,8 @@ def sweep_right(st: Style, x: float, top: float, reach: float) -> g.Shape:
     """Down on the left, then a bowl that swings back to the right (ح ع isolated/final)."""
     D, h, X = st.descender, st.hair, st.x_height
     yb = -D + h / 2
+    if st.angular >= 0.5:
+        return _named(g.angular_stroke(st, [(x, top), (x, yb), (x + reach, yb)], st.corner_r), "كأس أيمن")
     return _named(g.stroke(st, g.path(
         g.line((x, top), (x, 0.05 * X)),
         g.cubic((x, 0.05 * X), (x, -0.75 * D), (x + 0.3 * reach, yb), (x + 0.6 * reach, yb)),
@@ -243,6 +264,15 @@ def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     u, X = st.stem / 2, st.x_height
+    if "top_entry" in JOIN.get():
+        # a bar from the top of the previous tooth, down the stem, and a flat foot on the baseline
+        h, U = st.hair, st.stem
+        foot = -u - st.tail_reach * U + u
+        yb = h / 2
+        path = [(st.white + 0.5 * U, X - h / 2), (-u, X - h / 2), (-u, yb), (foot, yb)]
+        shapes = [_named(g.angular_stroke(st, path, st.corner_r), "راء موصولة من أعلى")]
+        shapes += marks(st, mark, -u, above_ref=X)
+        return Glyph(shapes, left=-U, stems=[(-u, X, 0)], tail=foot - h)
     lib = _lib()
     top = lib.parts["tail"].info.get("top", 0.62 * X) if lib is not None and lib.has("tail") else 0.62 * X
     shapes = [tail(st, -u, top)]
@@ -400,7 +430,12 @@ def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
 def waw(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X = st.stem, st.stem / 2, st.x_height
     xl, w = head_box(st)
-    shapes = [_ring(st, xl, 0, 0, X), tail(st, -u, X / 2)]
+    if st.tail_drop < 0.3:
+        # the tail rests on the baseline: the head rises above it, or it would read as ه with a foot
+        hb = 0.4 * X
+        shapes = [_ring(st, xl, 0, hb, X), tail(st, -u, hb + st.hair)]
+    else:
+        shapes = [_ring(st, xl, 0, 0, X), tail(st, -u, X / 2)]
     shapes += marks(st, mark, xl / 2)
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, tail=-u - 3.05 * U - st.hair)
 

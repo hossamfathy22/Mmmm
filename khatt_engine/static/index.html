@@ -114,6 +114,8 @@ ul.obs li[data-k="match"]{color:var(--accent)}
       <div class="fig" id="partsSheet"></div>
       <div class="row"><span class="note">قاعدة القلم المقيسة:</span></div>
       <div class="fig" id="penSheet" style="max-width:760px"></div>
+      <div class="row"><span class="note">الهيكل: مسار القلم في كل حرف — مستقيم، منحنى، زاوية:</span></div>
+      <div class="fig" id="skeletonSheet"></div>
     </section>
     <section class="panel stage">
       <header><span class="num">5</span><h2 id="wordTitle">البناء</h2><p>كل حرف مبني من القطع الست بأرقام الشعار. في الطريقة التجريبية: الداكن مقصوص من الشعار، والرمادي مستنتج.</p></header>
@@ -170,7 +172,7 @@ function show(j){
   $("reads").innerHTML=j.lines.map(l=>`<div class="read">السطر ${l.line}: ${l.script==="arabic"?`<b>${esc(l.text_given||l.text_guess||"؟")}</b> <span class="note">${l.text_given?"مُطابق مع النص الذي كتبته":"قراءة المحرك"}</span>`:"لاتيني"}<div class="note">${l.stems.map(s=>esc((s.letter?s.letter+" · ":"")+s.role_ar)).join("، ")}</div></div>`).join("");
   $("obs").innerHTML=j.observations.map(o=>`<li data-k="${o.kind}">${esc(o.text)}</li>`).join("");
   $("feats").innerHTML="<tr><th>معامل الشكل</th><th>القيمة</th><th>العينات</th><th>المعنى</th></tr>"+Object.entries(j.features||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v.value)}${esc(v.unit)}</td><td class="n">${v.samples}</td><td>${esc(v.note)}</td></tr>`).join("");
-  $("logoSheet").innerHTML=j.logo_sheet_svg;$("partsSheet").innerHTML=j.parts_svg;$("penSheet").innerHTML=j.pen_svg||'<p class="note" style="padding:12px">لا توجد نقاط كافية لقياس قاعدة القلم.</p>';
+  $("logoSheet").innerHTML=j.logo_sheet_svg;$("partsSheet").innerHTML=j.parts_svg;$("penSheet").innerHTML=j.pen_svg||'<p class="note" style="padding:12px">لا توجد نقاط كافية لقياس قاعدة القلم.</p>';$("skeletonSheet").innerHTML=j.skeleton_svg||'';
   $("wordTitle").textContent="البناء: "+j.word;$("wordImg").src="data:image/png;base64,"+j.word_png;$("construction").innerHTML=j.construction_svg;
   $("recipes").innerHTML="<tr><th>الحرف</th><th>الشكل</th><th>قطع من الشعار</th><th>قطع مستنتجة</th></tr>"+j.recipes.map(r=>`<tr><td style="font-size:20px">${esc(r.letter)}</td><td>${esc(r.form)}</td><td>${esc(r.from_logo.join("، ")||"—")}</td><td>${esc(r.inferred.join("، ")||"—")}</td></tr>`).join("")+(j.skipped.length?`<tr><td colspan="4" class="err">حروف لم تُرسم: ${esc(j.skipped.join(" "))}</td></tr>`:"");
   const pill=v=>`<span class="pill ${v==="مطابق"?"ok":v==="قريب"?"warn":"bad"}">${esc(v)}</span>`;
@@ -178,7 +180,7 @@ function show(j){
   $("correction").textContent=Math.abs(j.spacing_used-j.style.white)>0.05?`تصحيح تلقائي: المسافة الداخلية بين الجذوع صارت ${fmt(j.spacing_used)} حتى يصبح الأبيض المرئي مساويًا لأبيض الشعار (${fmt(j.style.white)}).`:"";
   const dl=$("downloads");dl.innerHTML="";
   const add=(name,data,type)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.textContent=name;dl.append(a)};
-  add("logo_sheet.svg",j.logo_sheet_svg,"image/svg+xml");add("parts.svg",j.parts_svg,"image/svg+xml");if(j.pen_svg)add("pen_rule.svg",j.pen_svg,"image/svg+xml");
+  add("logo_sheet.svg",j.logo_sheet_svg,"image/svg+xml");add("parts.svg",j.parts_svg,"image/svg+xml");if(j.pen_svg)add("pen_rule.svg",j.pen_svg,"image/svg+xml");if(j.skeleton_svg)add("skeleton.svg",j.skeleton_svg,"image/svg+xml");
   add("word.svg",j.word_svg,"image/svg+xml");add("word.png",Uint8Array.from(atob(j.word_png),c=>c.charCodeAt(0)),"image/png");add("construction.svg",j.construction_svg,"image/svg+xml");
   add("parts.json",JSON.stringify(j.parts_json,null,1),"application/json");add("measurements.json",JSON.stringify({lines:j.lines,observations:j.observations,style:j.style,verification:j.verification},null,1),"application/json");
   add("report.md",j.report_md,"text/markdown");

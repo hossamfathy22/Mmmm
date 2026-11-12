@@ -30,6 +30,10 @@ class Style:
     seen_drop: float = 0.0      # inner teeth of س ش are this much lower
     group_gap: float = 0.0      # white between letters that do not join (0 = 1.15 x white)
     round_gap: float = 1.18     # extra white before a round head (optical spacing)
+    # ---- vocabulary read from the skeleton (skeleton.py)
+    angular: float = 0.0        # share of the turning done at corners: >= 0.5 draws tails and cups with corners
+    corner_r: float = 0.0       # outer radius of those corners (0 = sharp)
+    tail_drop: float = 1.0      # how far tails go below the baseline, fraction of the descender
 
     @property
     def pitch(self) -> float:

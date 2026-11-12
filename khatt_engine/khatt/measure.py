@@ -341,11 +341,6 @@ def _pieces(L: Line, U0: float, X: float = 0.0) -> None:
             kind = "dot"
         elif ww >= 3 * hh and hh <= max(3.5 * hair_guess, 0.5 * U0) and ww >= 0.8 * U0:
             kind = "dash"
-            # a flat stroke lying on the baseline is a letter drawn flat (a kashida-like ی), not a
-            # diacritic dash: marks sit above the letters or below the baseline
-            bottom, top_ = L.y_of_row(r0 + hh), L.y_of_row(r0)
-            if X > 0 and abs(bottom) <= 0.12 * X and top_ <= 0.45 * X:
-                kind = "body"
         p = Piece(kind=kind, comp=i, x0=L.x_of_col(c0), x1=L.x_of_col(c0 + ww), y0=L.y_of_row(r0 + hh), y1=L.y_of_row(r0),
                   area=area, cx=cx, cy=cy)
         if kind == "dot":

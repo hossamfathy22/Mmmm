@@ -302,3 +302,62 @@ def ideal_parts_sheet(st) -> str:
     vh = top - bot + 5.6 * fs + 4.4 * U + 2 * fs
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 {-top:.1f} {W:.1f} {vh:.1f}" width="{W * 1.6:.0f}" height="{vh * 1.6:.0f}">'
             f'<rect x="0" y="{-top:.1f}" width="{W:.1f}" height="{vh:.1f}" fill="#fff"/>{"".join(o)}</svg>')
+
+
+# ------------------------------------------------------------------ 2c. the skeleton: what the eye reads as the pen's path
+def skeleton_sheet(L: Line, sk, k: float) -> str:
+    """The letters' centre line over the logo line: straight strokes (blue, with their angle),
+    curves (green, with their radius) and corners (red, with their radius), and the vocabulary
+    measured from them."""
+    if not sk.strokes:
+        return ""
+    H, W = L.B.shape
+    img = Image.fromarray(np.where(L.B.astype(bool), 205, 255).astype(np.uint8))
+    buf = io.BytesIO(); img.save(buf, "PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    pad, head = 30.0, 96.0
+    P = lambda x, y: (L.col_of_x(x) + pad, L.row_of_y(y) + head)
+    U = L.stem
+    fs = max(8.0, 0.55 * U)
+    o = [f'<rect width="{W + 2 * pad}" height="{H + head + pad}" fill="#fff"/>',
+         f'<image href="data:image/png;base64,{b64}" x="{pad}" y="{head}" width="{W}" height="{H}"/>']
+    for s in sk.strokes:
+        pts = " ".join("%.1f,%.1f" % P(x, y) for x, y in s)
+        o.append(f'<polyline points="{pts}" fill="none" stroke="#b9c2cc" stroke-width="{max(1.0, 0.08 * U):.1f}"/>')
+    labels = Labels(fs)
+    colours = {"straight": "#2f6fd6", "curve": C["base"], "corner": C["thin"]}
+    for seg in sk.segments:
+        pts = [P(x, y) for x, y in seg.pts]
+        sw = max(1.5, 0.16 * U)
+        o.append(f'<polyline points="{" ".join("%.1f,%.1f" % q for q in pts)}" fill="none" stroke="{colours[seg.kind]}" '
+                 f'stroke-width="{sw:.1f}" stroke-linecap="round"/>')
+        mx, my = pts[len(pts) // 2]
+        if seg.kind == "straight":
+            if len(seg.pts) * 0.12 * U < 1.5 * U:
+                continue
+            txt = f"{seg.angle:.0f}°"
+        elif seg.kind == "corner":
+            o.append(f'<circle cx="{mx:.1f}" cy="{my:.1f}" r="{0.22 * U:.1f}" fill="{C["thin"]}"/>')
+            if abs(seg.turn) < 30:
+                continue
+            txt = f"زاوية {abs(seg.turn):.0f}° · ن.ق {(seg.radius + U / 2) * k:.1f}"
+        else:
+            if abs(seg.turn) < 30:
+                continue
+            txt = f"منحنى {abs(seg.turn):.0f}° · ن.ق {(seg.radius + U / 2) * k:.1f}"
+        labels.add(mx, my - 0.6 * U, txt, colours[seg.kind], anchor="middle", weight=600)
+    o += labels.out
+    a = sk.angular
+    verdict = ("يرسم بالزوايا: الذيول والكؤوس تُبنى من خطوط مستقيمة تلتقي بزاوية" if a >= 0.5
+               else "يرسم بالمنحنيات: الذيول والكؤوس تُبنى من منحنيات")
+    ang = " · ".join(f"{t:.0f}° ({v * 100:.0f}%)" for t, v in sk.angles[:5])
+    o.append(f'<text x="{W + pad}" y="28" font-size="15" font-weight="700" text-anchor="start" direction="rtl" fill="{C["text"]}" font-family="{FONT}">'
+             f'الهيكل: الزوايا {a * 100:.0f}% من الانعطاف — {_esc(verdict)}</text>')
+    cr = f"نصف قطر الزاوية الخارجي {sk.corner_r * k:.1f}" if sk.corner_r == sk.corner_r else "لا زوايا"
+    o.append(f'<text x="{W + pad}" y="52" font-size="12" text-anchor="start" direction="rtl" fill="#5b6878" font-family="{FONT}">'
+             f'{_esc(cr)} · زوايا الخطوط المستقيمة: {_esc(ang)}</text>')
+    o.append(f'<text x="{W + pad}" y="74" font-size="12" text-anchor="start" direction="rtl" font-family="{FONT}">'
+             f'<tspan fill="#2f6fd6">■ مستقيم</tspan>  <tspan fill="{C["base"]}">■ منحنى</tspan>  <tspan fill="{C["thin"]}">■ زاوية</tspan></text>')
+    Wd, Hd = W + 2 * pad, H + head + pad
+    z = max(1.6, 1400 / Wd)
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {Wd:.0f} {Hd:.0f}" width="{Wd * z:.0f}" height="{Hd * z:.0f}">{"".join(o)}</svg>'

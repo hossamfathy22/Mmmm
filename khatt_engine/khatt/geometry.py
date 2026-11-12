@@ -241,3 +241,50 @@ def circle(cx: float, cy: float, r: float, tan: float = 0.0, n: int = 48, shape_
         x, y = x * cr - y * sr, x * sr + y * cr
         pts.append((cx + x - y * tan, cy + y))
     return [pts]
+
+
+
+def angular_stroke(st: Style, pts: Sequence[Pt], r_out: float = 0.0) -> Shape:
+    """Straight strokes meeting at corners, the way a geometric logo draws its tails and cups.
+    Each stroke takes its pen width from its direction (vertical = stem, horizontal = hairline),
+    strokes overlap fully at the corners, and only the outer corner of each turn is rounded with
+    the logo's radius `r_out`; the stroke ends stay square."""
+    from shapely.geometry import Point, Polygon
+    from shapely.ops import unary_union
+    segs = []
+    for a, b in zip(pts, pts[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        ln = math.hypot(dx, dy)
+        if ln < 1e-6:
+            continue
+        u = (dx / ln, dy / ln)
+        segs.append((a, b, u, st.width_at(u[1])))
+    if not segs:
+        return []
+    polys = []
+    for i, (a, b, u, w) in enumerate(segs):
+        ea = segs[i - 1][3] / 2 if i > 0 else 0.0
+        eb = segs[i + 1][3] / 2 if i < len(segs) - 1 else 0.0
+        A = (a[0] - u[0] * ea, a[1] - u[1] * ea)
+        B = (b[0] + u[0] * eb, b[1] + u[1] * eb)
+        n = (-u[1] * w / 2, u[0] * w / 2)
+        polys.append(Polygon([(A[0] + n[0], A[1] + n[1]), (B[0] + n[0], B[1] + n[1]),
+                              (B[0] - n[0], B[1] - n[1]), (A[0] - n[0], A[1] - n[1])]))
+    shape = unary_union(polys)
+    for i in range(1, len(segs)):
+        (_, b, u1, w1), (_, _, u2, w2) = segs[i - 1], segs[i]
+        r = min(r_out, w1 + 0.5 * w2, w2 + 0.5 * w1)
+        if r <= 0.5:
+            continue
+        # the outer corner: past the turn along the incoming stroke, behind it along the outgoing one
+        O = (b[0] + u1[0] * w2 / 2 - u2[0] * w1 / 2, b[1] + u1[1] * w2 / 2 - u2[1] * w1 / 2)
+        C = (O[0] - u1[0] * r + u2[0] * r, O[1] - u1[1] * r + u2[1] * r)
+        cutter = Polygon([O, (O[0] - u1[0] * r, O[1] - u1[1] * r), C, (O[0] + u2[0] * r, O[1] + u2[1] * r)])
+        shape = shape.difference(cutter.difference(Point(C).buffer(r, 32)))
+    out: Shape = []
+    for poly in getattr(shape, "geoms", [shape]):
+        if poly.is_empty:
+            continue
+        out.append(list(poly.exterior.coords)[:-1])
+        out += [list(h.coords)[:-1] for h in poly.interiors]
+    return out

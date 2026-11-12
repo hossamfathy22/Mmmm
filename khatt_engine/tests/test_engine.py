@@ -167,3 +167,39 @@ def test_a_row_of_big_square_dots_belongs_to_its_line():
     ink[40:90, 100:150] = 1; ink[40:90, 200:250] = 1      # dots, 50 px tall
     ink[110:260, 80:520] = 1                              # the writing, 150 px tall
     assert find_lines(ink) == [(40, 259)]
+
+
+# ---------------------------------------------------------------- the skeleton: corners or curves
+def _line_of(ink):
+    from khatt.analyze import find_lines
+    from khatt.measure import measure_line
+    a, b = find_lines(ink.astype(np.uint8))[0]
+    return measure_line(ink.astype(float), ink.astype(bool), a, b, 0)
+
+
+def test_skeleton_tells_corners_from_curves():
+    """Square hooks read as corners; round hooks of the same size read as curves."""
+    from khatt.skeleton import read_skeleton
+    from skimage.draw import disk
+    sq = np.zeros((200, 700), bool)
+    rd = np.zeros((200, 700), bool)
+    for x in range(80, 640, 140):
+        sq[50:150, x:x + 14] = True; sq[136:150, x - 60:x + 14] = True          # down, then a corner, then left
+        sq[50:62, x:x + 60] = True                                              # and a top bar
+        yy, xx = disk((100, x - 20), 48, shape=rd.shape); rd[yy, xx] = True     # a ring with the same reach
+        yy, xx = disk((100, x - 20), 34, shape=rd.shape); rd[yy, xx] = False
+    a, b = read_skeleton(_line_of(sq)), read_skeleton(_line_of(rd))
+    assert a.angular > 0.6
+    assert b.angular < 0.3
+
+
+def test_angular_tail_rests_on_the_baseline_with_a_round_corner():
+    from khatt.letters import tail
+    from khatt.typeset import flat
+    st = Style(stem=11, hair=8, x_height=44, slant=0, angular=0.8, corner_r=8, tail_drop=0.0, tail_reach=1.9)
+    pts = [p for sh in flat([tail(st, 0, 26)]) for poly in sh for p in poly]
+    ys = [p[1] for p in pts]; xs = [p[0] for p in pts]
+    assert min(ys) == pytest.approx(0, abs=0.5)                 # the foot sits on the baseline
+    assert min(xs) == pytest.approx(-1.9 * 11, abs=0.5)         # as far left as the logo's
+    # the outer corner (bottom right) is rounded: no point at the sharp corner itself
+    assert not any(abs(x - 5.5) < 0.3 and abs(y) < 0.3 for x, y in pts)

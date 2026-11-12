@@ -6,3 +6,4 @@ fastapi>=0.110
 uvicorn>=0.25
 python-multipart>=0.0.9
 pytest>=8.0
+shapely>=2.0

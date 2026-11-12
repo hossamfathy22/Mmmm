@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from . import geometry as g
-from .letters import LETTERS, Glyph
+from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
 from .style import Style
 
@@ -94,7 +94,10 @@ def typeset(word: str, st: Style) -> Layout:
     x = 0.0
     prev: Optional[Placed] = None
     group_gap = st.group_gap if st.group_gap > 0 else 1.15 * st.white
-    for c, form in shape_forms(word):
+    forms = shape_forms(word)
+    # letters of the ر family that this logo joins from the top (see letters.top_joins)
+    top = {i for i, (c, f) in enumerate(forms) if f == "F" and c in "رزژ" and top_joins(st)}
+    for i, (c, form) in enumerate(forms):
         if form == " ":
             if prev is not None:
                 x = prev.x + prev.glyph.left - 3 * st.pitch
@@ -103,11 +106,20 @@ def typeset(word: str, st: Style) -> Layout:
         if form == "?":
             lay.skipped.append(c)
             continue
-        glyph = LETTERS[c][1](st, form)
+        flags = frozenset((["no_exit"] if i + 1 in top else []) + (["top_entry"] if i in top else []))
+        tok = JOIN.set(flags)
+        try:
+            glyph = LETTERS[c][1](st, form)
+        finally:
+            JOIN.reset(tok)
         glyph.below = _below_range(glyph)
         joined = prev is not None and form in ("M", "F")
         if prev is not None:
-            if joined and prev.glyph.exit_edge is not None:
+            if i in top:
+                # joined at the top: the bar reaches the left edge of the previous tooth
+                x = prev.x + prev.glyph.left - st.white - glyph.entry_edge
+                joined = False
+            elif joined and prev.glyph.exit_edge is not None:
                 x = prev.x + prev.glyph.exit_edge - st.white - glyph.entry_edge
             else:
                 gap = group_gap * (st.round_gap if glyph.entry_x < glyph.entry_edge - 1e-6 else 1.0)   # optical: rounds need more

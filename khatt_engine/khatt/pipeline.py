@@ -23,7 +23,8 @@ from .features import measure_features
 from .library import ACTIVE, build_library
 from .measure import Line, measure_line
 from .render import sheet_svg, to_png, to_svg
-from .sheets import ideal_parts_sheet, logo_sheet, parts_sheet, pen_sheet, thickness_png
+from .sheets import ideal_parts_sheet, logo_sheet, parts_sheet, pen_sheet, skeleton_sheet, thickness_png
+from .skeleton import read_skeleton
 from .style import Style
 from .typeset import typeset
 from .understand import ROLE_AR, Reading, observations, read_line
@@ -98,6 +99,9 @@ def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) 
     if "overshoot" in f: st.overshoot = float(np.clip(f["overshoot"], 0, 0.06 * st.x_height))
     if "seen_drop" in f: st.seen_drop = float(np.clip(f["seen_drop"], 0, 0.3 * st.x_height))
     if "group_gap" in f: st.group_gap = float(np.clip(f["group_gap"], 0.5 * st.white, 2.5 * st.white))
+    if "angular" in f: st.angular = float(np.clip(f["angular"], 0, 1))
+    if "corner_r" in f: st.corner_r = float(np.clip(f["corner_r"], 0, 1.5 * st.stem))
+    if "tail_drop" in f: st.tail_drop = float(np.clip(f["tail_drop"], 0, 1))
     return st
 
 
@@ -127,6 +131,16 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
     if feats:
         md += ["", "### معاملات الشكل المقيسة (ما يحكم به المصمم بالعين)", "", "| المعامل | القيمة | عدد العينات | المعنى |", "|---|---|---|---|"]
         md += [f"| {k} | {v['value']}{v['unit']} | {v['samples']} | {v['note']} |" for k, v in feats.items()]
+        if "angular" in feats:
+            a = feats["angular"]["value"]
+            md += ["", "### الهيكل (skeleton.svg)", "",
+                   f"قُرئ مسار القلم في كل حرف وقُسّم إلى خطوط مستقيمة ومنحنيات وزوايا. الزوايا {a * 100:.0f}% من كل الانعطاف، "
+                   + ("فالشعار يرسم بالزوايا: تُبنى الذيول والكؤوس من خطوط مستقيمة تلتقي بزاوية"
+                      + (f" نصف قطرها الخارجي {feats['corner_r']['value']}px" if "corner_r" in feats else "") + "."
+                      if a >= 0.5 else "فالشعار يرسم بالمنحنيات: تُبنى الذيول والكؤوس منحنية.")]
+            if "tail_drop" in feats and feats["tail_drop"]["value"] < 0.3:
+                md += ["", "ذيل حروف الراء في الشعار يستقر على السطر ولا ينزل تحته، فتُبنى الذيول على السطر، "
+                       "ويرتفع رأس الواو فوق ذيلها حتى لا يُقرأ هاءً."]
     md += ["", "## المرحلة 3: صندوق القطع", "", "| القطعة | من أين | قياسات |", "|---|---|---|"]
     md += [f"| {p['name']} | {p['source']} | " + ", ".join(f"{k}={v}" for k, v in p.items() if k not in ("key", "name", "source")) + " |" for p in lib.summary()]
     md += ["", "## المرحلة 4: البناء", "", "### القواعد المستعملة", "```json", json.dumps(style.to_dict(), ensure_ascii=False, indent=2), "```",
@@ -204,12 +218,16 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "parts_svg": parts_sheet(lib) if use_parts else ideal_parts_sheet(style),
         "cut_parts_svg": parts_sheet(lib), "pen_svg": pen_sheet(L, k), "mode": "cut" if use_parts else "ideal",
     }
+    sk = read_skeleton(L)
+    result["skeleton"] = sk.summary(k)
+    result["skeleton_svg"] = skeleton_sheet(L, sk, k)
     result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats)
     if out_dir:
         d = Path(out_dir)
         d.mkdir(parents=True, exist_ok=True)
         for key, fname in [("word_svg", "word.svg"), ("construction_svg", "construction.svg"), ("logo_sheet_svg", "logo_sheet.svg"),
-                           ("parts_svg", "parts.svg"), ("pen_svg", "pen_rule.svg"), ("report_md", "report.md")]:
+                           ("parts_svg", "parts.svg"), ("pen_svg", "pen_rule.svg"), ("skeleton_svg", "skeleton.svg"),
+                           ("report_md", "report.md")]:
             (d / fname).write_text(result[key], encoding="utf-8")
         (d / "word.png").write_bytes(result["word_png"])
         (d / "parts.json").write_text(json.dumps(parts_json, ensure_ascii=False, indent=1), encoding="utf-8")
