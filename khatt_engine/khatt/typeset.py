@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 
 from . import geometry as g
 from .letters import LETTERS, Glyph
+from .library import Compound, Tagged
 from .style import Style
 
 HARAKAT = {chr(c) for c in range(0x064B, 0x0653)} | {"ٰ"}
@@ -18,6 +19,7 @@ class Placed:
     form: str
     x: float          # where the glyph's right edge sits
     glyph: Glyph
+    parts: List[Tuple[str, str]] = field(default_factory=list)   # (source, part name)
 
 
 @dataclass
@@ -59,19 +61,28 @@ def shape_forms(word: str) -> List[Tuple[str, str]]:
     return out
 
 
+def flat(shapes):
+    """Compound parts (several unioned shapes) become separate shapes."""
+    for s in shapes:
+        if isinstance(s, Compound):
+            yield from s
+        else:
+            yield s
+
+
 def _below_range(glyph: Glyph):
-    xs = [x for s in glyph.shapes if max(y for poly in s for _, y in poly) < 0 for poly in s for x, _ in poly]
+    xs = [x for s in flat(glyph.shapes) if max(y for poly in s for _, y in poly) < 0 for poly in s for x, _ in poly]
     return (min(xs), max(xs)) if xs else None
 
 
 def glyph_hint(glyph: Glyph) -> float:
-    ys = [y for s in glyph.shapes for poly in s for _, y in poly]
+    ys = [y for s in flat(glyph.shapes) for poly in s for _, y in poly]
     return max(ys) - min(ys) if ys else 1.0
 
 
 def _has_floating_below(glyph: Glyph) -> bool:
     """True when some separate shape (a dot or dash) lies wholly under the baseline."""
-    return any(max(y for poly in s for _, y in poly) < 0 for s in glyph.shapes)
+    return any(max(y for poly in s for _, y in poly) < 0 for s in flat(glyph.shapes))
 
 
 def _shift(shape: g.Shape, dx: float) -> g.Shape:
@@ -106,9 +117,13 @@ def typeset(word: str, st: Style) -> Layout:
         here = Placed(c, form, x, glyph)
         if joined and prev.glyph.exit_x is not None:
             a, b = x + glyph.entry_x, prev.x + prev.glyph.exit_x
-            lay.shapes.append(g.connector(st, a, b))
+            lay.shapes.insert(0, Tagged(g.connector(st, a, b), "engine", "وصلة"))
             lay.joins.append((a, b))
-        lay.shapes += [_shift(s, x) for s in glyph.shapes]
+        for s in glyph.shapes:
+            for sub in (s if isinstance(s, Compound) else [s]):
+                src, name = getattr(sub, "source", "engine"), getattr(sub, "name", "") or "قطعة"
+                here.parts.append((src, name))
+                lay.shapes.append(Tagged(_shift(sub, x), src, name))
         lay.placed.append(here)
         prev = here
     return lay

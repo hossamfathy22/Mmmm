@@ -65,7 +65,7 @@ def to_png(lay: Layout, height: int = 360, ink: Tuple[int, int, int] = (17, 17, 
     return buf.getvalue()
 
 
-def sheet_svg(lay: Layout, title: str = "") -> str:
+def sheet_svg(lay: Layout, title: str = "", white: Optional[float] = None) -> str:
     """Construction drawing: grid lines, stem boxes, pitch and white, with Arabic labels."""
     st = lay.style
     U, X, A, D, h = st.stem, st.x_height, st.ascender, st.descender, st.hair
@@ -75,7 +75,7 @@ def sheet_svg(lay: Layout, title: str = "") -> str:
     left, right = x0 - pad_l, x1 + pad_r + abs(st.tan) * (X + A)
     top, bottom = -(y1 + pad_t), -(y0 - pad_b)
     vw, vh = right - left, bottom - top
-    C = {"ink": "#1e2d5a", "stem": "#0b8a96", "guide": "#6551d0", "base": "#23895f", "dim": "#c46a00", "hair": "#cf3f53"}
+    C = {"ink": "#1e2d5a", "stem": "#0b8a96", "guide": "#6551d0", "base": "#23895f", "dim": "#c46a00", "hair": "#cf3f53", "engine": "#8e9bb0"}
     o: List[str] = []
 
     def text(x, y, s, col, size=fs, anchor="end", weight=700):
@@ -89,8 +89,16 @@ def sheet_svg(lay: Layout, title: str = "") -> str:
     for y, col, lab in guides:
         o.append(f'<line x1="{left:.1f}" x2="{gx1:.1f}" y1="{-y:.1f}" y2="{-y:.1f}" stroke="{col}" stroke-width="{max(0.6, h * 0.18):.2f}" stroke-dasharray="{U*0.25:.1f} {U*0.18:.1f}"/>')
         text(gx1 + U * 0.4, -y + fs * 0.35, lab, col)
-    body = "".join(f'<path fill-rule="evenodd" d="{_d(lay, s)}"/>' for s in lay.shapes)
-    o.insert(0, f'<g fill="{C["ink"]}">{body}</g>')
+    order = sorted(lay.shapes, key=lambda sh: getattr(sh, "source", "engine") == "logo")
+    body = "".join(f'<path fill-rule="evenodd" fill="{C["ink"] if getattr(sh, "source", "engine") == "logo" else C["engine"]}" d="{_d(lay, sh)}"/>' for sh in order)
+    o.insert(0, f'<g>{body}</g>')
+    has_logo = any(getattr(sh, "source", "") == "logo" for sh in lay.shapes)
+    if has_logo:
+        ly = -(y0 - pad_b * 0.35)
+        for i, (col, t) in enumerate([(C["ink"], "قطعة من الشعار"), (C["engine"], "قطعة مستنتجة بقواعد الشعار")]):
+            xx = gx1 - i * U * 7
+            o.append(f'<rect x="{xx - U * 0.5:.1f}" y="{ly - fs * 0.8:.1f}" width="{fs * .9:.1f}" height="{fs * .9:.1f}" fill="{col}"/>')
+            text(xx - U * 0.7, ly, t, "#16202c", size=fs * 0.85, anchor="start")
     sw = max(0.8, h * 0.22)
     centres = []
     for p in lay.placed:
@@ -111,7 +119,7 @@ def sheet_svg(lay: Layout, title: str = "") -> str:
             ya = X * 0.5
             p, q = _sk(lay, c1 + U / 2, ya), _sk(lay, c0 - U / 2, ya)
             o.append(f'<line x1="{p[0]:.1f}" x2="{q[0]:.1f}" y1="{p[1]:.1f}" y2="{q[1]:.1f}" stroke="{C["dim"]}" stroke-width="{sw*1.6:.2f}"/>')
-            text((p[0] + q[0]) / 2, p[1] - fs * 0.4, f"أبيض {st.white:.1f}", C["dim"], size=fs * 0.85, anchor="middle")
+            text((p[0] + q[0]) / 2, p[1] - fs * 0.4, f"أبيض {(white if white is not None else st.white):.1f}", C["dim"], size=fs * 0.85, anchor="middle")
     sx = gx1 - U * 0.2
     o.append(f'<line x1="{sx:.1f}" y1="0" x2="{sx + st.tan * (X + A):.1f}" y2="{-(X + A):.1f}" stroke="{C["stem"]}" stroke-width="{sw*1.4:.2f}"/>')
     text(sx, D * 0.55, f"ميل {st.slant:.1f}°", C["stem"], anchor="middle")

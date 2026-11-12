@@ -1,4 +1,4 @@
-"""Command line:  python -m khatt logo.png "بيدوناق" -o out/  [--line 2] [--explain]"""
+"""Command line:  python -m khatt logo.png "بيدوناق" -o out/ [--text "سیرنگ|Sirang"] [--line 1]"""
 from __future__ import annotations
 
 import argparse
@@ -9,28 +9,26 @@ from .pipeline import run
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(prog="khatt", description="قِس شعارًا وولّد كلمة جديدة بنفس أسلوبه")
+    p = argparse.ArgumentParser(prog="khatt", description="قِس شعارًا وافهمه وقطّعه، ثم ابنِ كلمة جديدة من قطعه")
     p.add_argument("image", help="صورة الشعار (PNG أو JPG)")
-    p.add_argument("word", help="الكلمة العربية المطلوب توليدها")
+    p.add_argument("word", help="الكلمة العربية المطلوب بناؤها")
     p.add_argument("-o", "--out", default="khatt_out", help="مجلد النتائج")
-    p.add_argument("--line", type=int, default=None, help="رقم السطر الذي تؤخذ منه القواعد (يبدأ من 1)")
-    p.add_argument("--explain", action="store_true", help="اطلب شرح التصميم من Claude (يحتاج ANTHROPIC_API_KEY)")
+    p.add_argument("--text", default="", help="النص المكتوب في الشعار، سطر لكل سطر مفصولة بـ | (اختياري، يحسّن الفهم)")
+    p.add_argument("--line", type=int, default=None, help="رقم السطر الذي تؤخذ منه القطع (يبدأ من 1)")
+    p.add_argument("--engine-only", action="store_true", help="ارسم بقطع المحرك وأرقام الشعار فقط، دون قطع الشعار")
     a = p.parse_args()
-    data = Path(a.image).read_bytes()
     try:
-        r = run(data, a.word, line=(a.line - 1) if a.line else None, explain=a.explain, out_dir=a.out, name=Path(a.image).name)
+        r = run(Path(a.image).read_bytes(), a.word, texts=[t for t in a.text.split("|")] if a.text else None,
+                line=(a.line - 1) if a.line else None, use_parts=not a.engine_only, out_dir=a.out, name=Path(a.image).name)
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
-    st = r["style"]
-    print(f"السطر المستعمل: {r['line'] + 1} من {len(r['analysis']['lines'])}")
-    print(f"الجذع {st['stem']} · الشعري {st['hair']} · ارتفاع الحروف {st['x_height']} · الميل {st['slant']}°")
-    for rule in r["analysis"]["rules"]:
-        print(" -", rule)
-    if r["result"]["skipped"]:
-        print("حروف لم تُرسم:", " ".join(r["result"]["skipped"]))
-    if a.explain and r["explain_error"]:
-        print("الشرح:", r["explain_error"], file=sys.stderr)
+    for l in r["lines"]:
+        print(f"السطر {l['line']} ({l['script']}): جذع {l['stem']} · شعري {l['hairline']} · ميل {l['slant_deg']}° · ارتفاع {l['x_height']}"
+              + (f" · قرأ: {l['text_guess']}" if l["text_guess"] else ""))
+    print("القطع:", "، ".join(p["name"] for p in r["parts"]))
+    for c in r["verification"]:
+        print(f"  تحقق {c['name']}: الشعار {c['rule']} · الكلمة {c['word']} → {c['verdict']}")
     print(f"النتائج في: {Path(a.out).resolve()}")
     return 0
 

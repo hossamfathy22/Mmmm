@@ -27,7 +27,20 @@ def rect(x0: float, x1: float, y0: float, y1: float) -> Shape:
 def stem(st: Style, xc: float, top: float, bottom: float = 0.0, *, entry: bool = False,
          exit: bool = False, round_br: bool = False, round_bl: bool = False) -> Shape:
     """A vertical stem. `entry`/`exit` add the concave fillet that flows into a baseline join
-    on the right/left; `round_*` round an outer bottom corner."""
+    on the right/left; `round_*` round an outer bottom corner.
+    When a logo part library is active, the stem is assembled from the logo's own pieces."""
+    from .library import ACTIVE
+    lib = ACTIVE.get()
+    if lib is not None and abs(bottom) < 1e-6:
+        built = lib.build_stem(xc, top, entry, exit,
+                         lambda t: _engine_stem(st, xc, t, 0.0, entry, exit, round_br, round_bl))
+        if built is not None:
+            return built
+    return _engine_stem(st, xc, top, bottom, entry, exit, round_br, round_bl)
+
+
+def _engine_stem(st: Style, xc: float, top: float, bottom: float, entry: bool, exit: bool,
+                 round_br: bool, round_bl: bool) -> Shape:
     u, h, F = st.stem / 2, st.hair, st.fillet
     R = u
     xl, xr = xc - u, xc + u
@@ -63,6 +76,12 @@ def _super(cx, cy, a, b, n=2.3, N=180) -> Poly:
 
 def ring(st: Style, xl: float, xr: float, yb: float, yt: float, side: float | None = None) -> Shape:
     """A closed head (و ف ق ه م ...): sides as thick as the stem, top and bottom hairline."""
+    from .library import ACTIVE
+    lib = ACTIVE.get()
+    if lib is not None:
+        got = lib.loop(xl, xr, yb, yt)
+        if got is not None:
+            return got
     side = st.stem if side is None else side
     cx, cy, a, b = (xl + xr) / 2, (yb + yt) / 2, (xr - xl) / 2, (yt - yb) / 2
     outer = _super(cx, cy, a, b)

@@ -10,7 +10,17 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 from . import geometry as g
+from .library import ACTIVE, Compound, Tagged
 from .style import Style
+
+
+def _lib():
+    return ACTIVE.get()
+
+
+def _named(shape, name: str):
+    """Tag an engine-drawn shape with the name of the part it plays."""
+    return Tagged(shape, "engine", name)
 
 
 @dataclass
@@ -48,24 +58,33 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
     cy = at if at is not None else (ref + gap + d / 2 if above else below_ref - gap - d / 2)
     out: List[g.Shape] = []
     kind = spec[1:] if spec[0] in "ab" else spec
+    lib = _lib()
+
+    def dot(x, y):
+        got = lib.dot(x, y) if lib is not None else None
+        return got if got is not None else _named(g.circle(x, y, d / 2, st.tan), "نقطة")
+
+    def dash(x, y, length):
+        got = lib.dash(x, y, length) if lib is not None else None
+        return got if got is not None else _named(g.rect(x - length / 2, x + length / 2, y - h / 2, y + h / 2), "شرطة")
     if kind == "1":
-        out.append(g.circle(cx, cy, d / 2, st.tan))
+        out.append(dot(cx, cy))
     elif kind == "2":
         if st.dash_marks:
-            out.append(g.rect(cx - 0.75 * d, cx + 0.75 * d, cy - h / 2, cy + h / 2))
+            out.append(dash(cx, cy, 1.5 * d))
         else:
-            out += [g.circle(cx - 0.6 * d, cy, d / 2, st.tan), g.circle(cx + 0.6 * d, cy, d / 2, st.tan)]
+            out += [dot(cx - 0.6 * d, cy), dot(cx + 0.6 * d, cy)]
     elif kind == "3":
         step = 0.95 * d if above else -0.95 * d
         if st.dash_marks:
-            out.append(g.rect(cx - 0.75 * d, cx + 0.75 * d, cy - h / 2, cy + h / 2))
-            out.append(g.circle(cx, cy + step * 0.75 + (d / 2 - h / 2) * (1 if above else -1) * 0.2, d / 2, st.tan))
+            out.append(dash(cx, cy, 1.5 * d))
+            out.append(dot(cx, cy + step * 0.75 + (d / 2 - h / 2) * (1 if above else -1) * 0.2))
         else:
-            out += [g.circle(cx - 0.6 * d, cy, d / 2, st.tan), g.circle(cx + 0.6 * d, cy, d / 2, st.tan), g.circle(cx, cy + step, d / 2, st.tan)]
+            out += [dot(cx - 0.6 * d, cy), dot(cx + 0.6 * d, cy), dot(cx, cy + step)]
     elif spec in ("ha", "hb"):
         out.append(g.open_arc(st, cx, cy, 0.42 * d, 0.5 * d, 40, 320, scale=0.55))
     elif spec == "md":
-        out.append(g.rect(cx - 0.9 * d, cx + 0.9 * d, cy - h / 2, cy + h / 2))
+        out.append(dash(cx, cy, 1.8 * d))
     return out
 
 
@@ -91,31 +110,39 @@ def bowl_down(st: Style, r: float, top: float, width: float, left_top: float) ->
     """Arm at x = r goes down below the baseline, across, and up on the left (ن ل ق س ص ي)."""
     D, h, X = st.descender, st.hair, st.x_height
     Lx, yb, k = r - width, -D + h / 2, 0.08 * X
-    return g.stroke(st, g.path(
+    return _named(g.stroke(st, g.path(
         g.line((r, top), (r, k)),
         g.cubic((r, k), (r, -0.72 * D), (r - 0.2 * width, yb), (r - 0.5 * width, yb)),
         g.cubic((r - 0.5 * width, yb), (Lx + 0.2 * width, yb), (Lx, -0.72 * D), (Lx, k)),
-        g.line((Lx, k), (Lx, left_top))))
+        g.line((Lx, k), (Lx, left_top)))), "كأس سفلي")
 
 
 def tail(st: Style, r: float, top: float) -> g.Shape:
-    """Stem that drops below the baseline and sweeps left as a hairline (ر و)."""
+    """Stem that drops below the baseline and sweeps left as a hairline (ر و).
+    With a logo library: the logo's own shaft and tail."""
+    lib = _lib()
+    if lib is not None and lib.has("tail"):
+        parts = Compound([lib.tail(r)])
+        sh = lib.shaft(r, top)
+        if sh is not None:
+            parts.insert(0, sh)
+        return parts
     U, D, h = st.stem, st.descender, st.hair
     yb = -D + h / 2
-    return g.stroke(st, g.path(
+    return _named(g.stroke(st, g.path(
         g.line((r, top), (r, 0)),
         g.cubic((r, 0), (r, -0.6 * D), (r - 0.52 * U, yb), (r - 1.48 * U, yb)),
-        g.cubic((r - 1.48 * U, yb), (r - 2.17 * U, yb), (r - 2.6 * U, -0.9 * D), (r - 3.05 * U, -0.8 * D))))
+        g.cubic((r - 1.48 * U, yb), (r - 2.17 * U, yb), (r - 2.6 * U, -0.9 * D), (r - 3.05 * U, -0.8 * D)))), "ذيل")
 
 
 def sweep_right(st: Style, x: float, top: float, reach: float) -> g.Shape:
     """Down on the left, then a bowl that swings back to the right (ح ع isolated/final)."""
     D, h, X = st.descender, st.hair, st.x_height
     yb = -D + h / 2
-    return g.stroke(st, g.path(
+    return _named(g.stroke(st, g.path(
         g.line((x, top), (x, 0.05 * X)),
         g.cubic((x, 0.05 * X), (x, -0.75 * D), (x + 0.3 * reach, yb), (x + 0.6 * reach, yb)),
-        g.cubic((x + 0.6 * reach, yb), (x + 0.85 * reach, yb), (x + 0.95 * reach, -0.85 * D), (x + reach, -0.6 * D))))
+        g.cubic((x + 0.6 * reach, yb), (x + 0.85 * reach, yb), (x + 0.95 * reach, -0.85 * D), (x + reach, -0.6 * D)))), "كأس أيمن")
 
 
 def head_box(st: Style, counter: Optional[float] = None) -> Tuple[float, float]:
@@ -208,10 +235,12 @@ def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     u, X = st.stem / 2, st.x_height
-    top = 0.62 * X
+    lib = _lib()
+    top = lib.parts["tail"].info.get("top", 0.62 * X) if lib is not None and lib.has("tail") else 0.62 * X
     shapes = [tail(st, -u, top)]
     if _e(form):
-        shapes.append(g.stem(st, -u, top, entry=True))
+        half = lib.half("r", True, -u, lib.white) if lib is not None else None
+        shapes.append(half if half is not None else g.stem(st, -u, top, entry=True))
     shapes += marks(st, mark, -u, above_ref=top)
     return Glyph(shapes, left=-st.stem, stems=[(-u, top, 0)], tail=-u - 3.05 * st.stem - st.hair)
 
