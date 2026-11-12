@@ -47,7 +47,7 @@ def measure_word(lay: Layout) -> Optional[Dict[str, float]]:
     out = {"stem": L.stem * k, "hair": L.hair * k, "x_height": L.x_height * k,
            "white": L.white * k if L.white == L.white else float("nan"),
            "dot": float(np.median(dots)) * k if dots else float("nan"), "slant": L.slant,
-           "power": L.power, "angle": getattr(L, "pen_angle", 0.0), "stems": len(L.stems)}
+           "power": L.power, "stems": len(L.stems)}
     out.update({"f_" + key: v["value"] for key, v in feats.items()})
     if "dot_size" in feats:
         out["dot"] = feats["dot_size"]["value"]          # measured the way the logo's dot was measured

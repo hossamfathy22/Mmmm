@@ -309,8 +309,6 @@ def read_line(L: Line, text: Optional[str] = None) -> Reading:
     for a, b in joined:
         L.stems[a].joined_left = True
         L.stems[b].joined_right = True
-    if text and any("\u0600" <= ch <= "\u06ff" for ch in text):
-        R.script = "arabic"                # the text the user typed outweighs the shape-based guess
     R.tails = _tails(L)
     R.bars = _bars(L)
     for i, (j, side) in _assign_marks(L).items():

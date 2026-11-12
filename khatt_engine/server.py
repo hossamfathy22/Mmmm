@@ -47,8 +47,4 @@ async def api_run(image: UploadFile = File(...), word: str = Form(...), texts: s
     except OSError:
         raise HTTPException(400, "تعذّر فتح الصورة. استعمل PNG أو JPG أو WebP.")
     r["word_png"] = base64.b64encode(r["word_png"]).decode("ascii")
-    r["fit_png"] = base64.b64encode(r["fit_png"]).decode("ascii")
-    r["alt_word_png"] = base64.b64encode(r["alt_word_png"]).decode("ascii")
-    if r.get("learning") and r["learning"].get("overlay_png"):
-        r["learning"]["overlay_png"] = base64.b64encode(r["learning"]["overlay_png"]).decode("ascii")
     return r

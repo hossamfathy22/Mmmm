@@ -17,7 +17,6 @@ class Style:
     dot: float = 25.0           # diameter of a dot
     dash_marks: bool = True     # two dots become one hairline dash
     contrast_power: float = 2.0 # how fast a curve thins from stem to hairline
-    pen_angle: float = 0.0      # 0 = vertical strokes thickest; near 90 = horizontal thickest (Naskh)
     # ---- shape parameters (measured from the logo by features.py; defaults = the hand-built بيدوناق)
     top_angle: float = 0.0      # degrees: how the top of a stem is cut
     top_round: float = 0.0      # 0 = square corners, 1 = half circle

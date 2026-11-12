@@ -105,23 +105,6 @@ ul.obs li[data-k="match"]{color:var(--accent)}
       <ul class="obs" id="obs"></ul>
       <div class="tablewrap"><table id="feats"></table></div>
     </section>
-    <section class="panel stage hidden" id="fitStage">
-      <header><span class="num">2ب</span><h2>إعادة رسم الشعار</h2><p>المحرك يعيد رسم نص الشعار بقواعده فوق الصورة، ويضبط القواعد معًا حتى يتطابقا. الداكن متطابق، والأحمر في الشعار ولم يُرسم، والأزرق رُسم وليس في الشعار.</p></header>
-      <p id="fitSummary" style="margin:0;font-size:15px"></p>
-      <div class="fig" style="padding:8px"><img id="fitImg" alt="إعادة رسم الشعار فوق الأصل"></div>
-      <div class="row" style="align-items:flex-start;gap:18px">
-        <div class="tablewrap" style="flex:1 1 260px"><table id="fitLetters"></table></div>
-        <div class="tablewrap" style="flex:2 1 380px"><table id="fitChanges"></table></div>
-      </div>
-      <ul class="obs" id="decisions"></ul>
-    </section>
-    <section class="panel stage hidden" id="learnStage">
-      <header><span class="num">2ج</span><h2>التعلّم من الخطوط المفتوحة</h2><p>كل مصدر يعيد رسم نص الشعار بعد تكييفه على قواعده. الدرجة = تطابق إعادة الرسم × نسبة قواعد الشعار التي يحفظها. صاحب أعلى درجة يبني الكلمة.</p></header>
-      <p id="learnSummary" style="margin:0"></p>
-      <div class="tablewrap"><table id="learnTable"></table></div>
-      <div id="winWrap" class="hidden"><p class="note">إعادة رسم الشعار بالمصدر الفائز:</p><div class="fig" style="padding:8px"><img id="winImg" alt="إعادة رسم الشعار بالخط الفائز"></div></div>
-      <div id="altWrap" class="hidden"><p class="note">الكلمة نفسها بقطع المحرك، للمقارنة:</p><div class="fig" style="padding:10px"><img id="altImg" alt="الكلمة بقطع المحرك"></div></div>
-    </section>
     <section class="panel stage">
       <header><span class="num">3</span><h2>مخطط بناء الشعار</h2><p>القلم السميك والرفيع، والشبكة، وصناديق الجذوع، وكل قطعة باسمها ورقمها.</p></header>
       <div class="fig" id="logoSheet"></div>
@@ -187,19 +170,6 @@ function show(j){
   $("reads").innerHTML=j.lines.map(l=>`<div class="read">السطر ${l.line}: ${l.script==="arabic"?`<b>${esc(l.text_given||l.text_guess||"؟")}</b> <span class="note">${l.text_given?"مُطابق مع النص الذي كتبته":"قراءة المحرك"}</span>`:"لاتيني"}<div class="note">${l.stems.map(s=>esc((s.letter?s.letter+" · ":"")+s.role_ar)).join("، ")}</div></div>`).join("");
   $("obs").innerHTML=j.observations.map(o=>`<li data-k="${o.kind}">${esc(o.text)}</li>`).join("");
   $("feats").innerHTML="<tr><th>معامل الشكل</th><th>القيمة</th><th>العينات</th><th>المعنى</th></tr>"+Object.entries(j.features||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v.value)}${esc(v.unit)}</td><td class="n">${v.samples}</td><td>${esc(v.note)}</td></tr>`).join("");
-  const F=j.fit;$("fitStage").classList.toggle("hidden",!F);
-  if(F){$("fitSummary").innerHTML=`أعاد المحرك رسم «<b>${esc(F.text)}</b>»: التطابق <b>${(F.iou_before*100).toFixed(1)}%</b> بالقياس وحده، و<b>${(F.iou_after*100).toFixed(1)}%</b> بعد ضبط القواعد معًا (${F.evaluations} محاولة).`+(F.outliers.length?` الحروف ${esc(F.outliers.join(" "))} ترسمها عائلات القطع بشكل مختلف عن الشعار، فاستُبعدت من الضبط.`:"");
-    $("fitImg").src="data:image/png;base64,"+j.fit_png;
-    $("fitLetters").innerHTML="<tr><th>الحرف</th><th>تطابق الشكل</th></tr>"+F.letters.map(x=>`<tr><td style="font-size:20px">${esc(x.letter)}</td><td class="n">${(x.iou*100).toFixed(0)}%${x.outlier?" *":""}</td></tr>`).join("");
-    $("fitChanges").innerHTML="<tr><th>القاعدة</th><th>المقيسة</th><th>بعد الضبط</th></tr>"+(F.changes.map(c=>`<tr><td>${esc(c.name)}</td><td class="n">${fmt(c.measured)}</td><td class="n">${fmt(c.fitted)}</td></tr>`).join("")||'<tr><td colspan="3">لم تحتج القواعد إلى ضبط.</td></tr>');}
-  const LR=j.learning;$("learnStage").classList.toggle("hidden",!(LR&&LR.candidates&&LR.candidates.length));
-  if(LR&&LR.candidates&&LR.candidates.length){
-    const nm=x=>x==="engine"?"المحرك (القطع الست)":x.replace("font:","خط ");
-    $("learnSummary").innerHTML=`يبني الكلمة: <b>${esc(nm(LR.chosen))}</b> · ${LR.fonts} ملف خط · ${esc(LR.license)}`;
-    $("learnTable").innerHTML="<tr><th>المصدر</th><th>تطابق إعادة رسم الشعار</th><th>القواعد المحفوظة</th><th>الدرجة</th></tr>"+LR.candidates.map(c=>`<tr${c.source===LR.chosen?' style="font-weight:700"':""}><td>${esc(c.label)}</td><td class="n">${(c.iou*100).toFixed(1)}%</td><td class="n">${c.conformity==null?"—":(c.conformity*100).toFixed(0)+"%"}</td><td class="n">${c.score==null?"—":c.score.toFixed(3)}</td></tr>`).join("");
-    $("winWrap").classList.toggle("hidden",!LR.overlay_png);if(LR.overlay_png)$("winImg").src="data:image/png;base64,"+LR.overlay_png;
-    $("altWrap").classList.toggle("hidden",!j.alt_word_png);if(j.alt_word_png)$("altImg").src="data:image/png;base64,"+j.alt_word_png;}
-  $("decisions").innerHTML=(j.design_decisions||[]).map(d=>`<li>${esc(d)}</li>`).join("");
   $("logoSheet").innerHTML=j.logo_sheet_svg;$("partsSheet").innerHTML=j.parts_svg;$("penSheet").innerHTML=j.pen_svg||'<p class="note" style="padding:12px">لا توجد نقاط كافية لقياس قاعدة القلم.</p>';
   $("wordTitle").textContent="البناء: "+j.word;$("wordImg").src="data:image/png;base64,"+j.word_png;$("construction").innerHTML=j.construction_svg;
   $("recipes").innerHTML="<tr><th>الحرف</th><th>الشكل</th><th>قطع من الشعار</th><th>قطع مستنتجة</th></tr>"+j.recipes.map(r=>`<tr><td style="font-size:20px">${esc(r.letter)}</td><td>${esc(r.form)}</td><td>${esc(r.from_logo.join("، ")||"—")}</td><td>${esc(r.inferred.join("، ")||"—")}</td></tr>`).join("")+(j.skipped.length?`<tr><td colspan="4" class="err">حروف لم تُرسم: ${esc(j.skipped.join(" "))}</td></tr>`:"");
@@ -211,7 +181,7 @@ function show(j){
   add("logo_sheet.svg",j.logo_sheet_svg,"image/svg+xml");add("parts.svg",j.parts_svg,"image/svg+xml");if(j.pen_svg)add("pen_rule.svg",j.pen_svg,"image/svg+xml");
   add("word.svg",j.word_svg,"image/svg+xml");add("word.png",Uint8Array.from(atob(j.word_png),c=>c.charCodeAt(0)),"image/png");add("construction.svg",j.construction_svg,"image/svg+xml");
   add("parts.json",JSON.stringify(j.parts_json,null,1),"application/json");add("measurements.json",JSON.stringify({lines:j.lines,observations:j.observations,style:j.style,verification:j.verification},null,1),"application/json");
-  add("report.md",j.report_md,"text/markdown");if(j.fit_png)add("fit_overlay.png",Uint8Array.from(atob(j.fit_png),c=>c.charCodeAt(0)),"image/png");
+  add("report.md",j.report_md,"text/markdown");
 }
 </script>
 </body>

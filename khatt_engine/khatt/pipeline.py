@@ -20,8 +20,6 @@ import numpy as np
 from .analyze import find_lines, load_binary
 from .bezier import to_path
 from .features import measure_features
-from .fit import fit_line
-from . import fonts as fontlib
 from .library import ACTIVE, build_library
 from .measure import Line, measure_line
 from .render import sheet_svg, to_png, to_svg
@@ -44,7 +42,7 @@ def line_json(L: Line, R: Reading, k: float) -> Dict[str, Any]:
         "slant_deg": L.slant, "stem": _r(L.stem, k), "stem_runs": _r(L.stem_runs, k), "hairline": _r(L.hair, k),
         "contrast": _r(L.stem / L.hair, 1) if L.hair == L.hair and L.hair else None, "monoline": L.monoline,
         "pen_rule": {"stem": _r(L.pen_fit.get("stem", float("nan")), k), "hair": _r(L.pen_fit.get("hair", float("nan")), k),
-                     "power": _r(L.pen_fit.get("power", float("nan"))), "angle": _r(L.pen_fit.get("angle", float("nan")), 1, 1), "median_error": _r(L.pen_fit.get("median_error", float("nan")), k),
+                     "power": _r(L.pen_fit.get("power", float("nan"))), "median_error": _r(L.pen_fit.get("median_error", float("nan")), k),
                      "samples": L.pen_fit.get("samples", 0)} if L.pen_fit else None,
         "x_height": _r(L.x_height, k), "ascender": _r(L.ascender, k), "descender": _r(L.descender, k),
         "white_between_stems": _r(L.white, k), "stem_pitch": _r(L.pitch, k),
@@ -107,15 +105,13 @@ def letter_recipes(lay) -> List[Dict[str, Any]]:
     out = []
     for p in lay.placed:
         c = Counter(p.parts)
-        parts = c if c else Counter((getattr(sh, "source", "engine"), getattr(sh, "name", "")) for sh in p.glyph.shapes)
-        out.append({"letter": p.char, "form": {"i": "منفصل", "I": "أول", "M": "وسط", "F": "آخر"}.get(p.form, p.form),
-                    "from_logo": [f"{n} ×{m}" for (src, n), m in parts.items() if src == "logo"],
-                    "inferred": [f"{n} ({src.replace('font:', 'خط ')}) ×{m}" if src.startswith("font:") else f"{n} ×{m}"
-                                 for (src, n), m in parts.items() if src != "logo"]})
+        out.append({"letter": p.char, "form": {"i": "منفصل", "I": "أول", "M": "وسط", "F": "آخر"}[p.form],
+                    "from_logo": [f"{n} ×{m}" for (src, n), m in c.items() if src == "logo"],
+                    "inferred": [f"{n} ×{m}" for (src, n), m in c.items() if src != "logo"]})
     return out
 
 
-def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: str, src_line: int, corrected: Optional[Style] = None, feats=None, fit=None, decisions=None, learning=None) -> str:
+def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: str, src_line: int, corrected: Optional[Style] = None, feats=None) -> str:
     md = [f"# تقرير بناء: {word}", "", f"الشعار: {name} — القواعد والقطع مأخوذة من السطر {src_line + 1}.", ""]
     md += ["## المرحلة 1: القياس", "", "| القياس | " + " | ".join(f"السطر {l['line']}" for l in lines_js) + " |",
            "|---|" + "---|" * len(lines_js)]
@@ -131,25 +127,6 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
     if feats:
         md += ["", "### معاملات الشكل المقيسة (ما يحكم به المصمم بالعين)", "", "| المعامل | القيمة | عدد العينات | المعنى |", "|---|---|---|---|"]
         md += [f"| {k} | {v['value']}{v['unit']} | {v['samples']} | {v['note']} |" for k, v in feats.items()]
-    if fit:
-        md += ["", "## المرحلة 2ب: إعادة رسم الشعار للتحقق من الفهم", "",
-               f"أعاد المحرك رسم «{fit['text']}» بقواعده فوق الشعار: التطابق {fit['iou_before'] * 100:.1f}% بالقياس وحده، "
-               f"و{fit['iou_after'] * 100:.1f}% بعد ضبط القواعد معًا ({fit['evaluations']} محاولة).", "",
-               "| الحرف | تطابق الشكل |", "|---|---|", *[f"| {x['letter']} | {x['iou'] * 100:.1f}%{' (مستبعد من الضبط)' if x.get('outlier') else ''} |" for x in fit["letters"]]]
-        if fit.get("outliers"):
-            md += ["", f"حروف ترسمها عائلات القطع بشكل مختلف عن الشعار، فاستُبعدت من ضبط القواعد: {' '.join(fit['outliers'])}."]
-        if fit["changes"]:
-            md += ["", "| القاعدة | المقيسة | بعد الضبط |", "|---|---|---|", *[f"| {c['name']} | {c['measured']} | {c['fitted']} |" for c in fit["changes"]]]
-    if decisions:
-        md += ["", "### قرارات تصميم فوق قواعد الشعار", *[f"- {d}" for d in decisions]]
-    if learning and learning.get("candidates"):
-        md += ["", "## المرحلة 2ج: التعلّم من الخطوط المفتوحة", "",
-               f"أعاد كل مصدر رسم نص الشعار فوقه، بعد تكييفه على قواعده (الحجم، والسماكة، والميل، ونقطة الشعار). "
-               f"المصدر الذي يبني الكلمة: **{learning['chosen'].replace('font:', 'خط ')}**. الخطوط: {learning['license']}.", "",
-               "الدرجة = تطابق إعادة رسم الشعار × نسبة قواعد الشعار التي تحفظها الكلمة الجديدة.", "",
-               "| المصدر | تطابق إعادة رسم الشعار | القواعد المحفوظة | الدرجة |", "|---|---|---|---|",
-               *[f"| {c['label']} | {c['iou'] * 100:.1f}% | {('%.0f%%' % (c['conformity'] * 100)) if c.get('conformity') is not None else '—'} | "
-                 f"{('%.3f' % c['score']) if c.get('score') is not None else '—'} |" for c in learning["candidates"]]]
     md += ["", "## المرحلة 3: صندوق القطع", "", "| القطعة | من أين | قياسات |", "|---|---|---|"]
     md += [f"| {p['name']} | {p['source']} | " + ", ".join(f"{k}={v}" for k, v in p.items() if k not in ("key", "name", "source")) + " |" for p in lib.summary()]
     md += ["", "## المرحلة 4: البناء", "", "### القواعد المستعملة", "```json", json.dumps(style.to_dict(), ensure_ascii=False, indent=2), "```",
@@ -165,8 +142,7 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
 
 
 def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
-        overrides: Optional[Dict[str, Any]] = None, use_parts: bool = False, use_fonts: bool = True,
-        out_dir: Optional[str] = None,
+        overrides: Optional[Dict[str, Any]] = None, use_parts: bool = False, out_dir: Optional[str] = None,
         name: str = "logo") -> Dict[str, Any]:
     # 1. load
     work, ink, scale, inverted = load_binary(image)
@@ -191,88 +167,21 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     lib = build_library(L, R, k)
     feats = measure_features(lines, readings, src, k)
     style = style_from(L, lib, k, feats)
-    # analysis by synthesis: redraw the logo's own text and adjust the rules until it matches
-    fit = None
-    fit_text = (R.text_given or R.text_guess or "").replace("ٮ", "ب")
-    if R.script == "arabic" and fit_text and not use_parts:
-        fit = fit_line(L, ink, fit_text, style, scale)
-        if fit is not None and fit.iou_after >= fit.iou_before:
-            style = fit.style
-    # design decisions for new letters, applied on top of what the logo shows (and reported):
-    # the descender is never shorter than the ascender, so dots under the line and cups have room
-    logo_descender = style.descender
-    style.descender = max(style.descender, style.ascender)
     for key, v in (overrides or {}).items():
         if hasattr(style, key) and v is not None:
             setattr(style, key, type(getattr(style, key))(v))
 
-    # learning from open-licensed typefaces: every font redraws the logo; the best source builds
-    learning, font_pick = None, None
-    if use_fonts and fit is not None and not use_parts and fontlib.font_files():
-        from .learn import adapt, choose
-        from .verify import compare, measure_word
-        try:
-            cands, _ = choose(L, ink, scale, fit_text, style, fit.iou_after, fit.letters)
-            # a source is judged on two things: how well it redraws the logo (IoU), and whether its
-            # redrawing of the SAME text keeps the logo's measurable rules (contrast, x-height, dots...).
-            # Comparing identical texts keeps the comparison fair in every style: score = IoU x conformity
-            rows = []
-            pool = cands[:4] + [c for c in cands[4:] if c.source == "engine"]
-            for c in pool:
-                if c.source == "engine":
-                    lay_c = typeset(fit_text, style)
-                else:
-                    face, fp, ks = c.pick
-                    lay_c = adapt(face, fit_text, style, fp, base_scale=ks.get("base_scale"),
-                                  size_k=ks.get("size_k", 1.0), weight_k=ks.get("weight_k", 1.0))
-                chk = compare(style, measure_word(lay_c)) if lay_c.shapes else []
-                ok = [1.0 if r["verdict"] == "مطابق" else 0.5 if r["verdict"] == "قريب" else 0.0
-                      for r in chk if r["verdict"] != "غير مقيس"]
-                conf = sum(ok) / len(ok) if ok else 0.0
-                rows.append((c, conf, c.iou * conf))
-            rows += [(c, None, None) for c in cands if c not in pool]
-            best = max((r for r in rows if r[2] is not None), key=lambda r: r[2])
-            learning = {"candidates": [{"label": c.label, "source": c.source, "iou": c.iou, "distance": c.distance,
-                                        "conformity": (round(cf, 3) if cf is not None else None),
-                                        "score": (round(sc, 4) if sc is not None else None), "letters": c.letters}
-                                       for c, cf, sc in rows],
-                        "chosen": best[0].source, "license": fontlib.LICENSE, "fonts": len(fontlib.font_files())}
-            font_pick = best[0].pick if best[0].source != "engine" else None
-            if font_pick is not None:
-                from .learn import overlay
-                face, fp, ks = font_pick
-                learning["overlay_png"] = overlay(adapt(face, fit_text, style, fp, base_scale=ks.get("base_scale"),
-                                                        size_k=ks.get("size_k", 1.0), weight_k=ks.get("weight_k", 1.0)),
-                                                  L, ink, scale)
-        except Exception as e:                      # learning is an improvement, never a requirement
-            learning = {"error": str(e), "candidates": [], "chosen": "engine"}
-            font_pick = None
-
     # 5-6. build and verify
     def build(st: Style):
-        if font_pick is not None:
-            from .learn import adapt
-            face, fp, ks = font_pick
-            return adapt(face, word, st, fp, base_scale=ks.get("base_scale"),
-                         size_k=ks.get("size_k", 1.0), weight_k=ks.get("weight_k", 1.0))
         tok = ACTIVE.set(lib if use_parts else None)
         try:
             return typeset(word, st)
         finally:
             ACTIVE.reset(tok)
-
-    def build_engine(st: Style):
-        return typeset(word, st)
     lib.used.clear()
     lay, got, checks, corrections = verify_and_correct(build, style)
     if not lay.shapes:
         raise ValueError("الكلمة لا تحتوي على حروف عربية يعرف المحرك رسمها.")
-    alt_png = b""
-    if font_pick is not None:
-        alt = build_engine(style)
-        if alt.shapes:
-            ax0, ay0, ax1, ay1 = alt.bbox()
-            alt_png = to_png(alt, height=int(min(900, max(240, (ay1 - ay0 + 3 * style.stem) * 2))))
     recipes = letter_recipes(lay)
     # 7. drawings
     x0, y0, x1, y1 = lay.bbox()
@@ -286,12 +195,6 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "image": {"width": round(work.width * k), "height": round(work.height * k), "inverted": inverted},
         "lines": lines_js, "observations": obs, "source_line": src,
         "parts": lib.summary(), "parts_json": parts_json, "features": feats,
-        "fit": ({"text": fit.text, "iou_before": fit.iou_before, "iou_after": fit.iou_after, "changes": fit.changes,
-                 "letters": fit.letters, "evaluations": fit.evaluations, "outliers": fit.outliers} if fit else None),
-        "fit_png": fit.overlay_png if fit else b"",
-        "learning": learning, "alt_word_png": alt_png,
-        "design_decisions": ([f"النزول في الشعار {logo_descender:.1f}، وجُعل للكلمة الجديدة {style.descender:.1f} = الصعود، حتى تتسع النقاط والكؤوس تحت السطر."]
-                             if style.descender - logo_descender > 0.5 else []),
         "style": style.to_dict(), "recipes": recipes, "skipped": lay.skipped,
         "verification": checks, "corrections": corrections,
         "word": word, "word_svg": to_svg(lay), "word_png": to_png(lay, height=height),
@@ -301,7 +204,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "parts_svg": parts_sheet(lib) if use_parts else ideal_parts_sheet(style),
         "cut_parts_svg": parts_sheet(lib), "pen_svg": pen_sheet(L, k), "mode": "cut" if use_parts else "ideal",
     }
-    result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats, result['fit'], result['design_decisions'], learning)
+    result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats)
     if out_dir:
         d = Path(out_dir)
         d.mkdir(parents=True, exist_ok=True)
@@ -309,12 +212,6 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
                            ("parts_svg", "parts.svg"), ("pen_svg", "pen_rule.svg"), ("report_md", "report.md")]:
             (d / fname).write_text(result[key], encoding="utf-8")
         (d / "word.png").write_bytes(result["word_png"])
-        if result["fit_png"]:
-            (d / "fit_overlay.png").write_bytes(result["fit_png"])
-        if result["alt_word_png"]:
-            (d / "word_engine.png").write_bytes(result["alt_word_png"])
-        if learning and learning.get("overlay_png"):
-            (d / "fit_overlay_winner.png").write_bytes(learning["overlay_png"])
         (d / "parts.json").write_text(json.dumps(parts_json, ensure_ascii=False, indent=1), encoding="utf-8")
         (d / "measurements.json").write_text(json.dumps({"lines": lines_js, "observations": obs, "style": result["style"],
                                                          "verification": checks}, ensure_ascii=False, indent=1), encoding="utf-8")
