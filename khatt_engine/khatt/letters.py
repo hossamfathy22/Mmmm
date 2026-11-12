@@ -298,9 +298,10 @@ def seen(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 
 def _loop(st: Style) -> Tuple[float, float]:
-    """The long flat loop of ص ط."""
+    """The long loop of ص ط. Like every head it fills the x-height (all letters lie between the
+    baseline and the x-height line); it is longer than a head: its counter is 1.6 whites wide."""
     w = 2 * st.stem + 1.6 * st.white
-    return -w, 0.72 * st.x_height
+    return -w, st.x_height
 
 
 def sad(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -309,9 +310,14 @@ def sad(st: Style, form: str, mark: Optional[str]) -> Glyph:
     shapes = [_ring(st, xl, 0, 0, ht)]
     xt = xl + u
     if form in ("I", "M"):
-        shapes.append(g.stem(st, xt, X, exit=_x(form), round_bl=not _x(form)))
+        # the tooth of ص stands one pitch after the loop, joined by the same u-bowl as two teeth:
+        # the loop's left side gives the right half of the bowl, the tooth the left half
+        xs = xt - st.pitch
+        shapes.append(g.stem(st, xt, 0.5 * X, exit=True))
+        shapes.append(g.stem(st, xs, X, entry=True, exit=_x(form), round_bl=not _x(form)))
         shapes += marks(st, mark, xl / 2, above_ref=ht)
-        return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl, exit_edge=xl, stems=[(xt, X, 0)])
+        return Glyph(shapes, left=xs - u, entry_x=-U, entry_edge=0, exit_x=xs - u, exit_edge=xs - u,
+                     stems=[(xs, X, 0)])
     w = 3.4 * U
     shapes.append(bowl_down(st, xt, 0.4 * ht, w, 0.45 * X))
     shapes += marks(st, mark, xl / 2, above_ref=ht)
