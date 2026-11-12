@@ -251,3 +251,54 @@ def pen_sheet(L: Line, k: float) -> str:
     o.append(f'<text x="{Wd - m}" y="44" font-size="11" text-anchor="start" fill="#5b6878" direction="rtl" font-family="{FONT}">'
              f'{L.pen_fit["samples"]} نقطة مقيسة على الهيكل العظمي للحروف · الخطأ الوسيط {L.pen_fit["median_error"] * k:.2f}</text>')
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {Wd} {Hd + 70}" width="{Wd * 1.4:.0f}" height="{(Hd + 70) * 1.4:.0f}">{"".join(o)}</svg>'
+
+
+# ------------------------------------------------------------------ 2b. the ideal part box (the six parts, drawn from the measured numbers)
+def ideal_parts_sheet(st) -> str:
+    from . import geometry as g
+    from .letters import tail
+    from .typeset import flat
+    U, h, X, D, P, d = st.stem, st.hair, st.x_height, st.descender, st.pitch, st.dot
+    hw = 2 * U + st.white
+    parts = [
+        ("الجذع", f"{U:.1f} × {X:.1f}", [g._fillet_stem(st, 0, X, 0, False, False, False, False)]),
+        ("كأس الوصل", f"جانبان {U:.1f} · قاع {h:.1f} · أبيض {st.white:.1f}",
+         list(flat([g._engine_stem(st, P, X, 0, False, True, False, False), g._engine_stem(st, 0, X, 0, True, False, False, False)]))),
+        ("الرأس (حلقة)", f"{hw:.1f} × {X:.1f} · فراغ {st.white:.1f}", [g.ring(st, -hw, 0, 0, X)]),
+        ("الذيل", f"ينزل −{D:.1f} ويرقّ كلما مال", list(flat([tail(st, 0, 0.62 * X)]))),
+        ("النقطة", f"⌀{d:.1f}", [g.circle(0, X / 2, d / 2, st.tan)]),
+        ("الشرطة", f"{1.5 * d:.1f} × {h:.1f}", [g.rect(-0.75 * d, 0.75 * d, X / 2 - h / 2, X / 2 + h / 2)]),
+    ]
+    fs = max(9.0, 0.45 * U)
+    cell = 5.2 * U + st.tan * X
+    top, bot = X + 0.6 * U, -D - 0.4 * U
+    o = []
+    for i, (name, info, shapes) in enumerate(parts):
+        xs = [x + y * st.tan for s in shapes for poly in s for x, y in poly]
+        ox = (len(parts) - 1 - i) * cell + cell / 2 - (min(xs) + max(xs)) / 2
+        for s in shapes:
+            dd = "".join("M" + " L".join(f"{ox + x + y * st.tan:.1f},{-y:.1f}" for x, y in poly) + "Z" for poly in s)
+            o.append(f'<path fill-rule="evenodd" fill="{C["ink"]}" d="{dd}"/>')
+        cx = (len(parts) - 1 - i) * cell + cell / 2
+        o.append(f'<text x="{cx:.1f}" y="{-bot + 1.4 * fs:.1f}" font-size="{fs:.1f}" font-weight="700" text-anchor="middle" direction="rtl" font-family="{FONT}" fill="{C["text"]}">{_esc(name)}</text>')
+        o.append(f'<text x="{cx:.1f}" y="{-bot + 2.6 * fs:.1f}" font-size="{fs * .8:.1f}" text-anchor="middle" direction="rtl" font-family="{FONT}" fill="#5b6878">{_esc(info)}</text>')
+    W = len(parts) * cell
+    for y, col in ((X, C["base"]), (0, C["base"]), (-D, C["guide"])):
+        o.insert(0, f'<line x1="0" x2="{W:.1f}" y1="{-y:.1f}" y2="{-y:.1f}" stroke="{col}" stroke-width="{max(.6, h * .15):.2f}" stroke-dasharray="{U * .3:.1f} {U * .2:.1f}"/>')
+    # the pen rule as five strokes
+    by = -bot + 5.6 * fs + 1.8 * U
+    for j, deg in enumerate((90, 60, 45, 30, 0)):
+        w = st.width_at(math.sin(math.radians(deg)))
+        cx = W - (j + 0.5) * W / 5
+        a = math.radians(deg); L2 = 1.2 * U
+        dx, dy = math.cos(a) * L2, math.sin(a) * L2
+        nx, ny = -math.sin(a) * w / 2, math.cos(a) * w / 2
+        pts = [(cx - dx + nx, by + dy - ny), (cx + dx + nx, by - dy - ny), (cx + dx - nx, by - dy + ny), (cx - dx - nx, by + dy + ny)]
+        o.append('<polygon points="' + " ".join(f"{p:.1f},{q:.1f}" for p, q in pts) + f'" fill="{C["ink"]}"/>')
+        o.append(f'<text x="{cx:.1f}" y="{by + 1.7 * U:.1f}" font-size="{fs * .85:.1f}" text-anchor="middle" font-family="{FONT}" fill="{C["text"]}">{deg}°</text>')
+        o.append(f'<text x="{cx:.1f}" y="{by + 1.7 * U + 1.2 * fs:.1f}" font-size="{fs * .8:.1f}" text-anchor="middle" direction="rtl" font-family="{FONT}" fill="{C["thin"]}">سمك {w:.1f}</text>')
+    o.append(f'<text x="{W - 4:.1f}" y="{by - 1.9 * U:.1f}" font-size="{fs * .9:.1f}" text-anchor="start" direction="rtl" font-family="{FONT}" font-weight="700" fill="{C["text"]}">'
+             f'قاعدة القلم: السمك = {h:.1f} + ({U:.1f} − {h:.1f}) × |جيب الزاوية|^{st.contrast_power:.2f}</text>')
+    vh = top - bot + 5.6 * fs + 4.4 * U + 2 * fs
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 {-top:.1f} {W:.1f} {vh:.1f}" width="{W * 1.6:.0f}" height="{vh * 1.6:.0f}">'
+            f'<rect x="0" y="{-top:.1f}" width="{W:.1f}" height="{vh:.1f}" fill="#fff"/>{"".join(o)}</svg>')

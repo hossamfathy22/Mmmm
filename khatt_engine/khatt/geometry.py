@@ -39,7 +39,67 @@ def stem(st: Style, xc: float, top: float, bottom: float = 0.0, *, entry: bool =
     return _engine_stem(st, xc, top, bottom, entry, exit, round_br, round_bl)
 
 
+def clip_x(poly: Poly, c: float, keep_right: bool) -> Poly:
+    """Sutherland-Hodgman clip of one polygon against the half-plane x >= c (or x <= c)."""
+    inside = (lambda p: p[0] >= c) if keep_right else (lambda p: p[0] <= c)
+    out: Poly = []
+    n = len(poly)
+    for i in range(n):
+        p, q = poly[i], poly[(i + 1) % n]
+        pin, qin = inside(p), inside(q)
+        if pin:
+            out.append(p)
+        if pin != qin:
+            t = (c - p[0]) / (q[0] - p[0]) if q[0] != p[0] else 0.0
+            out.append((c, p[1] + t * (q[1] - p[1])))
+    return out
+
+
+def bowl_top(st: Style) -> float:
+    return 0.455 * st.x_height
+
+
+def bowl(st: Style, xr: float, xl: float) -> Shape:
+    """The join between two teeth (stem centres xr > xl): thick sides, hairline at the bottom.
+    Outer curve from the outer edges down to the baseline, inner curve from the inner edges
+    down to the hairline. Proportions are those of the hand-built بيدوناق (U = 23, X = 66)."""
+    u, h, U = st.stem / 2, st.hair, st.stem
+    top = bowl_top(st)
+    xm = (xr + xl) / 2
+    a, b, c, d = 0.39 * U, 0.087 * U, 0.565 * U, 0.174 * U
+    pts: Poly = []
+    for seg in (cubic((xr + u, top), (xr + u, a), (xr + b, 0), (xm, 0)),
+                cubic((xm, 0), (xl - b, 0), (xl - u, a), (xl - u, top)),
+                line((xl - u, top), (xl + u, top), 2),
+                cubic((xl + u, top), (xl + u, c), (xl + u + d, h), (xm, h)),
+                cubic((xm, h), (xr - u - d, h), (xr - u, c), (xr - u, top))):
+        pts += [(p[0], p[1]) for p in seg]
+    return [pts]
+
+
 def _engine_stem(st: Style, xc: float, top: float, bottom: float, entry: bool, exit: bool,
+                 round_br: bool, round_bl: bool) -> Shape:
+    """Engine stem. A stem joined at the baseline draws its own half of the join bowl on each
+    joined side; two neighbours' halves meet exactly in the middle of the counter."""
+    u = st.stem / 2
+    on_base = abs(bottom) < 1e-6
+    if on_base and (entry or exit) and top > bowl_top(st) + 0.2 * st.stem:
+        cut = bowl_top(st) - 0.1 * st.stem          # the stem reaches into the bowl: no seam
+        polys: Shape = [[(xc - u, top), (xc + u, top), (xc + u, cut), (xc - u, cut)]]
+        P = st.pitch
+        if exit:                      # joined on the left: right half of bowl(xc, xc - P)
+            b = bowl(st, xc, xc - P)[0]
+            polys.append(clip_x(b, xc - P / 2 - 0.04 * P, True))
+        if entry:                     # joined on the right: left half of bowl(xc + P, xc)
+            b = bowl(st, xc + P, xc)[0]
+            polys.append(clip_x(b, xc + P / 2 + 0.04 * P, False))
+        from .library import Compound, Tagged
+        names = ["جذع"] + ["كأس الوصل"] * (len(polys) - 1)
+        return Compound([Tagged([p], "engine", n) for p, n in zip(polys, names) if len(p) >= 3])   # unioned
+    return _fillet_stem(st, xc, top, bottom, entry, exit, round_br, round_bl)
+
+
+def _fillet_stem(st: Style, xc: float, top: float, bottom: float, entry: bool, exit: bool,
                  round_br: bool, round_bl: bool) -> Shape:
     u, h, F = st.stem / 2, st.hair, st.fillet
     R = u

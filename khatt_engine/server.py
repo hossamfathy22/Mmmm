@@ -28,7 +28,7 @@ def health() -> Dict[str, str]:
 
 @app.post("/api/run")
 async def api_run(image: UploadFile = File(...), word: str = Form(...), texts: str = Form(""), line: int = Form(-1),
-                  overrides: str = Form(""), use_parts: bool = Form(True)) -> Dict[str, Any]:
+                  overrides: str = Form(""), use_parts: bool = Form(False)) -> Dict[str, Any]:
     data = await image.read()
     if not data:
         raise HTTPException(400, "الملف فارغ.")

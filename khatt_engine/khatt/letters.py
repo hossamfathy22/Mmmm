@@ -20,7 +20,13 @@ def _lib():
 
 def _named(shape, name: str):
     """Tag an engine-drawn shape with the name of the part it plays."""
+    if isinstance(shape, (Tagged, Compound)):
+        return shape
     return Tagged(shape, "engine", name)
+
+
+def _ring(st, xl, xr, yb, yt):
+    return _named(g.ring(st, xl, xr, yb, yt), "رأس")
 
 
 @dataclass
@@ -227,8 +233,8 @@ def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
 def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, h = st.stem, st.stem / 2, st.x_height, st.hair
     shapes = [g.stem(st, -u, X, entry=_e(form), exit=True),
-              g.rect(-U - 0.57 * U, -U, X - h, X),
-              g.connector(st, -U - 1.75 * U, -U)]
+              _named(g.rect(-U - 0.57 * U, -U, X - h, X), "راية الدال"),
+              _named(g.connector(st, -U - 1.75 * U, -U), "قاعدة الدال")]
     shapes += marks(st, mark, -u)
     return Glyph(shapes, left=-U - 1.75 * U, stems=[(-u, X, 0)])
 
@@ -268,7 +274,7 @@ def _loop(st: Style) -> Tuple[float, float]:
 def sad(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X = st.stem, st.stem / 2, st.x_height
     xl, ht = _loop(st)
-    shapes = [g.ring(st, xl, 0, 0, ht)]
+    shapes = [_ring(st, xl, 0, 0, ht)]
     xt = xl + u
     if form in ("I", "M"):
         shapes.append(g.stem(st, xt, X, exit=_x(form), round_bl=not _x(form)))
@@ -284,7 +290,7 @@ def tah(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, A = st.stem, st.stem / 2, st.x_height, st.ascender
     xl, ht = _loop(st)
     xt = xl + u
-    shapes = [g.ring(st, xl, 0, 0, ht), g.stem(st, xt, X + A, exit=_x(form), round_bl=not _x(form))]
+    shapes = [_ring(st, xl, 0, 0, ht), g.stem(st, xt, X + A, exit=_x(form), round_bl=not _x(form))]
     shapes += marks(st, mark, xl * 0.38, above_ref=ht)
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl if _x(form) else None,
                  exit_edge=xl if _x(form) else None, stems=[(xt, X + A, 0)])
@@ -295,7 +301,7 @@ def ain(st: Style, form: str, mark: Optional[str]) -> Glyph:
     if form in ("M", "F"):
         xl = -(2 * U + 0.6 * st.white)
         top = 0.8 * X
-        shapes = [g.ring(st, xl, 0, 0, top)]
+        shapes = [_ring(st, xl, 0, 0, top)]
         shapes += marks(st, mark, xl / 2, above_ref=top)
         if form == "M":
             return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
@@ -316,7 +322,7 @@ def ain(st: Style, form: str, mark: Optional[str]) -> Glyph:
 def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
     U, u, P, X = st.stem, st.stem / 2, st.pitch, st.x_height
     xl, w = head_box(st)
-    shapes = [g.ring(st, xl, 0, 0, X)]
+    shapes = [_ring(st, xl, 0, 0, X)]
     shapes += marks(st, mark, xl / 2)
     common = dict(entry_x=-U, entry_edge=0)
     if form in ("I", "M"):
@@ -369,7 +375,7 @@ def meem(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, D = st.stem, st.stem / 2, st.x_height, st.descender
     xl = -(2 * U + 0.55 * st.white)
     top = 0.6 * X
-    shapes = [g.ring(st, xl, 0, 0, top)]
+    shapes = [_ring(st, xl, 0, 0, top)]
     common = dict(entry_x=-U, entry_edge=0)
     if form in ("I", "M"):
         return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
@@ -381,7 +387,7 @@ def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, X, A, h = st.stem, st.x_height, st.ascender, st.hair
     xl, w = head_box(st)
     top = X + 0.5 * A if form == "I" else X
-    shapes = [g.ring(st, xl, 0, 0, top)]
+    shapes = [_ring(st, xl, 0, 0, top)]
     if form == "M":   # ـهـ : a hairline splits the counter into two eyes
         shapes.append(g.rect(xl + U * 0.9, -U * 0.9, X / 2 - h / 2, X / 2 + h / 2))
     shapes += marks(st, mark, xl / 2)
@@ -392,7 +398,7 @@ def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
 def waw(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X = st.stem, st.stem / 2, st.x_height
     xl, w = head_box(st)
-    shapes = [g.ring(st, xl, 0, 0, X), tail(st, -u, X / 2)]
+    shapes = [_ring(st, xl, 0, 0, X), tail(st, -u, X / 2)]
     shapes += marks(st, mark, xl / 2)
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, tail=-u - 3.05 * U - st.hair)
 

@@ -70,7 +70,7 @@ ul.obs li[data-k="match"]{color:var(--accent)}
 <div class="wrap">
   <header>
     <h1>محرك <b>خط</b></h1>
-    <p class="lede">يقيس الشعار، ويفهم حروفه وقطعه، ويقصّ قطعه الحقيقية كمنحنيات بيزيه، ثم يبني كلمتك من هذه القطع ويقيسها ليتحقق أنها تتبع قواعد الشعار. كل شيء يعمل بالقواعد والخوارزميات على جهازك.</p>
+    <p class="lede">يقيس الشعار، ويفهم حروفه وقطعه، ويستخرج قواعده بالأرقام، ثم يرسم كلمتك رسمًا مثاليًا بهذه الأرقام ويقيسها ليتحقق أنها تتبع قواعد الشعار. كل شيء يعمل بالقواعد والخوارزميات على جهازك.</p>
   </header>
 
   <form class="panel" id="form">
@@ -87,7 +87,7 @@ ul.obs li[data-k="match"]{color:var(--accent)}
         <textarea id="texts" dir="rtl" placeholder="مثال: سیرنگ"></textarea>
       </label>
       <div class="row">
-        <label class="row note" for="parts"><input type="checkbox" id="parts" checked> ابنِ من قطع الشعار نفسه</label>
+        <label class="row note" for="parts"><input type="checkbox" id="parts"> تجريبي: قصّ قطع الشعار من بكسلاته بدل رسمها رسمًا مثاليًا بأرقامه</label>
         <button class="btn" id="go" type="submit">ابدأ</button>
       </div>
     </div>
@@ -109,13 +109,13 @@ ul.obs li[data-k="match"]{color:var(--accent)}
       <div class="fig" id="logoSheet"></div>
     </section>
     <section class="panel stage">
-      <header><span class="num">4</span><h2>صندوق القطع</h2><p>قطع حقيقية مقصوصة من الشعار ومحوّلة إلى منحنيات بيزيه. النقاط الحمراء بدايات المنحنيات، والخطوط الزرقاء مقابض التحكم.</p></header>
+      <header><span class="num">4</span><h2>صندوق القطع</h2><p>القطع الست مرسومة رسمًا مثاليًا بأرقام الشعار المقيسة. في الطريقة التجريبية تظهر القطع المقصوصة من الشعار بمنحنيات بيزيه ونقاط تحكمها.</p></header>
       <div class="fig" id="partsSheet"></div>
       <div class="row"><span class="note">قاعدة القلم المقيسة:</span></div>
       <div class="fig" id="penSheet" style="max-width:760px"></div>
     </section>
     <section class="panel stage">
-      <header><span class="num">5</span><h2 id="wordTitle">البناء</h2><p>الداكن قطعة من الشعار، والرمادي قطعة مستنتجة بقواعد الشعار لأن الشعار لا يحتوي عليها.</p></header>
+      <header><span class="num">5</span><h2 id="wordTitle">البناء</h2><p>كل حرف مبني من القطع الست بأرقام الشعار. في الطريقة التجريبية: الداكن مقصوص من الشعار، والرمادي مستنتج.</p></header>
       <div class="fig" style="padding:10px"><img id="wordImg" alt="الكلمة الجديدة"></div>
       <div class="fig" id="construction"></div>
       <div class="tablewrap"><table id="recipes"></table></div>

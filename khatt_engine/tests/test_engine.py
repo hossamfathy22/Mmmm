@@ -12,7 +12,7 @@ from khatt.letters import LETTERS
 from khatt.library import build_library
 from khatt.measure import measure_line
 from khatt.render import to_png
-from khatt.typeset import shape_forms
+from khatt.typeset import flat, shape_forms
 from khatt.understand import read_line
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "bidonaq.png"
@@ -35,7 +35,7 @@ def test_forms_follow_arabic_joining():
 @pytest.mark.parametrize("form", ["i", "I", "M", "F"])
 def test_every_letter_draws_in_every_form(letter, form):
     glyph = LETTERS[letter][1](Style(), form)
-    pts = [p for s in glyph.shapes for poly in s for p in poly]
+    pts = [p for s in flat(glyph.shapes) for poly in s for p in poly]
     assert pts and all(math.isfinite(x) and math.isfinite(y) for x, y in pts)
 
 
@@ -96,9 +96,16 @@ def test_library_cuts_real_parts():
 
 
 # ---------------------------------------------------------------- stages 5-7: build, verify, draw
-def test_pipeline_builds_from_parts_and_verifies(tmp_path):
-    r = run(EXAMPLE.read_bytes(), "شركة", texts=["بيدوناق"], out_dir=str(tmp_path))
-    assert any(r["recipes"][i]["from_logo"] for i in range(len(r["recipes"])))
+def test_default_method_measures_then_redraws_clean_parts(tmp_path):
+    r = run(EXAMPLE.read_bytes(), "بيدوناق", texts=["بيدوناق"], out_dir=str(tmp_path))
+    assert r["mode"] == "ideal"
+    assert not any(x["from_logo"] for x in r["recipes"])
+    assert all(c["verdict"] == "مطابق" for c in r["verification"])
+
+
+def test_cut_parts_mode_uses_the_logo_pixels_and_verifies(tmp_path):
+    r = run(EXAMPLE.read_bytes(), "شركة", texts=["بيدوناق"], use_parts=True, out_dir=str(tmp_path))
+    assert any(x["from_logo"] for x in r["recipes"])
     verdicts = {c["key"]: c["verdict"] for c in r["verification"]}
     assert verdicts["stem"] == "مطابق" and verdicts["slant"] == "مطابق"
     for name in ["word.svg", "word.png", "construction.svg", "logo_sheet.svg", "parts.svg", "pen_rule.svg",

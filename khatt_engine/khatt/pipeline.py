@@ -22,7 +22,7 @@ from .bezier import to_path
 from .library import ACTIVE, build_library
 from .measure import Line, measure_line
 from .render import sheet_svg, to_png, to_svg
-from .sheets import logo_sheet, parts_sheet, pen_sheet, thickness_png
+from .sheets import ideal_parts_sheet, logo_sheet, parts_sheet, pen_sheet, thickness_png
 from .style import Style
 from .typeset import typeset
 from .understand import ROLE_AR, Reading, observations, read_line
@@ -74,7 +74,9 @@ def style_from(L: Line, lib, k: float) -> Style:
     asc = L.ascender * k
     dot = lib.parts["dot"].info["diameter"] if "dot" in lib.parts else 1.1 * L.stem * k
     return Style(stem=L.stem * k, hair=(L.stem if L.monoline else L.hair) * k, x_height=X,
-                 ascender=asc if asc >= 0.3 * X else 0.55 * X, descender=max(L.descender * k, 0.45 * X),
+                 ascender=asc if asc >= 0.3 * X else 0.55 * X,
+                 # the descender is made equal to the ascender (vertical balance), never shorter than the logo's
+                 descender=max(L.descender * k, asc if asc >= 0.3 * X else 0.55 * X),
                  slant=L.slant, white=(L.white if L.white == L.white else L.stem) * k, dot=dot,
                  dash_marks=bool(L.dashes) or not L.dots, contrast_power=float(np.clip(L.power, 0.8, 6.0)))
 
@@ -115,7 +117,7 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
 
 
 def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
-        overrides: Optional[Dict[str, Any]] = None, use_parts: bool = True, out_dir: Optional[str] = None,
+        overrides: Optional[Dict[str, Any]] = None, use_parts: bool = False, out_dir: Optional[str] = None,
         name: str = "logo") -> Dict[str, Any]:
     # 1. load
     work, ink, scale, inverted = load_binary(image)
@@ -173,7 +175,8 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "construction_svg": sheet_svg(lay, title=word, white=style.white),
         "spacing_used": round(lay.style.white, 2),
         "logo_sheet_svg": logo_sheet(thickness_png(ink, lines), (round(work.width * k), round(work.height * k)), scale, lines, readings),
-        "parts_svg": parts_sheet(lib), "pen_svg": pen_sheet(L, k),
+        "parts_svg": parts_sheet(lib) if use_parts else ideal_parts_sheet(style),
+        "cut_parts_svg": parts_sheet(lib), "pen_svg": pen_sheet(L, k), "mode": "cut" if use_parts else "ideal",
     }
     result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style.white)
     if out_dir:

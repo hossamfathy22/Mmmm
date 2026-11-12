@@ -71,7 +71,7 @@ def sheet_svg(lay: Layout, title: str = "", white: Optional[float] = None) -> st
     U, X, A, D, h = st.stem, st.x_height, st.ascender, st.descender, st.hair
     x0, y0, x1, y1 = lay.bbox()
     fs = max(9.0, U * 0.42)
-    pad_l, pad_r, pad_t, pad_b = U * 1.5, U * 9.5, U * 3.2, U * 3.0
+    pad_l, pad_r, pad_t, pad_b = U * 1.5, U * 9.5, U * 5.5, U * 5.5
     left, right = x0 - pad_l, x1 + pad_r + abs(st.tan) * (X + A)
     top, bottom = -(y1 + pad_t), -(y0 - pad_b)
     vw, vh = right - left, bottom - top
@@ -90,7 +90,9 @@ def sheet_svg(lay: Layout, title: str = "", white: Optional[float] = None) -> st
         o.append(f'<line x1="{left:.1f}" x2="{gx1:.1f}" y1="{-y:.1f}" y2="{-y:.1f}" stroke="{col}" stroke-width="{max(0.6, h * 0.18):.2f}" stroke-dasharray="{U*0.25:.1f} {U*0.18:.1f}"/>')
         text(gx1 + U * 0.4, -y + fs * 0.35, lab, col)
     order = sorted(lay.shapes, key=lambda sh: getattr(sh, "source", "engine") == "logo")
-    body = "".join(f'<path fill-rule="evenodd" fill="{C["ink"] if getattr(sh, "source", "engine") == "logo" else C["engine"]}" d="{_d(lay, sh)}"/>' for sh in order)
+    mixed = any(getattr(sh, "source", "") == "logo" for sh in lay.shapes)
+    colour = lambda sh: C["ink"] if (not mixed or getattr(sh, "source", "engine") == "logo") else C["engine"]
+    body = "".join(f'<path fill-rule="evenodd" fill="{colour(sh)}" d="{_d(lay, sh)}"/>' for sh in order)
     o.insert(0, f'<g>{body}</g>')
     has_logo = any(getattr(sh, "source", "") == "logo" for sh in lay.shapes)
     if has_logo:
@@ -120,6 +122,48 @@ def sheet_svg(lay: Layout, title: str = "", white: Optional[float] = None) -> st
             p, q = _sk(lay, c1 + U / 2, ya), _sk(lay, c0 - U / 2, ya)
             o.append(f'<line x1="{p[0]:.1f}" x2="{q[0]:.1f}" y1="{p[1]:.1f}" y2="{q[1]:.1f}" stroke="{C["dim"]}" stroke-width="{sw*1.6:.2f}"/>')
             text((p[0] + q[0]) / 2, p[1] - fs * 0.4, f"أبيض {(white if white is not None else st.white):.1f}", C["dim"], size=fs * 0.85, anchor="middle")
+    # one label per kind of part, with a leader line
+    LBL = {"كأس الوصل": f"قاع الكأس {h:.1f}", "رأس": f"رأس {2 * U + st.white:.0f}×{X:.0f}", "ذيل": f"ذيل −{D:.0f}",
+           "كأس سفلي": f"كأس سفلي −{D:.0f}", "كأس أيمن": "كأس يمين", "نقطة": f"نقطة ⌀{st.dot:.1f}",
+           "شرطة": f"شرطة {1.5 * st.dot:.0f}×{h:.1f}", "راية الدال": f"راية الدال {0.57 * U:.0f}×{h:.1f}",
+           "قاعدة الدال": f"قاعدة الدال {h:.1f}"}
+    seen = set()
+    used_y: List[float] = []
+    for sh in lay.shapes:
+        nm = getattr(sh, "name", "")
+        if nm not in LBL or nm in seen:
+            continue
+        seen.add(nm)
+        pts = [_sk(lay, x, y) for poly in sh for x, y in poly]
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        ax, ay = (min(xs) + max(xs)) / 2, max(ys) if nm in ("كأس الوصل", "ذيل", "كأس سفلي", "قاعدة الدال") else min(ys)
+        below = ay > -0.1 * X
+        ty = (D + U * 1.6) if below else -(X + A + U * 0.9)
+        while any(abs(ty - u) < fs * 1.3 and True for u in used_y):
+            ty += fs * 1.3 if below else -fs * 1.3
+        used_y.append(ty)
+        col = C["hair"] if nm in ("كأس الوصل", "شرطة", "راية الدال", "قاعدة الدال") else (C["guide"] if nm == "نقطة" else C["ink"])
+        o.append(f'<line x1="{ax:.1f}" y1="{ay:.1f}" x2="{ax:.1f}" y2="{ty - (fs * 0.9 if below else -fs * 0.3):.1f}" stroke="{col}" stroke-width="{sw * 0.8:.2f}"/>')
+        text(ax, ty, LBL[nm], col, size=fs * 0.8, anchor="middle")
+    # gaps between letters that do not join, measured at mid height
+    for a, b in zip(lay.placed, lay.placed[1:]):
+        if b.form in ("M", "F"):
+            continue
+        xa = a.x + a.glyph.left
+        xb = b.x + b.glyph.entry_edge
+        if xa - xb <= 0.5:
+            continue
+        p1, p2 = _sk(lay, xb, X * 0.5), _sk(lay, xa, X * 0.5)
+        o.append(f'<line x1="{p1[0]:.1f}" x2="{p2[0]:.1f}" y1="{p1[1]:.1f}" y2="{p2[1]:.1f}" stroke="{C["dim"]}" stroke-width="{sw * 1.6:.2f}"/>')
+        text((p1[0] + p2[0]) / 2, p1[1] - fs * 0.4, f"{xa - xb:.0f}", C["dim"], size=fs * 0.8, anchor="middle")
+    if len(centres) >= 2:
+        cs = sorted(centres, reverse=True)
+        steps = [a - b for a, b in zip(cs, cs[1:]) if a - b < 1.6 * st.pitch]
+        if steps:
+            c0 = cs[0]
+            p1, p2 = _sk(lay, c0 - steps[0], X + U * 1.2), _sk(lay, c0, X + U * 1.2)
+            o.append(f'<line x1="{p1[0]:.1f}" x2="{p2[0]:.1f}" y1="{p1[1]:.1f}" y2="{p2[1]:.1f}" stroke="{C["dim"]}" stroke-width="{sw * 1.4:.2f}"/>')
+            text((p1[0] + p2[0]) / 2, p1[1] - fs * 0.4, f"خطوة {steps[0]:.0f}", C["dim"], size=fs * 0.8, anchor="middle")
     sx = gx1 - U * 0.2
     o.append(f'<line x1="{sx:.1f}" y1="0" x2="{sx + st.tan * (X + A):.1f}" y2="{-(X + A):.1f}" stroke="{C["stem"]}" stroke-width="{sw*1.4:.2f}"/>')
     text(sx, D * 0.55, f"ميل {st.slant:.1f}°", C["stem"], anchor="middle")

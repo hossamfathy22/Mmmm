@@ -15,11 +15,11 @@ def main() -> int:
     p.add_argument("-o", "--out", default="khatt_out", help="مجلد النتائج")
     p.add_argument("--text", default="", help="النص المكتوب في الشعار، سطر لكل سطر مفصولة بـ | (اختياري، يحسّن الفهم)")
     p.add_argument("--line", type=int, default=None, help="رقم السطر الذي تؤخذ منه القطع (يبدأ من 1)")
-    p.add_argument("--engine-only", action="store_true", help="ارسم بقطع المحرك وأرقام الشعار فقط، دون قطع الشعار")
+    p.add_argument("--cut-parts", action="store_true", help="تجريبي: قصّ قطع الشعار من بكسلاته بدل رسمها رسمًا مثاليًا بأرقامه")
     a = p.parse_args()
     try:
         r = run(Path(a.image).read_bytes(), a.word, texts=[t for t in a.text.split("|")] if a.text else None,
-                line=(a.line - 1) if a.line else None, use_parts=not a.engine_only, out_dir=a.out, name=Path(a.image).name)
+                line=(a.line - 1) if a.line else None, use_parts=a.cut_parts, out_dir=a.out, name=Path(a.image).name)
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
