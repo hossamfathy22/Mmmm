@@ -105,7 +105,7 @@ def _join_profile(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
         full = (c1 - c0)
         mc = int(round((c0 + c1) / 2))
         prof = L.G[:, mc - 1:mc + 2].mean(axis=1)
-        r0 = int(round(L.row_of_y(0.0)))
+        r0 = min(len(prof) - 1, max(0, int(round(L.row_of_y(0.0)))))
         # the bottom of the counter: walk up the middle column from the baseline until the ink ends
         r = r0
         while r > 0 and prof[r] < L.level and r > r0 - 0.3 * L.stem:
@@ -113,7 +113,7 @@ def _join_profile(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
         while r > 0 and prof[r] >= L.level:
             r -= 1
         y_bottom = L.y_of_row(r)
-        for rr in range(r, int(L.row_of_y(0.9 * X)), -1):
+        for rr in range(min(r, L.G.shape[0] - 1), max(0, int(L.row_of_y(0.9 * X))), -1):
             w = float((L.G[rr, int(c0) - 1:int(c1) + 2] < L.level).sum())
             if w >= 0.92 * full:
                 ins.append(L.y_of_row(rr) / X)
@@ -241,8 +241,12 @@ def measure_features(lines: List[Line], readings: List[Reading], src: int, k: fl
     put("tail_reach", (_median(reaches) / L.stem) if reaches else None, len(reaches), "امتداد الذيل إلى اليسار بوحدة الجذع")
     ov, oc = _overshoot(lines)
     put("overshoot", ov * k if ov is not None else None, oc, "نزول القيعان المستديرة تحت القيعان المسطحة", "px")
-    lows = [v for v in L.levels if v.name == "lowered" and v.n >= 2]
-    put("seen_drop", ((L.x_height - lows[0].y) * k) if lows else None, lows[0].n if lows else 0,
+    # lowered teeth: only inner teeth of a run (joined on both sides by tooth joins), as in س
+    tooth_join = {(j.right, j.left) for j in R.joins if j.kind == "join"}
+    inner = [s for i, s in enumerate(L.stems) if (i - 1, i) in tooth_join and (i, i + 1) in tooth_join
+             and s.role in ("tooth", "lowered")]
+    drops = [L.x_height - s.top for s in inner if s.role == "lowered"]
+    put("seen_drop", (_median(drops) * k) if len(drops) >= 2 else None, len(drops),
         "انخفاض الأسنان الداخلية عن ارتفاع الحروف", "px")
     gg = _group_gap(L, R)
     put("group_gap", gg * k if gg is not None else None, 1, "الأبيض بين حرفين غير متصلين", "px")

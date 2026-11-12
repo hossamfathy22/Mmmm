@@ -140,3 +140,13 @@ def test_shapes_of_the_first_style():
     assert st["slant"] == pytest.approx(14, abs=1)
     assert st["top_round"] < 0.2 and abs(st["top_angle"]) < 3
     assert st["dot_n"] < 3
+
+
+# ---------------------------------------------------------------- analysis by synthesis
+def test_redrawing_the_logo_matches_and_moves_rules_towards_the_truth():
+    """The test logo was drawn with hair 9, pen power 1.5 and descender 40 (x1.6 in the image)."""
+    r = run(ROUND.read_bytes(), "بيدوناق", texts=["سفينة نجم"])
+    f = r["fit"]
+    assert f["iou_after"] >= f["iou_before"] and f["iou_after"] > 0.95
+    assert not f["outliers"]
+    assert abs(r["style"]["contrast_power"] - 1.5) < 0.2

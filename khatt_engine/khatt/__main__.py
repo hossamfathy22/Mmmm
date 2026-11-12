@@ -26,6 +26,14 @@ def main() -> int:
     for l in r["lines"]:
         print(f"السطر {l['line']} ({l['script']}): جذع {l['stem']} · شعري {l['hairline']} · ميل {l['slant_deg']}° · ارتفاع {l['x_height']}"
               + (f" · قرأ: {l['text_guess']}" if l["text_guess"] else ""))
+    if r["fit"]:
+        f = r["fit"]
+        print(f"إعادة رسم «{f['text']}»: تطابق {f['iou_before'] * 100:.1f}% ← {f['iou_after'] * 100:.1f}% بعد الضبط")
+        print("  شكل كل حرف:", "  ".join(f"{x['letter']} {x['iou'] * 100:.0f}%" + ("*" if x.get("outlier") else "") for x in f["letters"]))
+        if f["outliers"]:
+            print("  * مستبعد من الضبط لأن عائلات القطع ترسمه بشكل مختلف:", " ".join(f["outliers"]))
+        for c in f["changes"]:
+            print(f"  ضبط {c['name']}: {c['measured']} ← {c['fitted']}")
     print("القطع:", "، ".join(p["name"] for p in r["parts"]))
     for c in r["verification"]:
         print(f"  تحقق {c['name']}: الشعار {c['rule']} · الكلمة {c['word']} → {c['verdict']}")
