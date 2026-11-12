@@ -17,6 +17,19 @@ class Style:
     dot: float = 25.0           # diameter of a dot
     dash_marks: bool = True     # two dots become one hairline dash
     contrast_power: float = 2.0 # how fast a curve thins from stem to hairline
+    # ---- shape parameters (measured from the logo by features.py; defaults = the hand-built بيدوناق)
+    top_angle: float = 0.0      # degrees: how the top of a stem is cut
+    top_round: float = 0.0      # 0 = square corners, 1 = half circle
+    join_in: float = 0.455      # where the inner curve of a join starts, fraction of the x-height
+    join_out: float = 0.455     # where the outer curve of a join starts, fraction of the x-height
+    ring_n: float = 2.3         # squareness of heads (2 = ellipse)
+    dot_n: float = 2.0          # 2 = round dot, larger = square
+    dot_rot: float = 0.0        # 45 = diamond
+    tail_reach: float = 3.05    # how far a tail sweeps left, in stems
+    overshoot: float = 0.0      # round bottoms and tops pass the lines by this much
+    seen_drop: float = 0.0      # inner teeth of س ش are this much lower
+    group_gap: float = 0.0      # white between letters that do not join (0 = 1.15 x white)
+    round_gap: float = 1.18     # extra white before a round head (optical spacing)
 
     @property
     def pitch(self) -> float:

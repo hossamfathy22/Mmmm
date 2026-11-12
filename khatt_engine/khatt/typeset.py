@@ -93,7 +93,7 @@ def typeset(word: str, st: Style) -> Layout:
     lay = Layout(text=word, style=st)
     x = 0.0
     prev: Optional[Placed] = None
-    group_gap = 1.15 * st.white
+    group_gap = st.group_gap if st.group_gap > 0 else 1.15 * st.white
     for c, form in shape_forms(word):
         if form == " ":
             if prev is not None:
@@ -110,7 +110,8 @@ def typeset(word: str, st: Style) -> Layout:
             if joined and prev.glyph.exit_edge is not None:
                 x = prev.x + prev.glyph.exit_edge - st.white - glyph.entry_edge
             else:
-                x = prev.x + prev.glyph.left - group_gap - glyph.entry_edge
+                gap = group_gap * (st.round_gap if glyph.entry_x < glyph.entry_edge - 1e-6 else 1.0)   # optical: rounds need more
+                x = prev.x + prev.glyph.left - gap - glyph.entry_edge
                 if prev.glyph.tail is not None and glyph.below is not None:
                     # a dot under this letter must not sit on the tail of the letter before
                     x = min(x, prev.x + prev.glyph.tail - 0.4 * st.dot - glyph.below[1])

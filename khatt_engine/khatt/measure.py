@@ -279,7 +279,9 @@ def _pieces(L: Line, U0: float) -> None:
         # a sheared circle keeps its area; measure its height instead of its (slanted) width
         diam = math.sqrt(4 * area / math.pi)
         kind = "body"
-        if 0.5 * U0 <= hh <= 2.4 * U0 and 0.5 * U0 <= diam <= 2.2 * U0 and 0.6 < fill < 0.9 and 0.7 < (hh / diam) < 1.3:
+        # round, square or diamond dots: about one stem across, nearly as tall as wide, mostly filled
+        if 0.5 * U0 <= hh <= 2.4 * U0 and 0.5 * U0 <= diam <= 2.2 * U0 and 0.45 < fill <= 1.0 and 0.7 < (hh / diam) < 1.32 \
+                and not (hh > 1.5 * diam):
             kind = "dot"
         elif ww >= 3 * hh and hh <= max(3.5 * hair_guess, 0.5 * U0) and ww >= 0.8 * U0:
             kind = "dash"

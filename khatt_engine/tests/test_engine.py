@@ -116,3 +116,27 @@ def test_cut_parts_mode_uses_the_logo_pixels_and_verifies(tmp_path):
 def test_style_keeps_room_under_the_baseline():
     r = run(EXAMPLE.read_bytes(), "بنت")
     assert r["style"]["descender"] >= 0.45 * r["style"]["x_height"] - 0.01
+
+
+# ---------------------------------------------------------------- shape judgement on a logo of a different style
+ROUND = Path(__file__).parent.parent / "examples" / "round_square.png"
+
+
+def test_shapes_are_read_from_a_different_logo():
+    """The test logo was drawn upright, with round stem tops, square dots and squarish heads."""
+    r = run(ROUND.read_bytes(), "بيدوناق", texts=["سفينة نجم"])
+    st = r["style"]
+    assert st["slant"] == pytest.approx(0, abs=0.5)
+    assert st["top_round"] > 0.75
+    assert st["dot_n"] > 5
+    assert st["ring_n"] == pytest.approx(3.5, abs=0.5)
+    assert st["overshoot"] < 1.0
+    assert all(c["verdict"] in ("مطابق", "قريب") for c in r["verification"])
+
+
+def test_shapes_of_the_first_style():
+    r = run(EXAMPLE.read_bytes(), "بيدوناق", texts=["بيدوناق"])
+    st = r["style"]
+    assert st["slant"] == pytest.approx(14, abs=1)
+    assert st["top_round"] < 0.2 and abs(st["top_angle"]) < 3
+    assert st["dot_n"] < 3

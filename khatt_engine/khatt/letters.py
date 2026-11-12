@@ -68,7 +68,7 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
 
     def dot(x, y):
         got = lib.dot(x, y) if lib is not None else None
-        return got if got is not None else _named(g.circle(x, y, d / 2, st.tan), "نقطة")
+        return got if got is not None else _named(g.circle(x, y, d / 2, st.tan, shape_n=st.dot_n, rot=st.dot_rot), "نقطة")
 
     def dash(x, y, length):
         got = lib.dash(x, y, length) if lib is not None else None
@@ -96,7 +96,7 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
 
 # ---------------------------------------------------------------- shared parts
 def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = None,
-          x0: float = 0.0) -> Tuple[List[g.Shape], List[float]]:
+          x0: float = 0.0, drop_inner: bool = False) -> Tuple[List[g.Shape], List[float]]:
     """n teeth joined at the baseline, right to left, starting at right edge x0."""
     u, P = st.stem / 2, st.pitch
     top = st.x_height if top is None else top
@@ -105,7 +105,8 @@ def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = Non
     for i, xc in enumerate(xs):
         ent = entry if i == 0 else True
         ex = exit if i == n - 1 else True
-        shapes.append(g.stem(st, xc, top, entry=ent, exit=ex,
+        t = top - st.seen_drop if (drop_inner and i > 0) else top
+        shapes.append(g.stem(st, xc, t, entry=ent, exit=ex,
                              round_br=(i == 0 and not entry), round_bl=(i == n - 1 and not exit)))
         if i > 0:
             shapes.append(g.connector(st, xc + u, xs[i - 1] - u))
@@ -133,7 +134,8 @@ def tail(st: Style, r: float, top: float) -> g.Shape:
         if sh is not None:
             parts.insert(0, sh)
         return parts
-    U, D, h = st.stem, st.descender, st.hair
+    D, h = st.descender, st.hair
+    U = st.stem * st.tail_reach / 3.05           # horizontal scale of the sweep, from the logo
     yb = -D + h / 2
     return _named(g.stroke(st, g.path(
         g.line((r, top), (r, 0)),
@@ -254,10 +256,10 @@ def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
 def seen(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, P, X = st.stem, st.stem / 2, st.pitch, st.x_height
     if form in ("I", "M"):
-        shapes, xs = teeth(st, 3, _e(form), _x(form))
+        shapes, xs = teeth(st, 3, _e(form), _x(form), drop_inner=True)
         shapes += marks(st, mark, xs[1])
         return Glyph(shapes, left=xs[-1] - u, exit_x=xs[-1] - u, exit_edge=xs[-1] - u, stems=[(x, X, 0) for x in xs])
-    shapes, xs = teeth(st, 2, _e(form), True)
+    shapes, xs = teeth(st, 2, _e(form), True, drop_inner=True)
     r = xs[-1] - P
     w = 3.4 * U
     shapes += [g.connector(st, r + u, xs[-1] - u), g.stem(st, r, X, entry=True), bowl_down(st, r, 0.4 * X, w, 0.45 * X)]

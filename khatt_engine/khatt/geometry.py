@@ -55,24 +55,38 @@ def clip_x(poly: Poly, c: float, keep_right: bool) -> Poly:
     return out
 
 
+def top_edge(st: Style, xc: float, top: float) -> Poly:
+    """The top of a stem, left to right: cut at the logo's angle, corners rounded by top_round."""
+    u = st.stem / 2
+    ta = math.tan(math.radians(st.top_angle))
+    r = max(0.0, min(1.0, st.top_round)) * u
+    pts: Poly = []
+    if r < 0.3:
+        pts = [(xc - u, top), (xc + u, top)]
+    else:
+        pts += [(xc - u + r - r * math.cos(math.radians(a)), top - r + r * math.sin(math.radians(a))) for a in range(0, 91, 10)]
+        pts += [(xc + u - r + r * math.cos(math.radians(a)), top - r + r * math.sin(math.radians(a))) for a in range(90, -1, -10)]
+    return [(x, y + ta * (x - xc)) for x, y in pts]
+
+
 def bowl_top(st: Style) -> float:
-    return 0.455 * st.x_height
+    return max(st.join_in, st.join_out) * st.x_height
 
 
 def bowl(st: Style, xr: float, xl: float) -> Shape:
     """The join between two teeth (stem centres xr > xl): thick sides, hairline at the bottom.
-    Outer curve from the outer edges down to the baseline, inner curve from the inner edges
-    down to the hairline. Proportions are those of the hand-built بيدوناق (U = 23, X = 66)."""
-    u, h, U = st.stem / 2, st.hair, st.stem
-    top = bowl_top(st)
+    The outer curve starts at join_out x X on the outer edges and reaches the baseline (minus the
+    overshoot) in the middle; the inner curve starts at join_in x X and reaches the hairline."""
+    u, h, U, X = st.stem / 2, st.hair, st.stem, st.x_height
+    hin, hout, ov = st.join_in * X, st.join_out * X, st.overshoot
     xm = (xr + xl) / 2
-    a, b, c, d = 0.39 * U, 0.087 * U, 0.565 * U, 0.174 * U
     pts: Poly = []
-    for seg in (cubic((xr + u, top), (xr + u, a), (xr + b, 0), (xm, 0)),
-                cubic((xm, 0), (xl - b, 0), (xl - u, a), (xl - u, top)),
-                line((xl - u, top), (xl + u, top), 2),
-                cubic((xl + u, top), (xl + u, c), (xl + u + d, h), (xm, h)),
-                cubic((xm, h), (xr - u - d, h), (xr - u, c), (xr - u, top))):
+    for seg in (cubic((xr + u, hout), (xr + u, 0.3 * hout - ov), (xr + 0.087 * U, -ov), (xm, -ov)),
+                cubic((xm, -ov), (xl - 0.087 * U, -ov), (xl - u, 0.3 * hout - ov), (xl - u, hout)),
+                line((xl - u, hout), (xl + u, hin), 2),
+                cubic((xl + u, hin), (xl + u, 0.43 * hin), (xl + u + 0.174 * U, h), (xm, h)),
+                cubic((xm, h), (xr - u - 0.174 * U, h), (xr - u, 0.43 * hin), (xr - u, hin)),
+                line((xr - u, hin), (xr + u, hout), 2)):
         pts += [(p[0], p[1]) for p in seg]
     return [pts]
 
@@ -84,8 +98,8 @@ def _engine_stem(st: Style, xc: float, top: float, bottom: float, entry: bool, e
     u = st.stem / 2
     on_base = abs(bottom) < 1e-6
     if on_base and (entry or exit) and top > bowl_top(st) + 0.2 * st.stem:
-        cut = bowl_top(st) - 0.1 * st.stem          # the stem reaches into the bowl: no seam
-        polys: Shape = [[(xc - u, top), (xc + u, top), (xc + u, cut), (xc - u, cut)]]
+        cut = min(st.join_in, st.join_out) * st.x_height - 0.1 * st.stem   # the stem reaches into the bowl
+        polys: Shape = [top_edge(st, xc, top) + [(xc + u, cut), (xc - u, cut)]]
         P = st.pitch
         if exit:                      # joined on the left: right half of bowl(xc, xc - P)
             b = bowl(st, xc, xc - P)[0]
@@ -105,7 +119,7 @@ def _fillet_stem(st: Style, xc: float, top: float, bottom: float, entry: bool, e
     R = u
     xl, xr = xc - u, xc + u
     on_base = abs(bottom) < 1e-6
-    p: Poly = [(xl, top), (xr, top)]
+    p: Poly = top_edge(st, xc, top)
     if on_base and entry:
         p.append((xr, h + F)); p += arc(xr + F, h + F, F, 180, 270)[1:]; p.append((xr + F, 0))
     elif on_base and round_br:
@@ -143,12 +157,18 @@ def ring(st: Style, xl: float, xr: float, yb: float, yt: float, side: float | No
         if got is not None:
             return got
     side = st.stem if side is None else side
+    ov = st.overshoot
+    if abs(yb) < 1e-6:
+        yb -= ov
+    if yt >= 0.99 * st.x_height:
+        yt += ov
     cx, cy, a, b = (xl + xr) / 2, (yb + yt) / 2, (xr - xl) / 2, (yt - yb) / 2
-    outer = _super(cx, cy, a, b)
+    n = max(1.5, st.ring_n)
+    outer = _super(cx, cy, a, b, n)
     ai, bi = a - side, b - st.hair
     if ai < 1 or bi < 1:
         return [outer]
-    return [outer, _super(cx, cy, ai, bi)]
+    return [outer, _super(cx, cy, ai, bi, n)]
 
 
 # ---- variable-width strokes (tails, bowls) -------------------------------------------------
@@ -209,10 +229,15 @@ def open_arc(st: Style, cx: float, cy: float, a: float, b: float, a0: float, a1:
     return stroke(small, pts)
 
 
-def circle(cx: float, cy: float, r: float, tan: float = 0.0, n: int = 48) -> Shape:
-    """A dot. Pre-compensated for the slant so it stays perfectly round after shearing."""
+def circle(cx: float, cy: float, r: float, tan: float = 0.0, n: int = 48, shape_n: float = 2.0, rot: float = 0.0) -> Shape:
+    """A dot: a superellipse (2 = circle, larger = square), optionally turned (45 = diamond).
+    Pre-compensated for the slant so it keeps its shape after shearing."""
     pts = []
+    e = 2.0 / max(1.2, shape_n)
+    cr, sr = math.cos(math.radians(rot)), math.sin(math.radians(rot))
     for i in range(n):
         c, s = math.cos(2 * math.pi * i / n), math.sin(2 * math.pi * i / n)
-        pts.append((cx + r * c - r * s * tan, cy + r * s))
+        x, y = r * math.copysign(abs(c) ** e, c), r * math.copysign(abs(s) ** e, s)
+        x, y = x * cr - y * sr, x * sr + y * cr
+        pts.append((cx + x - y * tan, cy + y))
     return [pts]

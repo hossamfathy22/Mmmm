@@ -103,6 +103,7 @@ ul.obs li[data-k="match"]{color:var(--accent)}
       <header><span class="num">2</span><h2>الفهم</h2><p>نوع الخط في كل سطر، والحروف التي تعرّف عليها المحرك، والقواعد والتطابقات المستنتجة من الأرقام.</p></header>
       <div class="reads" id="reads"></div>
       <ul class="obs" id="obs"></ul>
+      <div class="tablewrap"><table id="feats"></table></div>
     </section>
     <section class="panel stage">
       <header><span class="num">3</span><h2>مخطط بناء الشعار</h2><p>القلم السميك والرفيع، والشبكة، وصناديق الجذوع، وكل قطعة باسمها ورقمها.</p></header>
@@ -168,6 +169,7 @@ function show(j){
     rows.map(([n,k,f])=>`<tr><td>${n}</td>${j.lines.map(l=>`<td class="n">${esc(f?f(l[k]):fmt(l[k]))}</td>`).join("")}</tr>`).join("");
   $("reads").innerHTML=j.lines.map(l=>`<div class="read">السطر ${l.line}: ${l.script==="arabic"?`<b>${esc(l.text_given||l.text_guess||"؟")}</b> <span class="note">${l.text_given?"مُطابق مع النص الذي كتبته":"قراءة المحرك"}</span>`:"لاتيني"}<div class="note">${l.stems.map(s=>esc((s.letter?s.letter+" · ":"")+s.role_ar)).join("، ")}</div></div>`).join("");
   $("obs").innerHTML=j.observations.map(o=>`<li data-k="${o.kind}">${esc(o.text)}</li>`).join("");
+  $("feats").innerHTML="<tr><th>معامل الشكل</th><th>القيمة</th><th>العينات</th><th>المعنى</th></tr>"+Object.entries(j.features||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v.value)}${esc(v.unit)}</td><td class="n">${v.samples}</td><td>${esc(v.note)}</td></tr>`).join("");
   $("logoSheet").innerHTML=j.logo_sheet_svg;$("partsSheet").innerHTML=j.parts_svg;$("penSheet").innerHTML=j.pen_svg||'<p class="note" style="padding:12px">لا توجد نقاط كافية لقياس قاعدة القلم.</p>';
   $("wordTitle").textContent="البناء: "+j.word;$("wordImg").src="data:image/png;base64,"+j.word_png;$("construction").innerHTML=j.construction_svg;
   $("recipes").innerHTML="<tr><th>الحرف</th><th>الشكل</th><th>قطع من الشعار</th><th>قطع مستنتجة</th></tr>"+j.recipes.map(r=>`<tr><td style="font-size:20px">${esc(r.letter)}</td><td>${esc(r.form)}</td><td>${esc(r.from_logo.join("، ")||"—")}</td><td>${esc(r.inferred.join("، ")||"—")}</td></tr>`).join("")+(j.skipped.length?`<tr><td colspan="4" class="err">حروف لم تُرسم: ${esc(j.skipped.join(" "))}</td></tr>`:"");

@@ -19,6 +19,7 @@ import numpy as np
 
 from .analyze import find_lines, load_binary
 from .bezier import to_path
+from .features import measure_features
 from .library import ACTIVE, build_library
 from .measure import Line, measure_line
 from .render import sheet_svg, to_png, to_svg
@@ -69,16 +70,35 @@ def pick_line(lines: List[Line], readings: List[Reading], line: Optional[int]) -
     return (arabic or usable)[0]
 
 
-def style_from(L: Line, lib, k: float) -> Style:
+def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) -> Style:
     X = L.x_height * k
     asc = L.ascender * k
     dot = lib.parts["dot"].info["diameter"] if "dot" in lib.parts else 1.1 * L.stem * k
-    return Style(stem=L.stem * k, hair=(L.stem if L.monoline else L.hair) * k, x_height=X,
+    base = Style(stem=L.stem * k, hair=(L.stem if L.monoline else L.hair) * k, x_height=X,
                  ascender=asc if asc >= 0.3 * X else 0.55 * X,
                  # the descender is made equal to the ascender (vertical balance), never shorter than the logo's
                  descender=max(L.descender * k, asc if asc >= 0.3 * X else 0.55 * X),
                  slant=L.slant, white=(L.white if L.white == L.white else L.stem) * k, dot=dot,
                  dash_marks=bool(L.dashes) or not L.dots, contrast_power=float(np.clip(L.power, 0.8, 6.0)))
+    f = {k_: v["value"] for k_, v in (feats or {}).items()}
+    st = Style(**{**base.__dict__})
+    if "top_angle" in f: st.top_angle = float(np.clip(f["top_angle"], -40, 40))
+    if "top_round" in f: st.top_round = float(np.clip(f["top_round"], 0, 1))
+    if "join_in" in f: st.join_in = float(np.clip(f["join_in"], 0.12, 0.7))
+    if "join_out" in f: st.join_out = float(np.clip(f["join_out"], 0.12, 0.7))
+    if st.join_out < st.join_in - 0.15:     # the outer curve never starts much lower than the inner one
+        st.join_out = st.join_in
+    if "ring_n" in f: st.ring_n = float(np.clip(f["ring_n"], 1.6, 8))
+    elif st.top_round >= 0.5: st.ring_n = 2.0
+    elif st.top_round == 0 and st.top_angle == 0: st.ring_n = 2.3
+    if "dot_n" in f: st.dot_n = float(np.clip(f["dot_n"], 1.6, 10))
+    if "dot_rot" in f: st.dot_rot = f["dot_rot"]
+    if "dot_size" in f: st.dot = float(f["dot_size"])
+    if "tail_reach" in f: st.tail_reach = float(np.clip(f["tail_reach"], 1.5, 5))
+    if "overshoot" in f: st.overshoot = float(np.clip(f["overshoot"], 0, 0.06 * st.x_height))
+    if "seen_drop" in f: st.seen_drop = float(np.clip(f["seen_drop"], 0, 0.3 * st.x_height))
+    if "group_gap" in f: st.group_gap = float(np.clip(f["group_gap"], 0.5 * st.white, 2.5 * st.white))
+    return st
 
 
 def letter_recipes(lay) -> List[Dict[str, Any]]:
@@ -91,7 +111,7 @@ def letter_recipes(lay) -> List[Dict[str, Any]]:
     return out
 
 
-def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: str, src_line: int, corrected: Optional[float] = None) -> str:
+def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: str, src_line: int, corrected: Optional[Style] = None, feats=None) -> str:
     md = [f"# تقرير بناء: {word}", "", f"الشعار: {name} — القواعد والقطع مأخوذة من السطر {src_line + 1}.", ""]
     md += ["## المرحلة 1: القياس", "", "| القياس | " + " | ".join(f"السطر {l['line']}" for l in lines_js) + " |",
            "|---|" + "---|" * len(lines_js)]
@@ -104,6 +124,9 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
         md.append(f"- السطر {l['line']}: {('عربي' if l['script'] == 'arabic' else 'لاتيني' if l['script'] == 'latin' else 'غير معروف')}"
                   + (f" — قرأ المحرك: «{l['text_guess']}»" if l['text_guess'] else "") + (f" — النص المعطى: «{l['text_given']}»" if l['text_given'] else ""))
     md += ["", "### الملاحظات", *[f"- {o['text']}" for o in obs]]
+    if feats:
+        md += ["", "### معاملات الشكل المقيسة (ما يحكم به المصمم بالعين)", "", "| المعامل | القيمة | عدد العينات | المعنى |", "|---|---|---|---|"]
+        md += [f"| {k} | {v['value']}{v['unit']} | {v['samples']} | {v['note']} |" for k, v in feats.items()]
     md += ["", "## المرحلة 3: صندوق القطع", "", "| القطعة | من أين | قياسات |", "|---|---|---|"]
     md += [f"| {p['name']} | {p['source']} | " + ", ".join(f"{k}={v}" for k, v in p.items() if k not in ("key", "name", "source")) + " |" for p in lib.summary()]
     md += ["", "## المرحلة 4: البناء", "", "### القواعد المستعملة", "```json", json.dumps(style.to_dict(), ensure_ascii=False, indent=2), "```",
@@ -111,8 +134,10 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
     md += [f"| {r['letter']} | {r['form']} | {'، '.join(r['from_logo']) or '—'} | {'، '.join(r['inferred']) or '—'} |" for r in recipes]
     md += ["", "## المرحلة 5: التحقق", "", "| القاعدة | الشعار | الكلمة | الفرق % | الحكم |", "|---|---|---|---|---|"]
     md += [f"| {c['name']} | {c['rule']} | {c['word']} | {c['diff']} | {c['verdict']} |" for c in checks]
-    if corrected is not None and abs(corrected - style.white) > 0.05:
-        md += ["", f"تصحيح تلقائي: المسافة الداخلية بين الجذوع صارت {corrected:.2f} حتى يصبح الأبيض المرئي مساويًا لأبيض الشعار ({style.white:.2f})."]
+    if corrected is not None and abs(corrected.white - style.white) > 0.05:
+        md += ["", f"تصحيح تلقائي: المسافة الداخلية بين الجذوع صارت {corrected.white:.2f} حتى يصبح الأبيض المرئي مساويًا لأبيض الشعار ({style.white:.2f})."]
+    if corrected is not None and abs(corrected.join_in - style.join_in) > 0.005:
+        md += ["", f"تصحيح تلقائي: بداية منحنى الوصل في الرسم صارت {corrected.join_in:.3f} حتى يصبح العمق المقيس مساويًا لعمق الشعار ({style.join_in:.3f})."]
     return "\n".join(md) + "\n"
 
 
@@ -140,7 +165,8 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     L, R = lines[src], readings[src]
     # 4. parts
     lib = build_library(L, R, k)
-    style = style_from(L, lib, k)
+    feats = measure_features(lines, readings, src, k)
+    style = style_from(L, lib, k, feats)
     for key, v in (overrides or {}).items():
         if hasattr(style, key) and v is not None:
             setattr(style, key, type(getattr(style, key))(v))
@@ -168,17 +194,17 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "stages": STAGES,
         "image": {"width": round(work.width * k), "height": round(work.height * k), "inverted": inverted},
         "lines": lines_js, "observations": obs, "source_line": src,
-        "parts": lib.summary(), "parts_json": parts_json,
+        "parts": lib.summary(), "parts_json": parts_json, "features": feats,
         "style": style.to_dict(), "recipes": recipes, "skipped": lay.skipped,
         "verification": checks, "corrections": corrections,
         "word": word, "word_svg": to_svg(lay), "word_png": to_png(lay, height=height),
         "construction_svg": sheet_svg(lay, title=word, white=style.white),
-        "spacing_used": round(lay.style.white, 2),
+        "spacing_used": round(lay.style.white, 2), "join_used": round(lay.style.join_in, 3),
         "logo_sheet_svg": logo_sheet(thickness_png(ink, lines), (round(work.width * k), round(work.height * k)), scale, lines, readings),
         "parts_svg": parts_sheet(lib) if use_parts else ideal_parts_sheet(style),
         "cut_parts_svg": parts_sheet(lib), "pen_svg": pen_sheet(L, k), "mode": "cut" if use_parts else "ideal",
     }
-    result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style.white)
+    result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats)
     if out_dir:
         d = Path(out_dir)
         d.mkdir(parents=True, exist_ok=True)
