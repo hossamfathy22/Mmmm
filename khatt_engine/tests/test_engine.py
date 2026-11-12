@@ -203,3 +203,41 @@ def test_angular_tail_rests_on_the_baseline_with_a_round_corner():
     assert min(xs) == pytest.approx(-1.9 * 11, abs=0.5)         # as far left as the logo's
     # the outer corner (bottom right) is rounded: no point at the sharp corner itself
     assert not any(abs(x - 5.5) < 0.3 and abs(y) < 0.3 for x, y in pts)
+
+
+# ---------------------------------------------------------------- the critic: a designer's eye on every letter
+def test_critic_sees_a_seam_and_a_touching_dot():
+    from khatt.critic import critique
+    from khatt.library import Tagged
+    from khatt.typeset import Layout
+    st = Style(stem=20, hair=4, x_height=60, slant=0, white=20)
+    gap = Layout("", st, shapes=[[[(0, 0), (40, 0), (40, 4), (0, 4)]], [[(40.4, 0), (80, 0), (80, 4), (40.4, 4)]],
+                                 [[(0, 0), (6, 0), (6, 60), (0, 60)]]])
+    # two pieces that do not quite meet leave a hairline seam only if the gap is real; here it is
+    # closed by the union (0.4 < a tenth of the hairline), so no seam
+    assert not [d for d in critique(gap) if d.kind == "crack"]
+    # two stems standing side by side with a hairline gap between them, joined at the top
+    wide = Layout("", st, shapes=[[[(0, 0), (20, 0), (20, 60), (0, 60)]], [[(22.5, 0), (42.5, 0), (42.5, 60), (22.5, 60)]],
+                                  [[(0, 56), (42.5, 56), (42.5, 60), (0, 60)]]])
+    assert [d for d in critique(wide) if d.kind == "crack"]
+    dot = Tagged([[(22, 1), (37, 1), (37, 16), (22, 16)]], "engine", "نقطة")
+    touch = Layout("", st, shapes=[[[(0, 0), (20, 0), (20, 60), (0, 60)]], dot])
+    assert [d for d in critique(touch) if d.kind == "touch"]
+
+
+@pytest.mark.parametrize("example", ["bidonaq.png", "round_square.png"])
+def test_every_letter_passes_the_critic(example):
+    """Every letter, in every form, drawn in the style measured from the example logo."""
+    from khatt.critic import specimen_defects
+    r = run((EXAMPLE.parent / example).read_bytes(), "بيدوناق")
+    st = Style(**{k: v for k, v in r["style"].items() if k in Style.__dataclass_fields__})
+    assert [d.text() for d in specimen_defects(st)] == []
+    assert r["critic"]["alphabet"] == [] and r["critic"]["word"] == []
+
+
+def test_every_letter_passes_the_critic_in_an_angular_style():
+    from khatt.critic import specimen_defects
+    st = Style(stem=11, hair=7.7, x_height=43.5, ascender=18.2, descender=18.2, slant=0, white=18.8, dot=9.2,
+               top_round=0, ring_n=8, dot_n=5.5, join_in=0.2, join_out=0.23, angular=0.72, corner_r=8.3,
+               tail_drop=0.0, tail_reach=1.9, contrast_power=2.3)
+    assert [d.text() for d in specimen_defects(st)] == []

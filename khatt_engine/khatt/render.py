@@ -12,6 +12,35 @@ from .typeset import Layout
 ARABIC_FONTS = "Vazirmatn, 'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, 'Segoe UI', sans-serif"
 
 
+def merged(lay: Layout) -> list:
+    """All the parts unioned into clean outlines (like Pathfinder > Unite in Illustrator), so no
+    hairline seam shows where two parts only touch. Each shape keeps the even-odd rule of its
+    own polygons (a ring is outer minus inner); gaps narrower than a tenth of the hairline close."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from shapely.validation import make_valid
+    eps = 0.05 * lay.style.hair
+    geoms = []
+    for shape in lay.shapes:
+        g = None
+        for poly in shape:
+            if len(poly) < 3:
+                continue
+            p = make_valid(Polygon(poly))
+            g = p if g is None else g.symmetric_difference(p)
+        if g is not None and not g.is_empty:
+            geoms.append(g)
+    if not geoms:
+        return []
+    u = unary_union([g.buffer(eps, join_style=2) for g in geoms]).buffer(-eps, join_style=2)
+    out = []
+    for poly in getattr(u, "geoms", [u]):
+        if poly.geom_type != "Polygon" or poly.is_empty:
+            continue
+        out.append([list(poly.exterior.coords)[:-1]] + [list(h.coords)[:-1] for h in poly.interiors])
+    return out
+
+
 def _sk(lay: Layout, x: float, y: float) -> Tuple[float, float]:
     return x + y * lay.style.tan, -y
 
@@ -34,7 +63,7 @@ def to_svg(lay: Layout, fill: str = "#111111", background: Optional[str] = "#fff
     pad = lay.style.stem * 1.5 if pad is None else pad
     vx, vy, vw, vh = _bounds(lay, pad)
     bg = f'<rect x="{vx:.1f}" y="{vy:.1f}" width="{vw:.1f}" height="{vh:.1f}" fill="{background}"/>' if background else ""
-    body = "".join(f'<path fill-rule="evenodd" d="{_d(lay, s)}"/>' for s in lay.shapes)
+    body = "".join(f'<path fill-rule="evenodd" d="{_d(lay, s)}"/>' for s in merged(lay))
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vx:.1f} {vy:.1f} {vw:.1f} {vh:.1f}" '
             f'width="{vw:.0f}" height="{vh:.0f}">{bg}<g fill="{fill}">{body}</g></svg>')
 
@@ -46,7 +75,7 @@ def to_png(lay: Layout, height: int = 360, ink: Tuple[int, int, int] = (17, 17, 
     W, H = max(1, int(vw * s)), max(1, int(vh * s))
     S = supersample
     mask = Image.new("L", (W * S, H * S), 0)
-    for shape in lay.shapes:
+    for shape in merged(lay):
         polys = [[((a - vx) * s * S, (b - vy) * s * S) for a, b in (_sk(lay, x, y) for x, y in poly)] for poly in shape]
         if len(polys) == 1:
             ImageDraw.Draw(mask).polygon(polys[0], fill=255)

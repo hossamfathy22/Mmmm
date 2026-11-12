@@ -101,10 +101,38 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
         else:
             out += [dot(cx - 0.6 * d, cy), dot(cx + 0.6 * d, cy), dot(cx, cy + step)]
     elif spec in ("ha", "hb"):
-        out.append(g.open_arc(st, cx, cy, 0.42 * d, 0.5 * d, 40, 320, scale=0.55))
+        hz = g.open_arc(st, cx, cy, 0.42 * d, 0.5 * d, 40, 320, scale=0.55)
+        if at is None:
+            # measured, not guessed: the drawn hamza keeps a white of 0.3 stem from its letter
+            ys = [y for poly in hz for _, y in poly]
+            dy = (ref + 0.3 * st.stem - min(ys)) if above else (below_ref - 0.3 * st.stem - max(ys))
+            if (above and dy > 0) or (not above and dy < 0):
+                hz = [[(x, y + dy) for x, y in poly] for poly in hz]
+        out.append(_named(hz, "همزة"))
     elif spec == "md":
         out.append(dash(cx, cy, 1.8 * d))
     return out
+
+
+def clear_marks(st: Style, body: List[g.Shape], spec: Optional[str], spots: List[Tuple[float, float]]) -> List[g.Shape]:
+    """Put the marks at the first spot where they keep their own white (a fifth of the stem)
+    from the letter: the critic's 'touch' test, applied while drawing."""
+    if not spec:
+        return []
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from .typeset import flat
+    polys = [Polygon(p).buffer(0) for s in flat(body) for p in s if len(p) >= 3]
+    ink = unary_union(polys).buffer(0.2 * st.stem) if polys else None
+    best = None
+    for x, y in spots:
+        m = marks(st, spec, x, at=y)
+        mp = unary_union([Polygon(p).buffer(0) for s in m for p in s if len(p) >= 3])
+        if ink is None or not mp.intersects(ink):
+            return m
+        if best is None:
+            best = m
+    return best or []
 
 
 # ---------------------------------------------------------------- shared parts
@@ -228,29 +256,61 @@ def yeh(st: Style, form: str, mark: Optional[str], final_mark: Optional[str]) ->
     if final_mark == "ha":
         shapes += marks(st, "ha", r - w / 2, above_ref=0.2 * X)
     else:
-        shapes += marks(st, final_mark, r - w / 2, at=-0.42 * D)
+        d = st.dot
+        shapes += marks(st, final_mark, r - w / 2, at=-D + st.hair + 0.4 * d + d / 2)
     return Glyph(shapes, left=r - w - u, stems=[(r, 0.45 * X, 0)])
 
 
+def _pen(st: Style, curved, corners) -> g.Shape:
+    """One continuous pen stroke: the curved path for a curved logo, straight strokes meeting at
+    corners for an angular one (see skeleton.py)."""
+    if st.angular >= 0.5:
+        return g.angular_stroke(st, corners, st.corner_r)
+    return g.stroke(st, curved)
+
+
 def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
-    u, P, X, h, D = st.stem / 2, st.pitch, st.x_height, st.hair, st.descender
-    d0 = -u if not _e(form) else -0.6 * P - u      # apex of the head
-    shapes: List[g.Shape] = [g.rect(d0 - 1.3 * P, d0, X - h, X)]
-    if _e(form):   # the join from the right climbs to the apex
-        shapes.append(g.stroke(st, g.cubic((0, h / 2), (d0 * 0.45, h / 2), (d0, 0.3 * X), (d0, X - h / 2))))
+    """ح ج خ چ: a hairline bar at the x-height and, from its right end, one stroke that turns back
+    and runs down to the left: to the baseline join (حـ ـحـ) or into a deep bowl that swings back
+    to the right under the letter (ح ـح). Bar and spine are one path, so they cannot part."""
+    U, u, P, X, h, D = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair, st.descender
+    d0 = -u if not _e(form) else -0.55 * P - u      # the apex: right end of the bar
+    xa = d0 - 1.25 * P                              # left end of the bar
+    yt = X - h / 2                                  # centre line of the bar
+    shapes: List[g.Shape] = []
+    if _e(form):      # the join from the right climbs to the apex
+        shapes.append(_named(_pen(st, g.cubic((0, h / 2), (d0 * 0.4, h / 2), (d0, 0.35 * X), (d0, yt)),
+                                  [(0.0, h / 2), (d0 - u, yt)]), "صعود الوصل"))
+    turn = g.path(g.line((xa, yt), (d0 - 0.25 * U, yt)),
+                  g.cubic((d0 - 0.25 * U, yt), (d0 + 0.4 * U, yt), (d0 + 0.15 * U, 0.6 * X), (d0 - 0.45 * P, 0.4 * X)))
     if form in ("I", "M"):
-        foot = d0 - 1.25 * P
-        shapes.append(g.stroke(st, g.cubic((d0, X - h / 2), (d0, 0.5 * X), (d0 - 0.8 * P, 0.2 * X), (foot, h / 2))))
-        shapes += marks(st, mark, d0 - 0.7 * P)
-        return Glyph(shapes, left=d0 - 1.3 * P, exit_x=foot + 1, exit_edge=foot)
-    x = d0 - 1.15 * P
-    shapes.append(g.stroke(st, g.cubic((d0, X - h / 2), (d0, 0.5 * X), (x, 0.45 * X), (x, 0.05 * X))))
-    shapes.append(sweep_right(st, x, 0.05 * X, 2.0 * P))
+        foot = xa - 0.05 * P
+        ex = foot - 0.35 * P
+        curved = g.path(turn, g.cubic((d0 - 0.45 * P, 0.4 * X), (d0 - 0.85 * P, 0.18 * X), (foot + 0.15 * P, h / 2), (ex, h / 2)))
+        # square kufi: from the apex the bar runs left, turns down the left side, and leaves on the baseline
+        shapes.append(_named(_pen(st, curved, [(d0, yt), (xa + u, yt), (xa + u, h / 2), (ex, h / 2)]), "رأس الحاء"))
+        if mark and mark[0] == "b":
+            shapes += marks(st, mark, (xa + d0) / 2 + 0.15 * P)
+        else:
+            shapes += marks(st, mark, (xa + d0) / 2)
+        return Glyph(shapes, left=min(xa, ex), exit_x=ex + 1, exit_edge=ex)
+    xl, reach = xa + 0.05 * P, 2.1 * P
+    yb = -D + h / 2
+    curved = g.path(turn,
+                    g.cubic((d0 - 0.45 * P, 0.4 * X), (xl - 0.05 * P, 0.25 * X), (xl - 0.1 * P, -0.5 * D), (xl + 0.45 * reach, yb)),
+                    g.cubic((xl + 0.45 * reach, yb), (xl + 0.8 * reach, yb), (xl + 0.95 * reach, -0.85 * D), (xl + reach, -0.6 * D)))
+    corners = [(d0, yt), (xl + u, yt), (xl + u, yb), (xl + reach, yb)]
+    shapes.append(_named(_pen(st, curved, corners), "الحاء"))
     if mark and mark[0] == "b":
-        shapes += marks(st, mark, x + 0.75 * P, at=-0.45 * D)
+        d = st.dot
+        base_y = yb + h / 2 + 0.45 * d + d / 2
+        spots = [(xl + f * reach, base_y + k * 0.25 * d) for k in (0, 1, 2) for f in (0.62, 0.55, 0.48, 0.7, 0.4)]
+        # a shallow bowl (short descender) has no room inside: then under it
+        spots += [(xl + f * reach, yb - h / 2 - 0.45 * d - d / 2) for f in (0.55, 0.45)]
+        shapes += clear_marks(st, shapes, mark, spots)
     else:
-        shapes += marks(st, mark, d0 - 0.65 * P)
-    return Glyph(shapes, left=d0 - 1.3 * P)
+        shapes += marks(st, mark, (xa + d0) / 2)
+    return Glyph(shapes, left=xa)
 
 
 def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -328,27 +388,61 @@ def tah(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, A = st.stem, st.stem / 2, st.x_height, st.ascender
     xl, ht = _loop(st)
     xt = xl + u
-    shapes = [_ring(st, xl, 0, 0, ht), g.stem(st, xt, X + A, exit=_x(form), round_bl=not _x(form))]
+    # the stem stands on the loop; a join to the next letter leaves from the loop's own bottom
+    shapes = [_ring(st, xl, 0, 0, ht), g.stem(st, xt, X + A)]
     shapes += marks(st, mark, xl * 0.38, above_ref=ht)
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl if _x(form) else None,
                  exit_edge=xl if _x(form) else None, stems=[(xt, X + A, 0)])
 
 
+def _ain_eye(st: Style, xl: float, top: float) -> List[g.Shape]:
+    """The eye of ـعـ ـع: a head on the baseline whose top dips in a V. The counter stays closed
+    (an open top would read as two teeth of ـسـ). The V is the band between the cut and the same
+    cut moved down by the pen, so it shares its edges with the head and cannot leave a seam."""
+    from shapely.affinity import translate
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    U, u, h = st.stem, st.stem / 2, st.hair
+    inner = top - 2 * h                             # height of the counter
+    depth = h + 0.35 * inner                        # the V reaches a third of the way into it
+    ring = g.ring(st, xl, 0, 0, top)
+    shp, outer = None, None
+    for poly in ring:
+        P_ = Polygon(poly).buffer(0)
+        outer = P_ if outer is None else outer.union(P_)
+        shp = P_ if shp is None else shp.symmetric_difference(P_)
+    xm = xl / 2
+    notch = Polygon([(xl + u, top + 2), (-u, top + 2), (-u, top - h / 2), (xm, top - depth), (xl + u, top - h / 2)])
+    t = 1.2 * h                                     # a diagonal is a little heavier than the hairline
+    band = notch.difference(translate(notch, 0, -t)).intersection(outer)
+    shp = unary_union([shp.difference(notch), band])
+    out: g.Shape = []
+    for poly in getattr(shp, "geoms", [shp]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            out.append(list(poly.exterior.coords)[:-1])
+            out += [list(i.coords)[:-1] for i in poly.interiors]
+    return [_named(out, "عين")]
+
+
 def ain(st: Style, form: str, mark: Optional[str]) -> Glyph:
-    U, u, P, X = st.stem, st.stem / 2, st.pitch, st.x_height
+    U, u, P, X, h, D = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair, st.descender
     if form in ("M", "F"):
-        xl = -(2 * U + 0.6 * st.white)
-        top = 0.8 * X
-        shapes = [_ring(st, xl, 0, 0, top)]
+        xl = -(2 * U + 0.7 * st.white)
+        top = 0.85 * X
+        shapes = _ain_eye(st, xl, top) + [g.connector(st, xl, 0)]
         shapes += marks(st, mark, xl / 2, above_ref=top)
         if form == "M":
             return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
-        shapes.append(sweep_right(st, xl + u, 0.4 * top, 1.8 * P))
+        shapes.append(sweep_right(st, xl + u, 0.3 * top, 1.8 * P))
         return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0)
     a, b = 0.55 * P, 0.3 * X
     cx, cy = -a * 0.95, X - b
-    shapes = [g.open_arc(st, cx, cy, a, b, 35, 325)]
     xs = cx - a
+    if st.angular >= 0.5:      # a square c: top bar, the left side, the lower arm
+        shapes = [_named(g.angular_stroke(st, [(cx + a, X - h / 2), (xs, X - h / 2), (xs, cy - b + h / 2), (cx + 0.6 * a, cy - b + h / 2)],
+                                          st.corner_r), "رأس العين")]
+    else:
+        shapes = [g.open_arc(st, cx, cy, a, b, 35, 325)]
     shapes += marks(st, mark, cx)
     if form == "I":
         shapes.append(g.stem(st, xs, cy, exit=True))
@@ -366,7 +460,9 @@ def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
     if form in ("I", "M"):
         return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
     if qaf:
-        bw = 3.5 * U
+        # the cup's left arm keeps half a white from the head (12 against a white of 22 in the
+        # hand-made بيدوناق), never against it
+        bw = max(3.5 * U, -xl + 0.5 * st.white)
         shapes.append(bowl_down(st, -u, X / 2, bw, 0.6 * X))
         return Glyph(shapes, left=xl, **common)
     post = xl - 2.0 * P
@@ -375,28 +471,29 @@ def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
 
 
 def kaf(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
-    U, u, P, X, A, h = st.stem / 2 * 2, st.stem / 2, st.pitch, st.x_height, st.ascender, st.hair
+    """ك ک گ: a stem to the ascender with a hairline arm to the left at its top (the gaf has a
+    second, floating bar above the arm; both stay under the ascender line). Final and isolated
+    forms add the baseline and a short post on the left, like ب; Arabic ك carries a small dash."""
+    U, u, P, X, A, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.ascender, st.hair
     top = X + A
+    arm_top = top - 2.6 * h if variant == "gaf" else top
+    arm_left = -U - 1.3 * P
+    shapes: List[g.Shape] = []
     if form in ("I", "M"):
-        # stem to the x-height, then a thin stroke rising to the upper left (كـ)
-        x_end = -U - 1.25 * P
-        bar = [[(-U, X - h), (-U, X), (x_end, top), (x_end, top - h * 1.4)]]
-        shapes = [g.stem(st, -u, X, entry=_e(form), exit=True, round_br=not _e(form)), bar]
-        if variant == "gaf":
-            off = 3.0 * h
-            shapes.append([[(-U - 0.25 * P, X - h + off + 0.2 * A), (-U - 0.25 * P, X + off + 0.2 * A),
-                            (x_end + 0.1 * P, top + off), (x_end + 0.1 * P, top + off - h * 1.4)]])
-        return Glyph(shapes, left=min(x_end, -U), exit_x=-U, exit_edge=-U, stems=[(-u, X, 0)])
-    bar_left = -U - 1.3 * P
-    shapes = [g.rect(bar_left, -U, top - h, top)]
+        shapes.append(g.stem(st, -u, arm_top, entry=_e(form), exit=_x(form), round_br=not _e(form)))
+    else:
+        shapes.append(g.stem(st, -u, arm_top, entry=_e(form), exit=True, round_br=not _e(form)))
+    shapes.append(_named(g.rect(arm_left, -u, arm_top - h, arm_top), "ذراع الكاف"))
     if variant == "gaf":
-        shapes.append(g.rect(bar_left + 0.15 * P, -U - 0.1 * P, top + 1.4 * h, top + 2.4 * h))
+        shapes.append(_named(g.rect(arm_left + 0.15 * P, -U - 0.1 * P, top - h, top), "شرطة الگاف"))
+    if form in ("I", "M"):
+        return Glyph(shapes, left=min(arm_left, -U), exit_x=-U, exit_edge=-U, stems=[(-u, arm_top, 0)])
     post = -U - 2.2 * P
-    shapes += [g.stem(st, -u, top, entry=_e(form), exit=True, round_br=not _e(form)),
-               g.connector(st, post + u, -U), g.stem(st, post, 0.45 * X, entry=True, round_bl=True)]
+    shapes += [g.connector(st, post + u, -U), g.stem(st, post, 0.45 * X, entry=True, round_bl=True)]
     if variant == "arabic":
-        shapes += marks(st, "ha", (post - u) / 2, at=0.42 * X)
-    return Glyph(shapes, left=min(bar_left, post - u), stems=[(-u, top, 0), (post, 0.45 * X, 0)])
+        cx = (post + u - U) / 2
+        shapes.append(_named(g.rect(cx - 0.35 * P, cx + 0.35 * P, 0.42 * X - h / 2, 0.42 * X + h / 2), "شرطة"))
+    return Glyph(shapes, left=min(arm_left, post - u), stems=[(-u, arm_top, 0), (post, 0.45 * X, 0)])
 
 
 def lam(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -410,24 +507,37 @@ def lam(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 
 def meem(st: Style, form: str, mark: Optional[str]) -> Glyph:
-    U, u, X, D = st.stem, st.stem / 2, st.x_height, st.descender
+    U, u, X, D, h = st.stem, st.stem / 2, st.x_height, st.descender, st.hair
     xl = -(2 * U + 0.55 * st.white)
     top = 0.6 * X
     shapes = [_ring(st, xl, 0, 0, top)]
     common = dict(entry_x=-U, entry_edge=0)
     if form in ("I", "M"):
         return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
-    shapes.append(g.stem(st, xl + u, top / 2, bottom=-D))
-    return Glyph(shapes, left=xl, stems=[(xl + u, top / 2, -D)], **common)
+    x = xl + u
+    # the tail drops from the left side of the head; in a curved logo it hooks to the left and thins
+    curved = g.path(g.line((x, top / 2), (x, -0.4 * D)),
+                    g.cubic((x, -0.4 * D), (x, -0.85 * D), (x - 0.3 * U, -D + h / 2), (x - 1.0 * U, -D + h / 2)))
+    shapes.append(_named(_pen(st, curved, [(x, top / 2), (x, -D)]), "ذيل الميم"))
+    return Glyph(shapes, left=xl - (1.0 * U if st.angular < 0.5 else 0), stems=[(x, top / 2, -D)], **common)
 
 
 def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
-    U, X, A, h = st.stem, st.x_height, st.ascender, st.hair
+    U, u, X, A, h = st.stem, st.stem / 2, st.x_height, st.ascender, st.hair
     xl, w = head_box(st)
-    top = X + 0.5 * A if form == "I" else X
-    shapes = [_ring(st, xl, 0, 0, top)]
-    if form == "M":   # ـهـ : a hairline splits the counter into two eyes
-        shapes.append(g.rect(xl + U * 0.9, -U * 0.9, X / 2 - h / 2, X / 2 + h / 2))
+    if form == "I":
+        # هـ: a lower head whose right side rises as a stem to the x-height (like a mirrored ط)
+        ht = 0.68 * X
+        shapes = [_ring(st, xl, 0, 0, ht), g.stem(st, -u, X, round_br=True)]
+        shapes += marks(st, mark, xl / 2, above_ref=X)
+        return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl, stems=[(-u, X, 0)])
+    if form == "M":
+        # ـهـ rises above the x-height (as in professional Arabic types), and a hairline splits its
+        # counter into two eyes: it must not read as the head of ـفـ ـقـ
+        tm = X + 0.4 * A
+        shapes = [_ring(st, xl, 0, 0, tm), g.rect(xl + U * 0.9, -U * 0.9, tm / 2 - h / 2, tm / 2 + h / 2)]
+    else:
+        shapes = [_ring(st, xl, 0, 0, X)]
     shapes += marks(st, mark, xl / 2)
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0,
                  exit_x=(xl + U) if _x(form) else None, exit_edge=xl if _x(form) else None)

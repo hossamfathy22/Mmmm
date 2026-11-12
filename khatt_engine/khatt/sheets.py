@@ -361,3 +361,42 @@ def skeleton_sheet(L: Line, sk, k: float) -> str:
     Wd, Hd = W + 2 * pad, H + head + pad
     z = max(1.6, 1400 / Wd)
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {Wd:.0f} {Hd:.0f}" width="{Wd * z:.0f}" height="{Hd * z:.0f}">{"".join(o)}</svg>'
+
+
+# ------------------------------------------------------------------ the specimen: every letter, every form
+def specimen_png(st, defects=None, cell: int = 120) -> bytes:
+    """All letters in all four forms, drawn in the logo's style, as a designer's proof sheet.
+    Letters the critic found a defect in are framed in red."""
+    from PIL import ImageDraw as D
+    from .critic import FORM_NAMES, FORMS
+    from .letters import LETTERS
+    from .render import to_png
+    from .typeset import typeset
+    bad = {d.where for d in (defects or [])}
+    letters = [c for c in LETTERS if c not in "ـء"]
+    cols = 4
+    per_row = 2                                    # two letters (eight cells) per row
+    rows = (len(letters) + per_row - 1) // per_row
+    W, H = cell * cols * per_row + 40 * per_row, cell * rows
+    sheet = Image.new("RGB", (W, H), (255, 255, 255))
+    dr = D.Draw(sheet)
+    for k, c in enumerate(letters):
+        r, side = divmod(k, per_row)
+        x0 = W - (side + 1) * (cell * cols + 40)
+        forms = "iIMF" if LETTERS[c][0] == "D" else "iF"
+        for j, f in enumerate("iIMF"):
+            if f not in forms:
+                continue
+            lay = typeset(FORMS[f].format(c), st)
+            if not lay.shapes:
+                continue
+            im = Image.open(io.BytesIO(to_png(lay, height=cell - 14))).convert("RGB")
+            im.thumbnail((cell - 8, cell - 8))
+            cx = x0 + (cols - 1 - j) * cell
+            sheet.paste(im, (cx + (cell - im.width) // 2, r * cell + (cell - im.height) // 2))
+            if f"{c} {FORM_NAMES[f]}" in bad:
+                dr.rectangle((cx + 2, r * cell + 2, cx + cell - 3, (r + 1) * cell - 3), outline=(207, 63, 83), width=3)
+        dr.line((0, (r + 1) * cell - 1, W, (r + 1) * cell - 1), fill=(232, 236, 240))
+    buf = io.BytesIO()
+    sheet.save(buf, "PNG", optimize=True)
+    return buf.getvalue()

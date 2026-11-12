@@ -270,6 +270,14 @@ def angular_stroke(st: Style, pts: Sequence[Pt], r_out: float = 0.0) -> Shape:
         n = (-u[1] * w / 2, u[0] * w / 2)
         polys.append(Polygon([(A[0] + n[0], A[1] + n[1]), (B[0] + n[0], B[1] + n[1]),
                               (B[0] - n[0], B[1] - n[1]), (A[0] - n[0], A[1] - n[1])]))
+    # each joint is filled (a bevel between the two stroke ends), so a sharp turn leaves no wedge
+    for i in range(1, len(segs)):
+        (_, b, u1, w1), (_, _, u2, w2) = segs[i - 1], segs[i]
+        n1 = (-u1[1] * w1 / 2, u1[0] * w1 / 2)
+        n2 = (-u2[1] * w2 / 2, u2[0] * w2 / 2)
+        joint = Polygon([(b[0] + n1[0], b[1] + n1[1]), (b[0] + n2[0], b[1] + n2[1]),
+                         (b[0] - n1[0], b[1] - n1[1]), (b[0] - n2[0], b[1] - n2[1])]).convex_hull
+        polys.append(joint)
     shape = unary_union(polys)
     for i in range(1, len(segs)):
         (_, b, u1, w1), (_, _, u2, w2) = segs[i - 1], segs[i]

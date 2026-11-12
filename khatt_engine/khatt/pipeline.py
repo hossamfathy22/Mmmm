@@ -23,7 +23,8 @@ from .features import measure_features
 from .library import ACTIVE, build_library
 from .measure import Line, measure_line
 from .render import sheet_svg, to_png, to_svg
-from .sheets import ideal_parts_sheet, logo_sheet, parts_sheet, pen_sheet, skeleton_sheet, thickness_png
+from .sheets import ideal_parts_sheet, logo_sheet, parts_sheet, pen_sheet, skeleton_sheet, specimen_png, thickness_png
+from .critic import critique, specimen_defects
 from .skeleton import read_skeleton
 from .style import Style
 from .typeset import typeset
@@ -221,7 +222,21 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     sk = read_skeleton(L)
     result["skeleton"] = sk.summary(k)
     result["skeleton_svg"] = skeleton_sheet(L, sk, k)
+    # the critic: the defects a designer would see, on the new word and on the whole alphabet
+    word_defects = critique(lay, word)
+    alpha_defects = specimen_defects(lay.style)
+    result["critic"] = {"word": [d.text() for d in word_defects], "alphabet": [d.text() for d in alpha_defects]}
+    result["specimen_png"] = specimen_png(lay.style, alpha_defects)
     result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats)
+    crit = result["critic"]
+    result["report_md"] += "\n".join(["", "## الناقد (specimen.png)", "",
+        "يرسم المحرك كل حرف بأشكاله الأربعة بأسلوب الشعار، ويفحصه بالعيوب التي يراها المصمم بعينه: "
+        "شق أبيض بين جزأين، وتكدّس حبر أثقل من القلم، وخط أرفع من القلم الشعري، وجزء خارج خطوط الشبكة، "
+        "وفراغ داخلي ضيق، ونقطة تلمس حرفها، وحرفان يُقرأ أحدهما كالآخر.", "",
+        f"- الكلمة «{word}»: " + ("لا عيوب." if not crit["word"] else f"{len(crit['word'])} عيب"),
+        *[f"  - {t}" for t in crit["word"]],
+        f"- الحروف كلها: " + ("لا عيوب." if not crit["alphabet"] else f"{len(crit['alphabet'])} عيب"),
+        *[f"  - {t}" for t in crit["alphabet"]], ""])
     if out_dir:
         d = Path(out_dir)
         d.mkdir(parents=True, exist_ok=True)
@@ -230,6 +245,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
                            ("report_md", "report.md")]:
             (d / fname).write_text(result[key], encoding="utf-8")
         (d / "word.png").write_bytes(result["word_png"])
+        (d / "specimen.png").write_bytes(result["specimen_png"])
         (d / "parts.json").write_text(json.dumps(parts_json, ensure_ascii=False, indent=1), encoding="utf-8")
         (d / "measurements.json").write_text(json.dumps({"lines": lines_js, "observations": obs, "style": result["style"],
                                                          "verification": checks}, ensure_ascii=False, indent=1), encoding="utf-8")
