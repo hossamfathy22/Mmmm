@@ -150,3 +150,33 @@ def test_redrawing_the_logo_matches_and_moves_rules_towards_the_truth():
     assert f["iou_after"] >= f["iou_before"] and f["iou_after"] > 0.95
     assert not f["outliers"]
     assert abs(r["style"]["contrast_power"] - 1.5) < 0.2
+
+
+# ---------------------------------------------------------------- learning from open-licensed fonts
+from khatt import fonts as FONTS
+
+needs_fonts = pytest.mark.skipif(not (FONTS.CACHE / "amiri-700.woff2").exists(),
+                                 reason="font library not downloaded (python -m khatt.fonts)")
+
+
+@needs_fonts
+def test_a_naskh_logo_is_built_from_a_naskh_font(tmp_path):
+    """A logo written in a Naskh face: the geometric engine cannot draw it, a font must win."""
+    from khatt.learn import _raw_layout
+    from khatt.render import to_png
+    face = FONTS.load(str(FONTS.CACHE / "amiri-700.woff2"))
+    lay = _raw_layout(face, "بستان الورد", Style(slant=0, stem=20, x_height=60), 220 / face.upm)
+    logo = tmp_path / "naskh.png"
+    logo.write_bytes(to_png(lay, height=420))
+    r = run(logo.read_bytes(), "بيدوناق", texts=["بستان الورد"])
+    learn = r["learning"]
+    assert learn["chosen"].startswith("font:")
+    best = next(c for c in learn["candidates"] if c["source"] == learn["chosen"])
+    engine = next(c for c in learn["candidates"] if c["source"] == "engine")
+    assert best["iou"] > 0.8 and best["score"] > engine["score"]
+
+
+@needs_fonts
+def test_a_geometric_logo_stays_with_the_engine():
+    r = run(ROUND.read_bytes(), "بيدوناق", texts=["سفينة نجم"])
+    assert r["learning"]["chosen"] == "engine"

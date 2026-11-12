@@ -98,7 +98,7 @@ def groups_of(lay: Layout) -> List[List[int]]:
 
 
 def rasterize(lay: Layout, scale: float, shape: Tuple[int, int], right: float, base_row: float,
-              ss: int = 2, target: Optional[np.ndarray] = None, reach: float = 0.0):
+              ss: int = 2, target: Optional[np.ndarray] = None, reach: float = 0.0, v_reach: float = 0.0):
     """Draw a layout into an image of `shape` (rows, cols), right edge at column `right`, baseline at
     `base_row`. With a target, every joined group is slid to its best horizontal position (within
     +-reach px), so the score judges shapes; the slides themselves measure the spacing.
@@ -109,6 +109,23 @@ def rasterize(lay: Layout, scale: float, shape: Tuple[int, int], right: float, b
     if not pts_x:
         return np.zeros(shape, bool), [], []
     dx = right - max(pts_x)
+    if target is not None and v_reach > 0:
+        # the baseline found in the image may sit a little off for scripts without a flat band (Naskh):
+        # find the vertical offset that makes the whole redrawing overlap the logo best
+        tf0 = lambda x, y: ((x * scale + y * scale * t + dx) * ss, (base_row - y * scale) * ss)
+        whole = _draw([sh for sh in lay.shapes], tf0, shape, ss)
+        best_v, best_ov = 0, -1
+        for dv in range(-int(v_reach), int(v_reach) + 1):
+            mv = np.roll(whole, dv, axis=0)
+            if dv > 0:
+                mv[:dv] = False
+            elif dv < 0:
+                mv[dv:] = False
+            # horizontal tolerance: compare column-summed profiles as well as pixels
+            ov = int(np.logical_and(mv, target).sum())
+            if ov > best_ov:
+                best_ov, best_v = ov, dv
+        base_row += best_v
     total = np.zeros(shape, bool)
     spans, offsets = [], []
     for g in groups_of(lay):

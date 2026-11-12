@@ -115,6 +115,13 @@ ul.obs li[data-k="match"]{color:var(--accent)}
       </div>
       <ul class="obs" id="decisions"></ul>
     </section>
+    <section class="panel stage hidden" id="learnStage">
+      <header><span class="num">2ج</span><h2>التعلّم من الخطوط المفتوحة</h2><p>كل مصدر يعيد رسم نص الشعار بعد تكييفه على قواعده. الدرجة = تطابق إعادة الرسم × نسبة قواعد الشعار التي يحفظها. صاحب أعلى درجة يبني الكلمة.</p></header>
+      <p id="learnSummary" style="margin:0"></p>
+      <div class="tablewrap"><table id="learnTable"></table></div>
+      <div id="winWrap" class="hidden"><p class="note">إعادة رسم الشعار بالمصدر الفائز:</p><div class="fig" style="padding:8px"><img id="winImg" alt="إعادة رسم الشعار بالخط الفائز"></div></div>
+      <div id="altWrap" class="hidden"><p class="note">الكلمة نفسها بقطع المحرك، للمقارنة:</p><div class="fig" style="padding:10px"><img id="altImg" alt="الكلمة بقطع المحرك"></div></div>
+    </section>
     <section class="panel stage">
       <header><span class="num">3</span><h2>مخطط بناء الشعار</h2><p>القلم السميك والرفيع، والشبكة، وصناديق الجذوع، وكل قطعة باسمها ورقمها.</p></header>
       <div class="fig" id="logoSheet"></div>
@@ -185,6 +192,13 @@ function show(j){
     $("fitImg").src="data:image/png;base64,"+j.fit_png;
     $("fitLetters").innerHTML="<tr><th>الحرف</th><th>تطابق الشكل</th></tr>"+F.letters.map(x=>`<tr><td style="font-size:20px">${esc(x.letter)}</td><td class="n">${(x.iou*100).toFixed(0)}%${x.outlier?" *":""}</td></tr>`).join("");
     $("fitChanges").innerHTML="<tr><th>القاعدة</th><th>المقيسة</th><th>بعد الضبط</th></tr>"+(F.changes.map(c=>`<tr><td>${esc(c.name)}</td><td class="n">${fmt(c.measured)}</td><td class="n">${fmt(c.fitted)}</td></tr>`).join("")||'<tr><td colspan="3">لم تحتج القواعد إلى ضبط.</td></tr>');}
+  const LR=j.learning;$("learnStage").classList.toggle("hidden",!(LR&&LR.candidates&&LR.candidates.length));
+  if(LR&&LR.candidates&&LR.candidates.length){
+    const nm=x=>x==="engine"?"المحرك (القطع الست)":x.replace("font:","خط ");
+    $("learnSummary").innerHTML=`يبني الكلمة: <b>${esc(nm(LR.chosen))}</b> · ${LR.fonts} ملف خط · ${esc(LR.license)}`;
+    $("learnTable").innerHTML="<tr><th>المصدر</th><th>تطابق إعادة رسم الشعار</th><th>القواعد المحفوظة</th><th>الدرجة</th></tr>"+LR.candidates.map(c=>`<tr${c.source===LR.chosen?' style="font-weight:700"':""}><td>${esc(c.label)}</td><td class="n">${(c.iou*100).toFixed(1)}%</td><td class="n">${c.conformity==null?"—":(c.conformity*100).toFixed(0)+"%"}</td><td class="n">${c.score==null?"—":c.score.toFixed(3)}</td></tr>`).join("");
+    $("winWrap").classList.toggle("hidden",!LR.overlay_png);if(LR.overlay_png)$("winImg").src="data:image/png;base64,"+LR.overlay_png;
+    $("altWrap").classList.toggle("hidden",!j.alt_word_png);if(j.alt_word_png)$("altImg").src="data:image/png;base64,"+j.alt_word_png;}
   $("decisions").innerHTML=(j.design_decisions||[]).map(d=>`<li>${esc(d)}</li>`).join("");
   $("logoSheet").innerHTML=j.logo_sheet_svg;$("partsSheet").innerHTML=j.parts_svg;$("penSheet").innerHTML=j.pen_svg||'<p class="note" style="padding:12px">لا توجد نقاط كافية لقياس قاعدة القلم.</p>';
   $("wordTitle").textContent="البناء: "+j.word;$("wordImg").src="data:image/png;base64,"+j.word_png;$("construction").innerHTML=j.construction_svg;

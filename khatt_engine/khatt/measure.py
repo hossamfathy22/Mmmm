@@ -81,6 +81,7 @@ class Line:
     stem_runs: float = float("nan")
     hair: float = float("nan")
     power: float = 2.0
+    pen_angle: float = 0.0
     pen_fit: Dict[str, float] = field(default_factory=dict)
     pen_points: Tuple[np.ndarray, np.ndarray] = (np.zeros(0), np.zeros(0))
     monoline: bool = False
@@ -382,33 +383,48 @@ def _pen(L: Line, U0: float) -> None:
         if ev[1] <= 0 or ev[0] / ev[1] > 0.08:
             continue
         v = evec[:, 1]
-        theta[k] = abs(v[1]) / math.hypot(v[0], v[1])          # |sin| of the stroke direction
+        theta[k] = math.degrees(math.atan2(-v[1], v[0])) % 180.0   # stroke direction, 0 = horizontal, 90 = vertical
     ok = ~np.isnan(theta)
-    s = theta[ok]
+    ang = np.radians(theta[ok])
     w = 2 * dist[ys[ok], xs[ok]] - 0.5
-    if len(s) < 30:
+    if len(ang) < 30:
         return
-    L.pen_points = (s, w)
     hair_runs = _hair_runs(L, U0)
-    h0 = hair_runs if hair_runs == hair_runs else 0.2 * U0
+    wmax, wmin = float(np.percentile(w, 95)), float(np.percentile(w, 8))
+    # the pen angle phi: a broad pen held at phi draws strokes perpendicular to it thickest.
+    # phi = 0 -> vertical strokes thick (geometric, Kufi, most logos); near 90 -> horizontal thick (Naskh)
 
     def resid(p):
-        U, hh, pw = p
-        return hh + (U - hh) * s ** pw - w
+        U, r, pw, phi = p                     # hairline = r x stem with r <= 1: one solution, not two
+        return U * r + U * (1 - r) * np.abs(np.cos(ang - np.radians(90 - phi))) ** pw - w
 
-    fit = least_squares(resid, [U0, h0, 2.0], bounds=([0.5 * U0, 1.0, 0.4], [2.0 * U0, U0, 8.0]),
-                        loss="soft_l1", f_scale=max(1.0, 0.08 * U0))
-    U, hh, pw = fit.x
-    rmse = float(np.sqrt(np.median(fit.fun ** 2)))
-    L.pen_fit = {"stem": float(U), "hair": float(hh), "power": float(pw), "median_error": rmse, "samples": int(len(s))}
+    best = None
+    for phi0 in (0.0, 45.0, 90.0, -45.0):
+        lo, hi = [0.3 * U0, 0.02, 0.4, -90.0], [3.0 * U0, 1.0, 8.0, 90.0]
+        x0 = [max(wmax, 1.5), min(max(wmin / max(wmax, 1e-6), 0.03), 0.99), 2.0, phi0]
+        x0 = [min(max(v, a + 1e-6), b - 1e-6) for v, a, b in zip(x0, lo, hi)]
+        f = least_squares(resid, x0, bounds=(lo, hi), loss="soft_l1", f_scale=max(1.0, 0.08 * U0))
+        if best is None or f.cost < best.cost:
+            best = f
+    U, r, pw, phi = best.x
+    hh = U * r
+    rmse = float(np.sqrt(np.median(best.fun ** 2)))
+    s = np.abs(np.cos(ang - np.radians(90 - phi)))
+    L.pen_points = (s, w)
+    L.pen_fit = {"stem": float(U), "hair": float(hh), "power": float(pw), "angle": float(phi),
+                 "median_error": rmse, "samples": int(len(s))}
     L.power = float(pw)
-    L.hair = hair_runs if hair_runs == hair_runs else float(hh)
-    if not L.stem == L.stem:
-        L.stem = float(U)
-    n_thin = int((w < 0.45 * L.stem).sum())
-    L.monoline = n_thin < max(8, 0.03 * len(w)) or L.hair > 0.75 * L.stem
+    L.pen_angle = float(phi)
+    contrast = U / max(hh, 1e-6)
+    L.monoline = bool(contrast < 1.45)
     if L.monoline:
         L.hair = L.stem
+    elif hair_runs == hair_runs and hair_runs < 0.6 * L.stem and abs(phi) <= 30:
+        L.hair = hair_runs                     # thin strokes are horizontal: their runs measure them best
+    else:
+        L.hair = float(hh)
+    if not L.stem == L.stem:
+        L.stem = float(U)
 
 
 def _hair_runs(L: Line, U0: float) -> float:
