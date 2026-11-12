@@ -180,3 +180,21 @@ def test_a_naskh_logo_is_built_from_a_naskh_font(tmp_path):
 def test_a_geometric_logo_stays_with_the_engine():
     r = run(ROUND.read_bytes(), "بيدوناق", texts=["سفينة نجم"])
     assert r["learning"]["chosen"] == "engine"
+
+
+# ---------------------------------------------------------------- thin monoline logos with long horizontals
+def test_band_survives_long_thin_horizontals():
+    """A geometric logo whose long horizontal strokes make a few rows look dense: the x-height band
+    must still span the letters, not collapse onto one stroke."""
+    from khatt.measure import measure_line
+    h, w = 140, 520
+    ink = np.zeros((h, w), float)
+    base, xh, pen = 100, 44, 8
+    ink[base - pen:base, 40:480] = 1                       # a long baseline stroke (kashida)
+    ink[base - xh:base - xh + pen, 300:480] = 1             # a long top stroke
+    for x in range(60, 300, 40):                           # stems standing on the baseline
+        ink[base - xh:base, x:x + 10] = 1
+    ink[base - xh:base, 470:480] = 1
+    L = measure_line(ink, ink > 0.5, 20, 120, 0)
+    assert abs(L.x_height - xh) <= 3
+    assert abs(L.stem - 10) <= 1.5
