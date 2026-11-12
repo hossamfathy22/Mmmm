@@ -81,6 +81,22 @@ def load_binary(data: bytes) -> Tuple[Image.Image, np.ndarray, float, bool]:
     return work, ink.astype(np.uint8), scale, bool(inverted)
 
 
+def _only_marks(ink: np.ndarray, m: List[int], tallest: int) -> bool:
+    """A strip that holds nothing but a few compact blobs (large square or round dots) under half
+    the tallest strip high is a row of marks belonging to the next line, not a line of writing."""
+    a, b = m
+    if b - a + 1 >= 0.5 * (tallest + 1):
+        return False
+    lab, n = ndi.label(ink[a:b + 1] > 0, structure=np.ones((3, 3)))
+    if n == 0 or n > 12:
+        return False
+    for sl in ndi.find_objects(lab):
+        hh, ww = sl[0].stop - sl[0].start, sl[1].stop - sl[1].start
+        if not (0.6 <= ww / max(hh, 1) <= 1.6):
+            return False
+    return True
+
+
 def find_lines(ink: np.ndarray) -> List[Tuple[int, int]]:
     H, W = ink.shape
     rows = ink.sum(axis=1)
@@ -104,7 +120,9 @@ def find_lines(ink: np.ndarray) -> List[Tuple[int, int]]:
     if not merged:
         return []
     tallest = max(b - a for a, b in merged)
-    big = [m for m in merged if m[1] - m[0] >= tallest * 0.35]
+    big = [m for m in merged if m[1] - m[0] >= tallest * 0.35 and not _only_marks(ink, m, tallest)]
+    if not big:
+        big = [max(merged, key=lambda m: m[1] - m[0])]
     for m in merged:  # dots and underlines join the nearest real line
         if m in big:
             continue

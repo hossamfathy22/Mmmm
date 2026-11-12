@@ -105,7 +105,7 @@ def _join_profile(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
         full = (c1 - c0)
         mc = int(round((c0 + c1) / 2))
         prof = L.G[:, mc - 1:mc + 2].mean(axis=1)
-        r0 = int(round(L.row_of_y(0.0)))
+        r0 = min(len(prof) - 1, max(0, int(round(L.row_of_y(0.0)))))
         # the bottom of the counter: walk up the middle column from the baseline until the ink ends
         r = r0
         while r > 0 and prof[r] < L.level and r > r0 - 0.3 * L.stem:
@@ -113,7 +113,7 @@ def _join_profile(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
         while r > 0 and prof[r] >= L.level:
             r -= 1
         y_bottom = L.y_of_row(r)
-        for rr in range(r, int(L.row_of_y(0.9 * X)), -1):
+        for rr in range(min(r, L.G.shape[0] - 1), max(0, int(L.row_of_y(0.9 * X))), -1):
             w = float((L.G[rr, int(c0) - 1:int(c1) + 2] < L.level).sum())
             if w >= 0.92 * full:
                 ins.append(L.y_of_row(rr) / X)
@@ -127,7 +127,7 @@ def _join_profile(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
             edge = s.x + side * s.w / 2
             start = None
             for y in np.linspace(0.7 * X, 0.0, 60):
-                r = int(round(L.row_of_y(y)))
+                r = min(L.G.shape[0] - 1, max(0, int(round(L.row_of_y(y)))))
                 row = L.G[r]
                 ci = int(round(L.col_of_x(s.x)))
                 e = _cross(row, L.level, ci, side)

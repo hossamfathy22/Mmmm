@@ -167,17 +167,47 @@ def _otsu01(v: np.ndarray) -> float:
     return float(c[int(np.argmax(var))])
 
 
-# ------------------------------------------------------------------ main
-def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx: int = 0) -> Optional[Line]:
-    """ink01: working image as ink intensity 0..1 (1 = ink). binary: thresholded ink."""
-    H, W = binary.shape
-    region = binary[top:bot + 1]
-    h = bot - top + 1
-    if region.sum() < 50:
+# ------------------------------------------------------------------ the x-height band
+def _band_from_columns(region: np.ndarray) -> Optional[Tuple[int, int, int]]:
+    """Read the band the way the eye does: the most common top of the letters is the x-height,
+    the most common bottom is the baseline. Works whether the horizontal strokes are thin
+    (monoline geometric logos) or thick; small pieces (dots) are left out."""
+    lab, n = ndi.label(region, structure=np.ones((3, 3)))
+    if n == 0:
         return None
-    cols = np.flatnonzero(region.any(axis=0))
-    x0, x1 = int(cols[0]), int(cols[-1])
-    rows = region.sum(axis=1)
+    areas = np.bincount(lab.ravel())
+    areas[0] = 0
+    keep = areas >= max(8, 0.03 * areas.sum())
+    body = keep[lab]
+    cols = np.flatnonzero(body.any(axis=0))
+    if len(cols) < 10:
+        return None
+    tops = np.argmax(body[:, cols], axis=0)
+    bots = body.shape[0] - 1 - np.argmax(body[::-1, cols], axis=0)
+
+    def mode(v):
+        hist = np.bincount(v, minlength=body.shape[0] + 2).astype(float)
+        sm = np.convolve(hist, [1, 2, 3, 2, 1], mode="same")
+        return int(np.argmax(sm))
+    t, b = mode(tops), mode(bots)
+    if b - t < 4:
+        return None
+    return (t, b, b - t)
+
+
+def _pen_estimate(region: np.ndarray) -> float:
+    """Typical stroke thickness: twice the distance to the background along the skeleton."""
+    from skimage.morphology import skeletonize
+    if not region.any():
+        return 0.0
+    d = ndi.distance_transform_edt(region)
+    sk = skeletonize(region)
+    v = d[sk]
+    return float(2 * np.median(v)) if len(v) else 0.0
+
+
+def _band_from_rows(rows: np.ndarray, h: int) -> Tuple[int, int, int]:
+    """Fallback: the longest run of dense rows."""
     thr = float(np.percentile(rows[rows > 0], 90)) * 0.45
     dense = rows >= thr
     best, i = (0, h - 1, -1), 0
@@ -195,6 +225,30 @@ def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx:
             i = j
         else:
             i += 1
+    return best
+
+
+# ------------------------------------------------------------------ main
+def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx: int = 0) -> Optional[Line]:
+    """ink01: working image as ink intensity 0..1 (1 = ink). binary: thresholded ink."""
+    H, W = binary.shape
+    region = binary[top:bot + 1]
+    h = bot - top + 1
+    if region.sum() < 50:
+        return None
+    cols = np.flatnonzero(region.any(axis=0))
+    x0, x1 = int(cols[0]), int(cols[-1])
+    rows = region.sum(axis=1)
+    # Two readings of the band: dense rows (good for calligraphic writing whose letters sit on a
+    # thick baseline stroke) and the commonest column top/bottom (good for monoline logos whose long
+    # thin horizontals make a few rows look dense). A real band is several pen widths tall, so the
+    # row reading is kept unless it collapses onto a single stroke.
+    best = _band_from_rows(rows, h)
+    pen = _pen_estimate(region)
+    if best[2] < 2.5 * pen:
+        alt = _band_from_columns(region)
+        if alt is not None and alt[2] > best[2]:
+            best = alt
     x_top_row, base_row = top + best[0], top + best[1]
     # slant: the shear that makes the strokes inside the band sharpest
     ys, xs = np.nonzero(binary[x_top_row:base_row + 1, x0:x1 + 1])
@@ -343,8 +397,9 @@ def _stems(L: Line, U0: float, x_top_row: int, base_row: int) -> None:
             continue
         tr_top = _cross(col, lvl, mid, -1)
         tr_bot = _cross(col, lvl, mid, +1)
-        if tr_top is None or tr_bot is None:
-            continue
+        # ink that reaches the edge of the line strip ends at the edge
+        tr_top = -0.5 if tr_top is None else tr_top
+        tr_bot = len(col) - 0.5 if tr_bot is None else tr_bot
         L.stems.append(Stem(x=L.x_of_col(c), w=w, top=L.y_of_row(tr_top), bottom=L.y_of_row(tr_bot), comp=tr["comp"]))
     L.stems.sort(key=lambda s: -s.x)   # right to left, the reading order of Arabic
     if L.stems:

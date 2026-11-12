@@ -140,3 +140,30 @@ def test_shapes_of_the_first_style():
     assert st["slant"] == pytest.approx(14, abs=1)
     assert st["top_round"] < 0.2 and abs(st["top_angle"]) < 3
     assert st["dot_n"] < 3
+
+
+# ---------------------------------------------------------------- thin monoline logos with long horizontals
+def test_band_survives_long_thin_horizontals():
+    """A geometric logo whose long horizontal strokes make a few rows look dense: the x-height band
+    must still span the letters, not collapse onto one stroke."""
+    from khatt.measure import measure_line
+    h, w = 140, 520
+    ink = np.zeros((h, w), float)
+    base, xh, pen = 100, 44, 8
+    ink[base - pen:base, 40:480] = 1                       # a long baseline stroke (kashida)
+    ink[base - xh:base - xh + pen, 300:480] = 1             # a long top stroke
+    for x in range(60, 300, 40):                           # stems standing on the baseline
+        ink[base - xh:base, x:x + 10] = 1
+    ink[base - xh:base, 470:480] = 1
+    L = measure_line(ink, ink > 0.5, 20, 120, 0)
+    assert abs(L.x_height - xh) <= 3
+    assert abs(L.stem - 10) <= 1.5
+
+
+def test_a_row_of_big_square_dots_belongs_to_its_line():
+    """Large square dots above the letters form their own ink strip; it must join the line below."""
+    from khatt.analyze import find_lines
+    ink = np.zeros((300, 600), np.uint8)
+    ink[40:90, 100:150] = 1; ink[40:90, 200:250] = 1      # dots, 50 px tall
+    ink[110:260, 80:520] = 1                              # the writing, 150 px tall
+    assert find_lines(ink) == [(40, 259)]
