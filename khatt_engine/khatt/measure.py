@@ -45,6 +45,7 @@ class Piece:
     size: float = 0.0        # dot diameter or dash length
     thick: float = 0.0       # dash thickness
     roundness: float = 0.0
+    squareness: float = 0.0
     contours: List[Poly] = field(default_factory=list)
     label: str = ""
 
@@ -84,6 +85,7 @@ class Line:
     pen_fit: Dict[str, float] = field(default_factory=dict)
     pen_points: Tuple[np.ndarray, np.ndarray] = (np.zeros(0), np.zeros(0))
     monoline: bool = False
+    hv_ratio: float = float("nan")
     stems: List[Stem] = field(default_factory=list)
     levels: List[Level] = field(default_factory=list)
     white: float = float("nan")
@@ -296,7 +298,7 @@ def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx:
     if not U0 == U0:
         L.x_height = float(xh_rows)
         return L
-    _pieces(L, U0)
+    _pieces(L, U0, xh_rows)
     _stems(L, U0, x_top_row, base_row)
     _rhythm(L)
     _levels(L, x_top_row, base_row)
@@ -315,7 +317,7 @@ def _contours(mask: np.ndarray, oy: int, ox: int, L: Line) -> List[Poly]:
     return out
 
 
-def _pieces(L: Line, U0: float) -> None:
+def _pieces(L: Line, U0: float, X: float = 0.0) -> None:
     objs = ndi.find_objects(L.lab)
     hair_guess = max(1.5, 0.22 * U0)
     for i, sl in enumerate(objs, start=1):
@@ -339,11 +341,17 @@ def _pieces(L: Line, U0: float) -> None:
             kind = "dot"
         elif ww >= 3 * hh and hh <= max(3.5 * hair_guess, 0.5 * U0) and ww >= 0.8 * U0:
             kind = "dash"
+            # a flat stroke lying on the baseline is a letter drawn flat (a kashida-like ی), not a
+            # diacritic dash: marks sit above the letters or below the baseline
+            bottom, top_ = L.y_of_row(r0 + hh), L.y_of_row(r0)
+            if X > 0 and abs(bottom) <= 0.12 * X and top_ <= 0.45 * X:
+                kind = "body"
         p = Piece(kind=kind, comp=i, x0=L.x_of_col(c0), x1=L.x_of_col(c0 + ww), y0=L.y_of_row(r0 + hh), y1=L.y_of_row(r0),
                   area=area, cx=cx, cy=cy)
         if kind == "dot":
             p.size = diam
             p.roundness = min(1.0, (area / (math.pi * (hh / 2) ** 2)))
+            p.squareness = area / (hh * ww)          # 0.785 for a circle, 1.0 for a square
         elif kind == "dash":
             p.size = float(ww)
             p.thick = area / ww
@@ -461,7 +469,16 @@ def _pen(L: Line, U0: float) -> None:
     if not L.stem == L.stem:
         L.stem = float(U)
     n_thin = int((w < 0.45 * L.stem).sum())
-    L.monoline = n_thin < max(8, 0.03 * len(w)) or L.hair > 0.75 * L.stem
+    hor, ver = w[s < 0.25], w[s > 0.85]
+    if len(hor) >= 10 and len(ver) >= 10:
+        # the eye's test: are the horizontal strokes as thick as the vertical ones?
+        ratio = float(np.median(hor) / np.median(ver))
+        L.hv_ratio = ratio
+        L.monoline = ratio > 0.88
+        if not L.monoline and (not hair_runs == hair_runs or hair_runs > 1.15 * ratio * L.stem):
+            L.hair = ratio * L.stem             # thick horizontals: too wide for the hairline run count
+    else:
+        L.monoline = n_thin < max(8, 0.03 * len(w)) or L.hair > 0.75 * L.stem
     if L.monoline:
         L.hair = L.stem
 

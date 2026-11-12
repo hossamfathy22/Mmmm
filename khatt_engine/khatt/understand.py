@@ -372,7 +372,7 @@ def observations(lines: List[Line], readings: List[Reading], k: float = 1.0) -> 
         if _close(L.descender, L.stem, 0.1):
             add("grid", f"{tag}: النزول ({L.descender:.1f}) يساوي سمك الجذع.", descender=L.descender, stem=L.stem)
         for p in L.dots:
-            add("part", f"{tag}: النقطة دائرة ⌀{p.size:.2f} = {p.size / L.stem:.2f} من الجذع، وقمتها عند {p.y1 - L.x_height:+.1f} من ارتفاع الحروف.",
+            add("part", f"{tag}: النقطة {'مربعة' if getattr(p, 'squareness', 0.0) > 0.9 else 'دائرة'} ⌀{p.size:.2f} = {p.size / L.stem:.2f} من الجذع، وقمتها عند {p.y1 - L.x_height:+.1f} من ارتفاع الحروف.",
                 diameter=p.size)
         for p in L.dashes:
             if _close(p.thick, L.hair, 0.25):
