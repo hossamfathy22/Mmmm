@@ -103,6 +103,7 @@ def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) 
     if "angular" in f: st.angular = float(np.clip(f["angular"], 0, 1))
     if "corner_r" in f: st.corner_r = float(np.clip(f["corner_r"], 0, 1.5 * st.stem))
     if "tail_drop" in f: st.tail_drop = float(np.clip(f["tail_drop"], 0, 1))
+    if "top_join" in f: st.top_join = float(f["top_join"])
     return st
 
 

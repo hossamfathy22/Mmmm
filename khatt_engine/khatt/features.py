@@ -262,7 +262,33 @@ def measure_features(lines: List[Line], readings: List[Reading], src: int, k: fl
         if drops:
             put("tail_drop", _median(drops), len(drops), "نزول ذيل الراء والزاي والواو تحت السطر ÷ النزول (0 على السطر)")
             put("tail_reach", _median(reach), len(reach), "امتداد الذيل إلى اليسار بوحدة الجذع")
+    tj = _top_joins(L, R)
+    if tj:
+        put("top_join", 1.0, tj, "حرف ذو ذيل موصول من أعلى السنّ الذي قبله بخط شعري، لا من السطر")
     return out
+
+
+def _top_joins(L: Line, R: Reading) -> int:
+    """How many descending stems (ر ز و) hang from the top of the tooth on their right: same body,
+    no join on the baseline between the two, ink across the top and white under it."""
+    X, U = L.x_height, L.stem
+    joined = {(j.right, j.left) for j in R.joins}
+    n = 0
+    for i, s in enumerate(L.stems):
+        if s.role != "descending" or i == 0:
+            continue
+        r = L.stems[i - 1]
+        if r.comp != s.comp or (i - 1, i) in joined or not (0 < r.x - s.x < 3.2 * U) or r.top < 0.85 * X:
+            continue
+        c0, c1 = int(round(L.col_of_x(s.x + s.w / 2))) + 1, int(round(L.col_of_x(r.x - r.w / 2))) - 1
+        if c1 - c0 < 2:
+            continue
+        gap = L.lab[:, c0:c1 + 1] == s.comp
+        top = gap[int(L.row_of_y(min(s.top, r.top))):int(L.row_of_y(0.75 * X)) + 1]
+        low = gap[int(L.row_of_y(0.6 * X)):int(L.row_of_y(0.12 * X)) + 1]
+        if top.size and low.size and top.any(axis=0).mean() > 0.85 and low.mean() < 0.1:
+            n += 1
+    return n
 
 
 def _reh_tails(L: Line, R: Reading) -> Tuple[List[float], List[float]]:

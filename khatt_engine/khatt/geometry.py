@@ -171,6 +171,125 @@ def ring(st: Style, xl: float, xr: float, yb: float, yt: float, side: float | No
     return [outer, _super(cx, cy, ai, bi, n)]
 
 
+# ---- key shapes drawn as explicit outlines (outer edge and counter) ---------------------------
+def _pts(seg) -> Poly:
+    return [(q[0], q[1]) for q in seg]
+
+
+def loop_length(st: Style) -> float:
+    """Length of the loop of ص ط, from the foot of its stem to its round end: the slope needs 0.8 of
+    the x-height to come down at about 45 degrees, the round end 1.35 stems."""
+    return 0.8 * st.x_height + 1.35 * st.stem
+
+
+def teardrop(st: Style, x0: float, xr: float) -> Shape:
+    """The loop of ص ض ط ظ. `x0` is the right edge of the tooth (or tall stem) that stands at its left
+    point, `xr` its right end. Outer edge: flat on the baseline, a round end on the right, the top at
+    the x-height, then a slope down to the foot of the stem. Counter: flat bottom one hairline up,
+    upright right side one stem in, a slope parallel to the outer one, a point at the stem.
+    The widths are the pen rule's: hairline below and at the top, the stem at the round end, the
+    width of a leaning stroke on the slope."""
+    U, h, X = st.stem, st.hair, st.x_height
+    L = xr - x0
+    ax = xr - 1.35 * U                                   # top of the round end
+    S = max(ax - x0, 0.3 * L)                            # horizontal run of the slope
+    th = math.atan2(0.8 * (X - 2 * h), max(S - 0.22 * U, 1e-6))
+    w = st.width_at(math.sin(th))
+    taper = 1.0 - 0.39 * (1.0 - h / U) / (1.0 - 4.5 / 23.0) if U > h else 1.0   # a contrast pen thins at the foot
+    yf = min(h + taper * w / math.cos(th), 0.6 * X)       # where the slope meets the stem
+    outer = ([(x0 - U / 2, 0.0)] + _pts(cubic((xr - 1.3 * U, 0), (xr - 0.565 * U, 0), (xr, 0.2 * X), (xr, 0.5 * X)))
+             + _pts(cubic((xr, 0.5 * X), (xr, 0.8 * X), (xr - 0.565 * U, X), (ax, X)))[1:]
+             + _pts(cubic((ax, X), (ax - 0.34 * S, X), (x0 + 0.45 * S, yf + 0.47 * S * math.tan(th)), (x0, yf)))[1:]
+             + [(x0 - U / 2, yf)])
+    tip = (x0 + 0.09 * U, h)
+    full = (X - 2 * h) / math.sin(th)                    # the counter's slope, if it ran straight to the top
+    d = (math.cos(th), math.sin(th))
+    e = (tip[0] + d[0] * 0.47 * full, tip[1] + d[1] * 0.47 * full)
+    c = (tip[0] + d[0] * 0.64 * full, tip[1] + d[1] * 0.64 * full)
+    top_in = (ax - 0.13 * U, X - h)
+    if xr - U - 0.3 * U <= tip[0] or X - 2 * h < 0.15 * U:
+        return [outer]                                   # too heavy for a counter
+    inner = ([tip] + _pts(cubic((xr - 1.48 * U, h), (xr - 1.13 * U, h), (xr - U, 0.21 * X), (xr - U, 0.455 * X)))
+             + _pts(cubic((xr - U, 0.455 * X), (xr - U, 0.7 * X), (xr - 1.13 * U, X - h), top_in))[1:]
+             + _pts(cubic(top_in, (top_in[0] - 0.19 * S, X - h), c, e))[1:])
+    from shapely.geometry import Polygon
+    o, i = Polygon(outer).buffer(0), Polygon(inner).buffer(0)
+    i = i.intersection(o.buffer(-0.5 * h))               # the counter never breaks the outer edge
+    if i.is_empty or i.area < 0.2 * U * U:
+        return [outer]
+    big = max(getattr(i, "geoms", [i]), key=lambda q: q.area)
+    return [outer, list(big.exterior.coords)[:-1]]
+
+
+def nose_top(st: Style, d0: float, xa: float) -> Poly:
+    """The upper half of ح ج خ: a hairline bar from `xa` at the x-height that turns down into the nose,
+    whose right end is `d0`. It stops where the pen is upright (0.636 of the x-height): the lower arm
+    takes over from that cut, d0 - stem .. d0."""
+    U, h, X = st.stem, st.hair, st.x_height
+    yn = 0.636 * X
+    return ([(xa, X)] + _pts(cubic((d0 - 1.13 * U, X), (d0 - 0.435 * U, X), (d0, 0.864 * X), (d0, yn)))
+            + _pts(cubic((d0 - U, yn), (d0 - U, 0.803 * X), (d0 - 1.3 * U, X - h), (d0 - 1.65 * U, X - h)))
+            + [(xa, X - h)])
+
+
+def nose_arm(st: Style, d0: float, xj: float, ex: float) -> Poly:
+    """The lower arm of حـ ـحـ: from the nose it sweeps back down to the baseline at `xj`, thinning as it
+    leans, and leaves as a hairline to `ex`."""
+    U, h, X = st.stem, st.hair, st.x_height
+    yn = 0.636 * X
+    run = d0 - xj
+    return ([(d0, yn + 0.01)] + _pts(cubic((d0, yn), (d0, 0.303 * X), (d0 - 0.387 * run, 0), (xj, 0)))
+            + [(ex, 0), (ex, h)]
+            + _pts(cubic((xj + 0.065 * run, h), (d0 - 0.6 * run, h), (d0 - U, 0.333 * X), (d0 - U, yn)))
+            + [(d0 - U, yn + 0.01)])
+
+
+def nose_turn(st: Style, d0: float, m: Pt, beta: float) -> Poly:
+    """The lower arm of ح ـح where it leaves the nose: from the cut d0 - stem .. d0 it turns to the left
+    and reaches the cross-section of a pen stroke centred on `m` and leaning `beta` degrees below the
+    horizontal; the pen stroke of the bowl goes on from there. The outer edge is a round turn, the
+    inner edge drops straight and then turns, so the white between bar and arm ends round, not in a
+    sharp wedge."""
+    U, X = st.stem, st.x_height
+    yn = 0.636 * X
+    b = math.radians(beta)
+    t = (-math.cos(b), -math.sin(b))
+    n = (math.sin(b), -math.cos(b))                      # towards the outer (lower right) edge
+    w = st.width_at(math.sin(b))
+    lo = (m[0] + n[0] * w / 2, m[1] + n[1] * w / 2)
+    hi = (m[0] - n[0] * w / 2, m[1] - n[1] * w / 2)
+    run = d0 - m[0]
+    return ([(d0, yn + 0.01)] + _pts(cubic((d0, yn), (d0, yn - 0.3 * X), (lo[0] - t[0] * 0.7 * run, lo[1] - t[1] * 0.7 * run), lo))
+            + _pts(cubic(hi, (hi[0] - t[0] * 0.5 * run, hi[1] - t[1] * 0.5 * run), (d0 - U, yn - 0.16 * X), (d0 - U, yn)))
+            + [(d0 - U, yn + 0.01)])
+
+
+def fuse(shapes: Sequence[Shape], r: float) -> Shape:
+    """Merge shapes into one and fill the sharp white wedges where two of them meet at a shallow angle
+    (narrower than 2r), the way ink closes them."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    geoms = []
+    for sh in shapes:
+        acc = None
+        for poly in sh:
+            if len(poly) >= 3:
+                q = Polygon(poly).buffer(0)
+                acc = q if acc is None else acc.symmetric_difference(q)
+        if acc is not None:
+            geoms.append(acc)
+    body = unary_union(geoms)
+    if r > 0:
+        body = body.buffer(r, 12).buffer(-r, 12)
+    out: Shape = []
+    for poly in getattr(body, "geoms", [body]):
+        if poly.is_empty:
+            continue
+        out.append(list(poly.exterior.coords)[:-1])
+        out += [list(q.coords)[:-1] for q in poly.interiors]
+    return out
+
+
 # ---- variable-width strokes (tails, bowls) -------------------------------------------------
 Sample = Tuple[float, float, float, float]  # x, y, unit tangent
 
@@ -209,6 +328,27 @@ def stroke(st: Style, pts: List[Sample]) -> Shape:
         nx, ny = -ty, tx
         L.append((x + nx * w, y + ny * w)); R.append((x - nx * w, y - ny * w))
     return [L + R[::-1]]
+
+
+def solid_stroke(st: Style, pts: List[Sample]) -> Shape:
+    """The same pen stroke, built piece by piece and merged: where the path turns more tightly than
+    half the pen (the inside of a sharp turn) the offset edge would fold over itself and leave a notch;
+    the merged pieces fill it, as ink does."""
+    from shapely.geometry import MultiPoint
+    from shapely.ops import unary_union
+    L, R = [], []
+    for x, y, tx, ty in pts:
+        w = st.width_at(ty) / 2
+        L.append((x - ty * w, y + tx * w)); R.append((x + ty * w, y - tx * w))
+    quads = [MultiPoint([L[i], L[i + 1], R[i + 1], R[i]]).convex_hull for i in range(len(pts) - 1)]
+    body = unary_union([q for q in quads if q.geom_type == "Polygon"]).buffer(0)
+    out: Shape = []
+    for poly in getattr(body, "geoms", [body]):
+        if poly.is_empty:
+            continue
+        out.append(list(poly.exterior.coords)[:-1])
+        out += [list(r.coords)[:-1] for r in poly.interiors]
+    return out
 
 
 def open_arc(st: Style, cx: float, cy: float, a: float, b: float, a0: float, a1: float, scale: float = 1.0) -> Shape:

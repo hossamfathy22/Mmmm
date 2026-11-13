@@ -241,3 +241,83 @@ def test_every_letter_passes_the_critic_in_an_angular_style():
                top_round=0, ring_n=8, dot_n=5.5, join_in=0.2, join_out=0.23, angular=0.72, corner_r=8.3,
                tail_drop=0.0, tail_reach=1.9, contrast_power=2.3)
     assert [d.text() for d in specimen_defects(st)] == []
+
+
+# ---------------------------------------------------------------- skeletons taken from the reference typefaces
+def _body(word: str, st: Style):
+    """The drawn word without its marks, as one upright geometry, and the layout."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    lay = typeset(word, st)
+    geoms = []
+    for sh in flat(lay.shapes):
+        if getattr(sh, "name", "") in ("نقطة", "شرطة", "همزة"):
+            continue
+        acc = None
+        for poly in sh:
+            if len(poly) >= 3:
+                q = Polygon(poly).buffer(0)
+                acc = q if acc is None else acc.symmetric_difference(q)
+        if acc is not None:
+            geoms.append(acc)
+    return unary_union(geoms), lay
+
+
+def test_loop_of_sad_is_a_teardrop_with_the_tooth_at_its_point():
+    from shapely.geometry import Point
+    st = Style()
+    body, lay = _body("ص", st)
+    X, U, h = st.x_height, st.stem, st.hair
+    L = 0.8 * X + 1.35 * U
+    assert len(body.interiors) == 1                                  # one counter
+    # the counter is tall at the round end and comes to a point at the tooth
+    assert body.contains(Point(-L + 0.2 * U, 0.2 * X))                # the slope arrives at the foot of the tooth
+    assert not body.contains(Point(-1.6 * U, 0.5 * X))                # white inside the round end
+    assert body.contains(Point(-L - U / 2, 0.9 * X))                  # the tooth stands left of the loop, to the x-height
+    assert not body.contains(Point(-L + 0.3 * U, 0.95 * X))           # and the loop's top has come down beside it
+
+
+def test_tah_carries_its_stem_at_the_point_of_the_loop():
+    from shapely.geometry import Point
+    st = Style()
+    body, _ = _body("ط", st)
+    X, U, A = st.x_height, st.stem, st.ascender
+    L = 0.8 * X + 1.35 * U
+    assert body.contains(Point(-L - U / 2, X + 0.9 * A))              # the tall stem is the leftmost part
+    assert not body.contains(Point(-L / 2, X + 0.3 * A))              # nothing rises over the loop
+
+
+def test_hah_has_a_nose_at_the_right_above_the_middle():
+    st = Style()
+    body, _ = _body("حب", st)
+    X = st.x_height
+    xs, ys = zip(*[p for p in body.exterior.coords])
+    right = max(xs)
+    nose = [y for x, y in zip(xs, ys) if x > right - 0.02 * st.stem]
+    assert 0.4 * X < sum(nose) / len(nose) < 0.85 * X                 # the rightmost point is the nose, not the top
+    assert max(ys) <= X + 1e-6 and min(ys) >= -1e-6                   # joined ح stays between the lines
+
+
+def test_medial_heh_has_an_eye_under_the_baseline():
+    st = Style()
+    body, _ = _body("بهب", st)
+    assert len(body.interiors) == 2
+    lows = sorted(min(y for _, y in r.coords) for r in body.interiors)
+    assert lows[0] < -0.3 * st.descender and lows[1] > 0              # one counter under the line, one above it
+    assert abs(body.bounds[1] + st.descender) < 1.0                   # and it reaches the descender line
+
+
+def test_reh_hangs_from_the_top_of_the_tooth_when_the_logo_says_so():
+    from shapely.geometry import Point
+    X, U, h, W = 66.0, 23.0, 4.5, 22.0
+    joined, lay = _body("بر", Style(top_join=1.0))
+    plain, _ = _body("بر", Style())
+    reh = [p for p in lay.placed if p.char == "ر"][0].x              # right edge of the ر stem
+    gap = reh + W / 2                                                 # middle of the white between tooth and ر
+    assert joined.contains(Point(gap, X - h / 2))                     # the hairline bar at the top
+    assert not joined.contains(Point(gap, h / 2))                     # and no join on the baseline
+    assert plain.contains(Point(reh + 0.2 * W, h / 2)) and not plain.contains(Point(gap, X - h / 2))
+    assert lay.placed[1].glyph.stems[0][1] == X                       # the ر stem is a full tooth
+    # after a round head there is no tooth to hang from: the baseline join stays
+    round_, lay2 = _body("فر", Style(top_join=1.0))
+    assert not round_.contains(Point([p for p in lay2.placed if p.char == "ر"][0].x + W / 2, X - h / 2))

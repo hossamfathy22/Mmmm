@@ -10,6 +10,7 @@ from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
 from .style import Style
 
+TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
 HARAKAT = {chr(c) for c in range(0x064B, 0x0653)} | {"ٰ"}
 
 
@@ -96,7 +97,9 @@ def typeset(word: str, st: Style) -> Layout:
     group_gap = st.group_gap if st.group_gap > 0 else 1.15 * st.white
     forms = shape_forms(word)
     # letters of the ر family that this logo joins from the top (see letters.top_joins)
-    top = {i for i, (c, f) in enumerate(forms) if f == "F" and c in "رزژ" and top_joins(st)}
+    # In a curved logo the bar needs a tooth or a stem at the left end of the letter before it.
+    top = {i for i, (c, f) in enumerate(forms) if f == "F" and c in "رزژ" and top_joins(st)
+           and (st.angular >= 0.5 or forms[i - 1][0] in TOOTH_END)}
     for i, (c, form) in enumerate(forms):
         if form == " ":
             if prev is not None:
