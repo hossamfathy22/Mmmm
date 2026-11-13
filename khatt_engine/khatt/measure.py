@@ -583,12 +583,20 @@ def _levels(L: Line, x_top_row: int, base_row: int) -> None:
     L.descender = max(0.0, -L.y_of_row(ink_rows[-1] + 1))
 
 
+def _band_height(L: Line) -> float:
+    """The x-height as far as it is known when the rhythm is read: the median height of the stems."""
+    tops = [s.top - max(s.bottom, 0.0) for s in L.stems]
+    return float(np.median(tops)) if tops else 0.0
+
+
 # ------------------------------------------------------------------ rhythm
 def _rhythm(L: Line) -> None:
     pitches, whites = [], []
     for a, b in zip(L.stems, L.stems[1:]):          # a is to the right of b
         p = a.x - b.x
-        if p < 3.2 * L.stem and a.comp == b.comp:
+        # two teeth of one body are neighbours up to 3.2 stems apart in a bold face; in a light one
+        # the stems are thin and the same teeth stand many stems apart, so the x-height sets the reach
+        if p < max(3.2 * L.stem, 0.85 * _band_height(L)) and a.comp == b.comp:
             pitches.append(p)
             whites.append((a.x - a.w / 2) - (b.x + b.w / 2))
             a.joined_left = b.joined_right = True

@@ -63,7 +63,7 @@ class Reading:
 def _joins(L: Line) -> List[Join]:
     out = []
     for i, (a, b) in enumerate(zip(L.stems, L.stems[1:])):
-        if a.comp != b.comp or a.x - b.x > 6 * L.stem:
+        if a.comp != b.comp or a.x - b.x > max(6 * L.stem, 1.6 * L.x_height):
             continue
         mx = ((a.x - a.w / 2) + (b.x + b.w / 2)) / 2
         c = int(round(L.col_of_x(mx)))
@@ -80,7 +80,7 @@ def _joins(L: Line) -> List[Join]:
                 if p is not None and q is not None:
                     thick = q - p
         out.append(Join(right=i, left=i + 1, white=(a.x - a.w / 2) - (b.x + b.w / 2), bottom=thick,
-                        kind="join" if a.x - b.x < 3.2 * L.stem else "bowl"))
+                        kind="join" if a.x - b.x < max(3.2 * L.stem, 0.85 * L.x_height) else "bowl"))
     return out
 
 
