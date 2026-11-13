@@ -17,7 +17,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from .analyze import find_lines, load_binary
+from .analyze import find_lines
+from .guard import assess, prepare
 from .bezier import to_path
 from .features import measure_features
 from .library import ACTIVE, build_library
@@ -117,8 +118,14 @@ def letter_recipes(lay) -> List[Dict[str, Any]]:
     return out
 
 
-def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: str, src_line: int, corrected: Optional[Style] = None, feats=None) -> str:
+def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: str, src_line: int, corrected: Optional[Style] = None, feats=None, health=None) -> str:
     md = [f"# تقرير بناء: {word}", "", f"الشعار: {name} — القواعد والقطع مأخوذة من السطر {src_line + 1}.", ""]
+    if health:
+        md += ["## فحص الصورة", "", f"الثقة في القراءة: {health['confidence'] * 100:.0f}%", ""]
+        md += [f"- صُحّح: {n['text']}" for n in health["corrections"]] + [f"- تنبيه: {n['text']}" for n in health["warnings"]]
+        if not health["corrections"] and not health["warnings"]:
+            md += ["- الصورة نظيفة: لا تصحيح ولا تنبيه."]
+        md += [""]
     md += ["## المرحلة 1: القياس", "", "| القياس | " + " | ".join(f"السطر {l['line']}" for l in lines_js) + " |",
            "|---|" + "---|" * len(lines_js)]
     rows = [("الميل °", "slant_deg"), ("سمك الجذع", "stem"), ("الخط الشعري", "hairline"), ("التباين", "contrast"),
@@ -157,11 +164,13 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
     return "\n".join(md) + "\n"
 
 
-def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
-        overrides: Optional[Dict[str, Any]] = None, use_parts: bool = False, out_dir: Optional[str] = None,
-        name: str = "logo") -> Dict[str, Any]:
+def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
+            overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Stages 1-4 alone: guard the picture, measure and read every line, and turn the chosen line
+    into drawing rules. Nothing is drawn. This is all a caller needs to typeset words in the logo's
+    style, and all the benchmark needs to test the measuring."""
     # 1. load
-    work, ink, scale, inverted = load_binary(image)
+    work, ink, scale, inverted, notes = prepare(image)
     k = 1.0 / scale
     g = np.asarray(work, float) / 255.0
     ink01 = g if inverted else 1.0 - g
@@ -176,8 +185,8 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         lines.append(L)
     if not lines:
         raise ValueError("لم أجد في الصورة كتابة يمكن قياسها. استعمل صورة أوضح بخلفية سادة.")
-    obs = observations(lines, readings, k)
     src = pick_line(lines, readings, line)
+    health = assess(lines, readings, src, notes)
     L, R = lines[src], readings[src]
     # 4. parts
     lib = build_library(L, R, k)
@@ -186,6 +195,19 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     for key, v in (overrides or {}).items():
         if hasattr(style, key) and v is not None:
             setattr(style, key, type(getattr(style, key))(v))
+    return {"work": work, "ink": ink, "scale": scale, "k": k, "inverted": inverted, "lines": lines, "readings": readings,
+            "src": src, "health": health, "lib": lib, "feats": feats, "style": style}
+
+
+def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
+        overrides: Optional[Dict[str, Any]] = None, use_parts: bool = False, out_dir: Optional[str] = None,
+        name: str = "logo") -> Dict[str, Any]:
+    an = analyse(image, texts=texts, line=line, overrides=overrides)
+    work, ink, scale, k, inverted = an["work"], an["ink"], an["scale"], an["k"], an["inverted"]
+    lines, readings, src, health = an["lines"], an["readings"], an["src"], an["health"]
+    lib, feats, style = an["lib"], an["feats"], an["style"]
+    L, R = lines[src], readings[src]
+    obs = observations(lines, readings, k)
 
     # 5-6. build and verify
     def build(st: Style):
@@ -210,6 +232,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "stages": STAGES,
         "image": {"width": round(work.width * k), "height": round(work.height * k), "inverted": inverted},
         "lines": lines_js, "observations": obs, "source_line": src,
+        "input": health,
         "parts": lib.summary(), "parts_json": parts_json, "features": feats,
         "style": style.to_dict(), "recipes": recipes, "skipped": lay.skipped,
         "verification": checks, "corrections": corrections,
@@ -228,7 +251,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     alpha_defects = specimen_defects(lay.style)
     result["critic"] = {"word": [d.text() for d in word_defects], "alphabet": [d.text() for d in alpha_defects]}
     result["specimen_png"] = specimen_png(lay.style, alpha_defects)
-    result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats)
+    result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats, health)
     crit = result["critic"]
     result["report_md"] += "\n".join(["", "## الناقد (specimen.png)", "",
         "يرسم المحرك كل حرف بأشكاله الأربعة بأسلوب الشعار، ويفحصه بالعيوب التي يراها المصمم بعينه: "

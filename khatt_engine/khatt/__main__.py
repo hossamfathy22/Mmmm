@@ -23,6 +23,12 @@ def main() -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
+    h = r["input"]
+    print(f"فحص الصورة: الثقة {h['confidence'] * 100:.0f}%")
+    for n in h["corrections"]:
+        print("  صُحّح:", n["text"])
+    for n in h["warnings"]:
+        print("  تنبيه:", n["text"])
     for l in r["lines"]:
         print(f"السطر {l['line']} ({l['script']}): جذع {l['stem']} · شعري {l['hairline']} · ميل {l['slant_deg']}° · ارتفاع {l['x_height']}"
               + (f" · قرأ: {l['text_guess']}" if l["text_guess"] else ""))

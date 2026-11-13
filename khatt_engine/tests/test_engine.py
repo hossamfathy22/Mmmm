@@ -321,3 +321,112 @@ def test_reh_hangs_from_the_top_of_the_tooth_when_the_logo_says_so():
     # after a round head there is no tooth to hang from: the baseline join stays
     round_, lay2 = _body("فر", Style(top_join=1.0))
     assert not round_.contains(Point([p for p in lay2.placed if p.char == "ر"][0].x + W / 2, X - h / 2))
+
+
+# ---------------------------------------------------------------- the input guard
+def _png(im) -> bytes:
+    b = io.BytesIO(); im.save(b, "PNG"); return b.getvalue()
+
+
+def _measured(im):
+    from khatt.pipeline import analyse
+    an = analyse(_png(im))
+    L, k = an["lines"][an["src"]], an["k"]
+    return L.x_height * k, L.stem * k, L.slant, an["health"]
+
+
+@pytest.fixture(scope="module")
+def clean_logo():
+    from PIL import Image
+    im = Image.open(EXAMPLE).convert("L")
+    return im, _measured(im)
+
+
+def test_guard_leaves_a_clean_picture_alone(clean_logo):
+    im, (X, U, slant, health) = clean_logo
+    assert health["corrections"] == [] and health["warnings"] == [] and health["confidence"] == 1.0
+
+
+@pytest.mark.parametrize("angle", [4, -7, 10])
+def test_guard_levels_a_rotated_picture(clean_logo, angle):
+    from PIL import Image
+    im, (X, U, slant, _) = clean_logo
+    x, u, s, health = _measured(im.rotate(angle, expand=True, fillcolor=255, resample=Image.BICUBIC))
+    assert [n["kind"] for n in health["corrections"]] == ["rotation"]
+    assert abs(health["corrections"][0]["angle"] - angle) < 0.3          # the turn is found
+    assert abs(x / X - 1) < 0.01 and abs(u / U - 1) < 0.02 and abs(s - slant) < 0.3   # and the letters' slant is untouched
+
+
+def test_guard_takes_a_symbol_out_of_the_line(clean_logo):
+    from PIL import Image, ImageDraw
+    im, (X, U, slant, _) = clean_logo
+    W, H = im.size
+    pic = Image.new("L", (W + H, H), 255); pic.paste(im, (0, 0))
+    ImageDraw.Draw(pic).ellipse([W + 30, 0.2 * H, W + H - 30, 0.8 * H], fill=0)
+    x, u, s, health = _measured(pic)
+    assert [n["kind"] for n in health["corrections"]] == ["symbol"]
+    assert abs(x / X - 1) < 0.01 and abs(u / U - 1) < 0.01
+
+
+@pytest.mark.parametrize("ground", ["gradient", "vignette", "grey"])
+def test_guard_evens_out_the_ground(clean_logo, ground):
+    from PIL import Image
+    im, (X, U, slant, _) = clean_logo
+    a = np.asarray(im).astype(float)
+    H, W = a.shape
+    if ground == "gradient":
+        a = a * np.linspace(1.0, 0.47, W)[None, :]
+    elif ground == "vignette":
+        yy, xx = np.mgrid[0:H, 0:W]
+        a = a * (1 - 0.25 * (((xx - W / 2) / (W / 2)) ** 2 + ((yy - H / 2) / (H / 2)) ** 2))
+    else:
+        a = a * 0.6 + 40                                                  # flat, but neither black nor white
+    x, u, s, health = _measured(Image.fromarray(a.astype(np.uint8)))
+    kinds = [n["kind"] for n in health["corrections"]]
+    assert ("ground" in kinds) == (ground != "grey")
+    assert abs(x / X - 1) < 0.01 and abs(u / U - 1) < 0.02
+
+
+def test_guard_fills_letters_drawn_as_outlines(clean_logo):
+    from PIL import Image
+    from scipy import ndimage as ndi
+    im, (X, U, slant, _) = clean_logo
+    a = np.asarray(im) < 128
+    x, u, s, health = _measured(Image.fromarray(np.where(a & ~ndi.binary_erosion(a, iterations=4), 0, 255).astype(np.uint8)))
+    assert "outline" in [n["kind"] for n in health["corrections"]]
+    assert abs(x / X - 1) < 0.01 and abs(u / U - 1) < 0.03                # not the 4 px of the outline
+    assert health["confidence"] <= 0.75                                   # and it says the reading is rough
+
+
+def test_guard_says_when_the_reading_is_not_sure():
+    """One stem is not a rhythm: the figure drops and the reason is given."""
+    from PIL import Image, ImageDraw
+    im = Image.new("L", (900, 400), 255)
+    ImageDraw.Draw(im).rectangle([400, 100, 440, 300], fill=0)
+    from khatt.pipeline import analyse
+    try:
+        h = analyse(_png(im))["health"]
+    except ValueError:
+        return                                                            # refusing to measure is also an honest answer
+    assert h["confidence"] < 0.7 and h["warnings"]
+
+
+# ---------------------------------------------------------------- the benchmark's yardstick
+def test_reading_metric_knows_the_same_skeleton_from_another():
+    """The distance used by the benchmark: weight does not count, shape does."""
+    from PIL import Image, ImageDraw
+    from khatt.bench.score import BASE_ROW, CANVAS, PX, RIGHT_COL, Shape, distance, read
+
+    def draw(fn):
+        im = Image.new("L", (CANVAS[1], CANVAS[0]), 0)
+        fn(ImageDraw.Draw(im)); return Shape(np.array(im) > 0)
+    x, b = RIGHT_COL, BASE_ROW
+    tooth_light = draw(lambda d: d.rectangle([x - 6, b - PX, x, b], fill=1))
+    tooth_bold = draw(lambda d: d.rectangle([x - 14, b - PX, x, b], fill=1))
+    tall = draw(lambda d: d.rectangle([x - 6, b - 2 * PX, x, b], fill=1))
+    ring = draw(lambda d: d.ellipse([x - 2 * PX, b - PX, x, b], outline=1, width=6))
+    assert distance(tooth_light, tooth_bold) < 0.06                       # the same skeleton, two weights
+    same = distance(tooth_light, tooth_bold)
+    assert distance(tooth_light, tall) > 2 * same and distance(tooth_light, ring) > 0.15   # another height, another shape
+    assert read(tooth_bold, {"ب": tooth_light, "ل": tall, "و": ring})[0] == "ب"
+    assert read(draw(lambda d: d.ellipse([x - 2 * PX - 4, b - PX, x - 4, b], outline=1, width=10)), {"ب": tooth_light, "ل": tall, "و": ring})[0] == "و"
