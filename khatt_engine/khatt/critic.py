@@ -44,7 +44,8 @@ class Defect:
         return f"{self.where}: {NAMES[self.kind]} ({self.value:.2f} مقابل الحد {self.limit:.2f})"
 
 
-def raster(lay: Layout, px_per_stem: float = 24.0, marks: bool = False, frame_marks: bool = True) -> Tuple[np.ndarray, float, float, float]:
+def raster(lay: Layout, px_per_stem: float = 24.0, marks: bool = False, frame_marks: bool = True,
+           only_marks: bool = False) -> Tuple[np.ndarray, float, float, float]:
     """Upright (unslanted) drawing of the letter bodies (and marks if asked) on a frame that holds
     the whole drawing, marks included, so two drawings of one layout line up; returns
     (mask, scale, x0, y_top)."""
@@ -53,7 +54,7 @@ def raster(lay: Layout, px_per_stem: float = 24.0, marks: bool = False, frame_ma
     every = [p for sh in lay.shapes for poly in sh for p in poly] if frame_marks else None
     from .render import merged
     body_only = Layout(text=lay.text, style=lay.style,
-                       shapes=[sh for sh in lay.shapes if marks or getattr(sh, "name", "") not in MARK_NAMES])
+                       shapes=[sh for sh in lay.shapes if (getattr(sh, "name", "") in MARK_NAMES) == only_marks or (marks and not only_marks)])
     shapes = merged(body_only)            # judged as it is printed: parts unioned
     pts = every or [p for sh in shapes for poly in sh for p in poly]
     if not pts or not shapes:
@@ -145,10 +146,12 @@ def critique(lay: Layout, where: str = "") -> List[Defect]:
         width = float(m.sum(axis=1).max())
         if width < 0.55 * st.white * s:
             out.append(Defect("counter", where, width / (st.white * s), 0.55))
-    # touch: marks keep their own white (a fifth of the stem) from the letter
-    allm, *_ = raster(lay, marks=True)
-    if allm.shape == body.shape:
-        only = allm & ~body
+    # touch: marks keep their own white (a fifth of the stem) from the letter. The marks are drawn
+    # alone on the same frame: taking them as "everything minus the letters" let a one-pixel
+    # difference along a long edge pass for a mark lying on its letter.
+    only, *_ = raster(lay, only_marks=True)
+    if only.shape == body.shape:
+        only = only & ~body
         if only.sum() > 0:
             near = ndi.binary_dilation(body, iterations=max(1, int(round(0.2 * U))))
             lab, n = ndi.label(only, structure=np.ones((3, 3)))

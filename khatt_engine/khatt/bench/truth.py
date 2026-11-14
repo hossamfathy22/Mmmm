@@ -112,3 +112,49 @@ def place(m: np.ndarray, base_row: int, right_col: int, px: float, canvas: Tuple
         if 0 <= d < W:
             out[:min(H, m.shape[0]), d] = m[:min(H, m.shape[0]), c]
     return out
+
+
+TEETH = set("بتثپنيیئ")
+
+
+def tooth_tops(face: Face, text: str, x_px: float = 130.0) -> List[float]:
+    """The height of every tooth of `text` as the engine defines a stem's height: at the middle of
+    the stem, not at the highest point of a slanted or rounded top. A tooth is a letter of the ب
+    family joined to the letter after it. Heights are in pixels of a picture whose medial ب is
+    `x_px` high (the picture `word_image` makes)."""
+    from ..typeset import shape_forms
+    forms = shape_forms(text)
+    s = x_px / x_height(face)
+    out = []
+    glyphs = {}
+    for cl, cont in shape(face, text):
+        glyphs.setdefault(cl, []).extend(cont)
+    for i, (c, f) in enumerate(forms):
+        if c not in TEETH or f not in ("I", "M") or i not in glyphs:
+            continue
+        cs = glyphs[i]
+        xs = [p[0] for q in cs for p in q]; ys = [p[1] for q in cs for p in q]
+        W, H = int((max(xs) - min(xs)) * s) + 6, int(max(ys) * s) + 6
+        if H < 8 or W < 4:
+            continue
+        m = drop_marks(raster(cs, min(xs) - 3 / s, (H - 1) / s, s, W, H, ss=2) > 0.5, x_px)
+        rows = np.flatnonzero(m.any(axis=1))
+        if not len(rows):
+            continue
+        top_row = rows[0]
+        base_row = H - 1
+        mid = int(top_row + 0.5 * (base_row - top_row))           # half way up the tooth: its stem is the run there
+        runs = np.flatnonzero(np.diff(np.r_[0, m[mid].astype(int), 0]))
+        if len(runs) < 2:
+            continue
+        spans = list(zip(runs[::2], runs[1::2]))
+        # the stem is the run that reaches highest
+        best = None
+        for a, b in spans:
+            band = m[:, int(a + 0.3 * (b - a)):max(int(a + 0.7 * (b - a)), int(a + 0.3 * (b - a)) + 1)]
+            r = np.flatnonzero(band.mean(axis=1) > 0.5)
+            if len(r) and (best is None or r[0] < best):
+                best = r[0]
+        if best is not None:
+            out.append(float(base_row - best))
+    return out

@@ -301,9 +301,9 @@ def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx:
     _pieces(L, U0, xh_rows)
     _stems(L, U0, x_top_row, base_row)
     _rhythm(L)
+    _counters(L)
     _levels(L, x_top_row, base_row)
     _pen(L, U0)
-    _counters(L)
     return L
 
 
@@ -415,7 +415,12 @@ def _pen(L: Line, U0: float) -> None:
     body = np.isin(L.lab, [p.comp for p in L.pieces if p.kind == "body"])
     if body.sum() < 50:
         return
-    skel, dist = medial_axis(body, return_distance=True)
+    # medial_axis breaks ties between pixels at random; a fixed seed makes the same picture give the
+    # same pen rule every time
+    try:
+        skel, dist = medial_axis(body, return_distance=True, rng=0)
+    except TypeError:                                    # older scikit-image
+        skel, dist = medial_axis(body, return_distance=True, random_state=0)
     ys, xs = np.nonzero(skel)
     if len(xs) < 30:
         return
@@ -544,14 +549,34 @@ def _levels(L: Line, x_top_row: int, base_row: int) -> None:
         for p in L.pieces:
             p.y0 -= shift; p.y1 -= shift; p.cy -= shift
             p.contours = [[(x, y - shift) for x, y in poly] for poly in p.contours]
+        for c in L.counters:
+            c.y0 -= shift; c.y1 -= shift
     tol = max(1.0, 0.12 * L.stem)
-    groups = _cluster([s.top for s in L.stems], tol)
+    # The side of a round head is not a tooth: it ends where the ring turns, below the head's top.
+    # A logo with as many round letters as teeth would take its x-height from them. A stem with a
+    # counter right beside its upper part is such a side, and stands aside while real teeth vote.
+    def ring_side(st) -> bool:
+        for c in L.counters:
+            beside = (c.x0 - 0.9 * st.w <= st.x <= c.x0 + 0.1 * st.w) or (c.x1 - 0.1 * st.w <= st.x <= c.x1 + 0.9 * st.w)
+            if beside and c.y1 > 0.5 * st.top and c.y0 < st.top:
+                return True
+        return False
+    voters = [st for st in L.stems if st.bottom > -0.3 * L.stem and not ring_side(st)]
+    if len(voters) < 2:
+        voters = L.stems
+    groups = _cluster([s.top for s in voters], tol)
     groups.sort(key=len, reverse=True)
     if not groups:
         L.x_height = float(base_row - x_top_row + 1)
         return
     band_top = L.y_of_row(x_top_row - L.top)
-    main = min(groups[:3], key=lambda g: abs(float(np.mean(g)) - band_top)) if len(groups) > 1 else groups[0]
+    # The x-height is where most stems end. Tall letters stand well above the band of the line and do
+    # not vote while others do; among the rest the level with the most stems wins, and the estimate
+    # of the band only settles a tie. (It used to pick, of the three largest levels, the one nearest
+    # that estimate: two stems could outvote five.)
+    cand = [g for g in groups if float(np.mean(g)) <= 1.25 * band_top] or groups
+    most = max(len(g) for g in cand)
+    main = min([g for g in cand if len(g) == most], key=lambda g: abs(float(np.mean(g)) - band_top))
     X = float(np.median(main))
     L.x_height = X
     levels = []

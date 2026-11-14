@@ -26,14 +26,14 @@ from ..style import Style
 from ..typeset import flat, typeset
 from . import fonts
 from .score import BASE_ROW, CANVAS, PX, RIGHT_COL, Shape, distance, read
-from .truth import FORMS, letter_mask, place, png, word_image, x_height
+from .truth import FORMS, letter_mask, place, png, tooth_tops, word_image, x_height
 
 LOGO = "بيدوناق"
 SKELETONS = ["ي" if c == "ی" else c for c in _SK]        # every Arabic typeface has ي; few have the Persian ی
 FORM_AR = {"i": "منفصل", "I": "أول", "M": "وسط", "F": "آخر"}
 TOL = {"x_height": 0.03, "stem": 0.06, "slant": 1.0}
 X_PX = 130.0
-TRUTH_CASE = "الصورة النظيفة: ارتفاع الحروف مقابل ارتفاع السنّ في الخط (±5%)"
+TRUTH_CASE = "الصورة النظيفة: ارتفاع الحروف مقابل ارتفاع أسنان الكلمة في الخط (±5%)"
 
 
 # ------------------------------------------------------------------ measuring: known distortions
@@ -93,8 +93,11 @@ def measuring(face: fonts.Face) -> Optional[Dict]:
     if clean is None:
         return None
     out = {"clean": {k: clean[k] for k in ("x_height", "stem", "slant", "confidence")}, "style": clean["style"], "cases": {}}
-    # the one length a typeface states outright: the picture was drawn with its tooth X_PX pixels high
-    e = clean["x_height"] / X_PX - 1
+    # the one length a typeface states outright: the height of the teeth of the word, taken as the
+    # engine takes a stem's height (at the middle of the stem). A word may have teeth of two heights
+    # (an initial tooth is often taller than a medial one): any of them is a right answer.
+    tops = tooth_tops(face, LOGO, X_PX) or [X_PX]
+    e = min((clean["x_height"] / t - 1 for t in tops), key=abs)
     out["cases"][TRUTH_CASE] = {"ok": abs(e) <= 0.05, "why": "" if abs(e) <= 0.05 else "x_height",
                                 "errors": {"x_height": round(float(e), 4)}, "fixes": []}
     for name, fn, scale, slant in DISTORTIONS:
