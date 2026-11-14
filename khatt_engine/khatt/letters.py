@@ -80,7 +80,8 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
     if not spec:
         return []
     d, h = st.dot, st.hair
-    gap = 0.44 * d
+    gap = val(st, "mark.gap")
+    dash_len = val(st, "mark.dash")
     above = spec[0] in "ah" and spec != "hb"
     ref = st.x_height if above_ref is None else above_ref
     cy = at if at is not None else (ref + gap + d / 2 if above else below_ref - gap - d / 2)
@@ -99,13 +100,13 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
         out.append(dot(cx, cy))
     elif kind == "2":
         if st.dash_marks:
-            out.append(dash(cx, cy, 1.5 * d))
+            out.append(dash(cx, cy, dash_len))
         else:
             out += [dot(cx - 0.6 * d, cy), dot(cx + 0.6 * d, cy)]
     elif kind == "3":
         step = 0.95 * d if above else -0.95 * d
         if st.dash_marks:
-            out.append(dash(cx, cy, 1.5 * d))
+            out.append(dash(cx, cy, dash_len))
             out.append(dot(cx, cy + step * 0.75 + (d / 2 - h / 2) * (1 if above else -1) * 0.2))
         else:
             out += [dot(cx - 0.6 * d, cy), dot(cx + 0.6 * d, cy), dot(cx, cy + step)]
@@ -149,6 +150,12 @@ def clear_marks(st: Style, body: List[g.Shape], spec: Optional[str], spots: List
 # the stems are thin and the cup came out half as wide as a letter. It is a share of the x-height;
 # 1.18 gives the same cup as before on that logo.
 param("cup.width", lambda st: max(3.4 * st.stem, 1.18 * st.x_height), "عرض الكأس السفلي = الأكبر من 3.4 جذع و1.18 × ارتفاع الحروف", DERIVED, "الكأس")
+param("cup.arm", lambda st: 0.4 * st.x_height, "حيث ينزل ذراع الكأس الأيمن من جذعه = 0.4 × ارتفاع الحروف", BY_EYE, "الكأس")
+param("cup.left", lambda st: 0.45 * st.x_height, "ارتفاع طرف الكأس الأيسر = 0.45 × ارتفاع الحروف", BY_EYE, "الكأس")
+param("bowl.reach", lambda st: 2.0 * st.pitch, "امتداد الكأس الراجع إلى اليمين تحت ح ع = خطوتان", BY_EYE, "الكأس")
+param("mark.gap", lambda st: 0.44 * st.dot, "البياض بين النقطة وحرفها = 0.44 من قطرها", BY_EYE, "النقاط")
+param("mark.dash", lambda st: st.dash if st.dash > 0 else 1.5 * st.dot,
+      "طول شرطة النقطتين = طول شرطة الشعار إن وُجدت، وإلا 1.5 من قطر النقطة", MEASURED, "النقاط")
 def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = None,
           x0: float = 0.0, drop_inner: bool = False) -> Tuple[List[g.Shape], List[float]]:
     """n teeth joined at the baseline, right to left, starting at right edge x0."""
@@ -235,14 +242,19 @@ def alef(st: Style, form: str, mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=-st.stem, stems=[(-u, X + A, 0)])
 
 
+# chosen by eye, then tried narrower, wider, lower and taller against the typefaces: these read best
+param("beh.post", lambda st: 0.5 * st.x_height, "ارتفاع طرفي الباء المنفصلة = نصف ارتفاع الحروف", FITTED, "الباء")
+param("beh.width", lambda st: 2.2 * st.pitch, "المسافة بين طرفي الباء المنفصلة = 2.2 خطوة", FITTED, "الباء")
+
+
 def beh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     u, P, X = st.stem / 2, st.pitch, st.x_height
     if form in ("I", "M"):
         shapes, xs = teeth(st, 1, _e(form), _x(form))
         shapes += marks(st, mark, xs[0])
         return Glyph(shapes, left=-st.stem, exit_x=-st.stem, exit_edge=-st.stem, stems=[(xs[0], X, 0)])
-    post = 0.5 * X
-    xr, xl = -u, -u - 2.2 * P
+    post = val(st, "beh.post")
+    xr, xl = -u, -u - val(st, "beh.width")
     shapes = [g.stem(st, xr, post, entry=_e(form), exit=True, round_br=not _e(form)),
               g.connector(st, xl + u, xr - u),
               g.stem(st, xl, post, entry=True, round_bl=True)]
@@ -250,16 +262,24 @@ def beh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=xl - u, stems=[(xr, post, 0), (xl, post, 0)])
 
 
+param("noon.stem", lambda st: 0.62 * st.x_height, "ارتفاع جذع النون المنفصلة = 0.62 × ارتفاع الحروف", FITTED, "النون")
+# joined to the letter before it, ن starts as a tooth of full height (final ن read right 57% at 0.62, 72% so)
+param("noon.stem_final", lambda st: 0.95 * st.x_height, "ارتفاع جذع النون الأخيرة = 0.95 × ارتفاع الحروف (سنّ كامل)", FITTED, "النون")
+
+
 def noon(st: Style, form: str, mark: Optional[str]) -> Glyph:
     if form in ("I", "M"):
         return beh(st, form, mark)
     U, u, X = st.stem, st.stem / 2, st.x_height
     r, w = -u, val(st, "cup.width")
-    shapes = [g.stem(st, r, 0.62 * X, entry=_e(form)), bowl_down(st, r, 0.4 * X, w, 0.45 * X)]
-    shapes += marks(st, mark, r - w / 2, at=0.3 * X + 0.44 * st.dot + st.dot / 2)
-    return Glyph(shapes, left=r - w - u, stems=[(r, 0.62 * X, 0)])
+    top = val(st, "noon.stem_final" if form == "F" and st.angular < 0.5 else "noon.stem")
+    shapes = [g.stem(st, r, top, entry=_e(form)), bowl_down(st, r, val(st, "cup.arm"), w, val(st, "cup.left"))]
+    shapes += marks(st, mark, r - w / 2, at=0.3 * X + val(st, "mark.gap") + st.dot / 2)
+    return Glyph(shapes, left=r - w - u, stems=[(r, top, 0)])
 
 
+param("yeh.stem", lambda st: 0.45 * st.x_height, "ارتفاع جذع الياء الأخيرة = 0.45 × ارتفاع الحروف", BY_EYE, "الياء")
+param("yeh.arm", lambda st: 0.3 * st.x_height, "حيث ينزل كأس الياء الأخيرة وحيث ينتهي = 0.3 × ارتفاع الحروف", BY_EYE, "الياء")
 param("yeh.head", lambda st: 0.98 * st.x_height, "قمة رأس الياء المنفصلة = 0.98 × ارتفاع الحروف", FITTED, "الياء")
 param("yeh.reach", lambda st: 2.3 * st.pitch, "امتداد كأس الياء المنفصلة = 2.3 خطوة", BY_EYE, "الياء")
 
@@ -296,13 +316,14 @@ def yeh(st: Style, form: str, mark: Optional[str], final_mark: Optional[str]) ->
         return _yeh_isolated(st, final_mark)
     U, u, X, D = st.stem, st.stem / 2, st.x_height, st.descender
     r, w = -u, val(st, "cup.width") * 4.0 / 3.4
-    shapes = [g.stem(st, r, 0.45 * X, entry=_e(form)), bowl_down(st, r, 0.3 * X, w, 0.3 * X)]
+    top, arm = val(st, "yeh.stem"), val(st, "yeh.arm")
+    shapes = [g.stem(st, r, top, entry=_e(form)), bowl_down(st, r, arm, w, arm)]
     if final_mark == "ha":
         shapes += marks(st, "ha", r - w / 2, above_ref=0.2 * X)
     else:
         d = st.dot
         shapes += marks(st, final_mark, r - w / 2, at=-D + st.hair + 0.4 * d + d / 2)
-    return Glyph(shapes, left=r - w - u, stems=[(r, 0.45 * X, 0)])
+    return Glyph(shapes, left=r - w - u, stems=[(r, top, 0)])
 
 
 def _pen(st: Style, curved, corners) -> g.Shape:
@@ -501,13 +522,24 @@ def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=xa, entry_x=0.0, entry_edge=0)
 
 
+# As drawn by hand in بيدوناق, which was judged by eye and kept. The typefaces would have the flag twice
+# as long and the base 1.4 times (د read right 73% so, 66% as it is): a choice left to the designer.
+param("dal.flag", lambda st: 0.57 * st.stem, "طول راية الدال = 0.57 جذع", BY_EYE, "الدال")
+param("dal.base", lambda st: 1.75 * st.stem, "طول قاعدة الدال = 1.75 جذع", BY_EYE, "الدال")
+
+
 def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, h = st.stem, st.stem / 2, st.x_height, st.hair
+    flag, base = val(st, "dal.flag"), val(st, "dal.base")
     shapes = [g.stem(st, -u, X, entry=_e(form), exit=True),
-              _named(g.rect(-U - 0.57 * U, -U, X - h, X), "راية الدال"),
-              _named(g.connector(st, -U - 1.75 * U, -U), "قاعدة الدال")]
+              _named(g.rect(-U - flag, -U, X - h, X), "راية الدال"),
+              _named(g.connector(st, -U - base, -U), "قاعدة الدال")]
     shapes += marks(st, mark, -u)
-    return Glyph(shapes, left=-U - 1.75 * U, stems=[(-u, X, 0)])
+    return Glyph(shapes, left=-U - base, stems=[(-u, X, 0)])
+
+
+param("reh.top", lambda st: 0.62 * st.x_height, "ارتفاع جذع الراء = 0.62 × ارتفاع الحروف", BY_EYE, "الراء")
+param("reh.corner", lambda st: 0.48 * st.stem, "استدارة ركن الراء الموصولة من أعلى = 0.48 جذع (قيست 11 على جذع 23)", MEASURED, "الراء")
 
 
 def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -516,7 +548,7 @@ def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
         # as the logo joins its own ر: a hairline bar from the top of the previous tooth, a rounded
         # corner, a full stem, and the tail under the line
         h, U = st.hair, st.stem
-        r = 0.48 * U
+        r = val(st, "reh.corner")
         bar = st.white + 0.5 * U
         body = [(bar, X), (bar, X - h), (0.0, X - h), (0.0, 0.0), (-U, 0.0), (-U, X - r)] \
             + [(q[0], q[1]) for q in g.cubic((-U, X - r), (-U, X - 0.45 * r), (-U + 0.45 * r, X), (-U + r, X), 10)]
@@ -533,7 +565,7 @@ def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
         shapes += marks(st, mark, -u, above_ref=X)
         return Glyph(shapes, left=-U, stems=[(-u, X, 0)], tail=foot - h)
     lib = _lib()
-    top = lib.parts["tail"].info.get("top", 0.62 * X) if lib is not None and lib.has("tail") else 0.62 * X
+    top = lib.parts["tail"].info.get("top", 0.62 * X) if lib is not None and lib.has("tail") else val(st, "reh.top")
     shapes = [tail(st, -u, top)]
     if _e(form):
         half = lib.half("r", True, -u, lib.white) if lib is not None else None
@@ -551,7 +583,8 @@ def seen(st: Style, form: str, mark: Optional[str]) -> Glyph:
     shapes, xs = teeth(st, 2, _e(form), True, drop_inner=True)
     r = xs[-1] - P
     w = val(st, "cup.width")
-    shapes += [g.connector(st, r + u, xs[-1] - u), g.stem(st, r, X, entry=True), bowl_down(st, r, 0.4 * X, w, 0.45 * X)]
+    shapes += [g.connector(st, r + u, xs[-1] - u), g.stem(st, r, X, entry=True),
+               bowl_down(st, r, val(st, "cup.arm"), w, val(st, "cup.left"))]
     shapes += marks(st, mark, xs[1])
     return Glyph(shapes, left=r - w - u, stems=[(x, X, 0) for x in xs] + [(r, X, 0)])
 
@@ -620,7 +653,7 @@ def sad(st: Style, form: str, mark: Optional[str]) -> Glyph:
         shapes += marks(st, mark, -0.43 * L, above_ref=X)
         return Glyph(shapes, left=xs - u, exit_x=xs - u, exit_edge=xs - u, stems=[(xs, val(st, "sad.tooth"), 0)], **common)
     w = val(st, "cup.width")
-    shapes += [g.stem(st, xs, val(st, "sad.tooth")), bowl_down(st, xs, 0.4 * X, w, 0.45 * X)]
+    shapes += [g.stem(st, xs, val(st, "sad.tooth")), bowl_down(st, xs, val(st, "cup.arm"), w, val(st, "cup.left"))]
     shapes += marks(st, mark, -0.43 * L, above_ref=X)
     return Glyph(shapes, left=xs - w - u, stems=[(xs, X, 0)], **common)
 
@@ -713,7 +746,7 @@ def _ain_joined(st: Style, form: str, mark: Optional[str]) -> Glyph:
     shapes += marks(st, mark, xl / 2, above_ref=top)
     if form == "M":
         return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
-    shapes.append(sweep_right(st, xl + u + (w - max(1.0 * U, 0.4 * w)) / 2, 0.3 * top, 1.8 * P))
+    shapes.append(sweep_right(st, xl + u + (w - max(1.0 * U, 0.4 * w)) / 2, 0.3 * top, 0.9 * val(st, "bowl.reach")))
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0)
 
 
@@ -726,7 +759,7 @@ def _ain_ring(st: Style, form: str, mark: Optional[str]) -> Glyph:
     shapes += marks(st, mark, xl / 2, above_ref=top)
     if form == "M":
         return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
-    shapes.append(sweep_right(st, xl + u, 0.3 * top, 1.8 * P))
+    shapes.append(sweep_right(st, xl + u, 0.3 * top, 0.9 * val(st, "bowl.reach")))
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0)
 
 
@@ -745,7 +778,7 @@ def _ain_open(st: Style, form: str, mark: Optional[str]) -> Glyph:
     if form == "I":
         shapes.append(g.stem(st, xs, cy, exit=True))
         return Glyph(shapes, left=xs - u, exit_x=xs - u, exit_edge=xs - u, stems=[(xs, cy, 0)])
-    shapes.append(sweep_right(st, xs, cy, 2.0 * P))
+    shapes.append(sweep_right(st, xs, cy, val(st, "bowl.reach")))
     return Glyph(shapes, left=xs - u)
 
 
@@ -759,6 +792,7 @@ param("fa.lift", lambda st: 0.15 * st.x_height if 0.15 * st.x_height >= 2.2 * st
 
 
 # two pitches by eye; the typefaces keep it shorter: isolated ف read right 38% so, 49% at 1.4 pitches
+param("qaf.left", lambda st: 0.6 * st.x_height, "ارتفاع طرف كأس القاف الأيسر = 0.6 × ارتفاع الحروف", BY_EYE, "الفاء والقاف")
 param("fa.tail", lambda st: 1.4 * st.pitch, "طول ذيل الفاء على السطر = 1.4 خطوة", FITTED, "الفاء والقاف")
 param("fa.end", lambda st: 0.5 * st.x_height, "ارتفاع طرف ذيل الفاء = نصف ارتفاع الحروف", BY_EYE, "الفاء والقاف")
 
@@ -791,12 +825,19 @@ def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
         # the cup's left arm keeps half a white from the head (12 against a white of 22 in the
         # hand-made بيدوناق), never against it
         bw = max(val(st, "cup.width") * 3.5 / 3.4, -xl + 0.5 * st.white)
-        shapes.append(bowl_down(st, -u, X / 2, bw, 0.6 * X))
+        shapes.append(bowl_down(st, -u, X / 2, bw, val(st, "qaf.left")))
         return Glyph(shapes, left=xl, **common)
     post = xl - val(st, "fa.tail")
     end = val(st, "fa.end")
     shapes += [g.connector(st, post + u, xl + U), g.stem(st, post, end, entry=True, round_bl=True)]
     return Glyph(shapes, left=post - u, stems=[(post, end, 0)], **common)
+
+
+# by eye the arm was 1.3 pitches and the end post 0.45 of the x-height; a shorter arm and a taller post
+# read better against the typefaces (final ك 55% -> 66%, isolated 53% -> 64%)
+param("kaf.arm", lambda st: 0.9 * st.pitch, "طول ذراع الكاف = 0.9 خطوة", FITTED, "الكاف")
+param("kaf.width", lambda st: 2.2 * st.pitch, "طول قاعدة الكاف الأخيرة = 2.2 خطوة", BY_EYE, "الكاف")
+param("kaf.post", lambda st: 0.7 * st.x_height, "ارتفاع طرف الكاف الأخيرة = 0.7 × ارتفاع الحروف", FITTED, "الكاف")
 
 
 def kaf(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
@@ -806,7 +847,7 @@ def kaf(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
     U, u, P, X, A, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.ascender, st.hair
     top = X + A
     arm_top = top - 2.6 * h if variant == "gaf" else top
-    arm_left = -U - 1.3 * P
+    arm_left = -U - val(st, "kaf.arm")
     shapes: List[g.Shape] = []
     if form in ("I", "M"):
         shapes.append(g.stem(st, -u, arm_top, entry=_e(form), exit=_x(form), round_br=not _e(form)))
@@ -817,12 +858,14 @@ def kaf(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
         shapes.append(_named(g.rect(arm_left + 0.15 * P, -U - 0.1 * P, top - h, top), "شرطة الگاف"))
     if form in ("I", "M"):
         return Glyph(shapes, left=min(arm_left, -U), exit_x=-U, exit_edge=-U, stems=[(-u, arm_top, 0)])
-    post = -U - 2.2 * P
-    shapes += [g.connector(st, post + u, -U), g.stem(st, post, 0.45 * X, entry=True, round_bl=True)]
+    post = -U - val(st, "kaf.width")
+    ph = val(st, "kaf.post")
+    shapes += [g.connector(st, post + u, -U), g.stem(st, post, ph, entry=True, round_bl=True)]
     if variant == "arabic":
         cx = (post + u - U) / 2
-        shapes.append(_named(g.rect(cx - 0.35 * P, cx + 0.35 * P, 0.42 * X - h / 2, 0.42 * X + h / 2), "شرطة"))
-    return Glyph(shapes, left=min(arm_left, post - u), stems=[(-u, arm_top, 0), (post, 0.45 * X, 0)])
+        cy = max(0.42 * X, 1.5 * h + 0.3 * U)             # clear of the baseline stroke, whatever its weight
+        shapes.append(_named(g.rect(cx - 0.35 * P, cx + 0.35 * P, cy - h / 2, cy + h / 2), "شرطة"))
+    return Glyph(shapes, left=min(arm_left, post - u), stems=[(-u, arm_top, 0), (post, ph, 0)])
 
 
 def lam(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -831,7 +874,7 @@ def lam(st: Style, form: str, mark: Optional[str]) -> Glyph:
         shapes = [g.stem(st, -u, X + A, entry=_e(form), exit=True, round_br=not _e(form))]
         return Glyph(shapes, left=-U, exit_x=-U, exit_edge=-U, stems=[(-u, X + A, 0)])
     w = val(st, "cup.width")
-    shapes = [g.stem(st, -u, X + A, entry=_e(form)), bowl_down(st, -u, 0.4 * X, w, 0.45 * X)]
+    shapes = [g.stem(st, -u, X + A, entry=_e(form)), bowl_down(st, -u, val(st, "cup.arm"), w, val(st, "cup.left"))]
     return Glyph(shapes, left=-u - w - u, stems=[(-u, X + A, 0)])
 
 
@@ -864,8 +907,10 @@ def _meem(st: Style, form: str, mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=xl - (1.0 * U if st.angular < 0.5 else 0), stems=[(x, top / 2, -D)], **common)
 
 
-param("heh.counter", lambda st: 1.3 * st.white + 0.8 * st.stem,
-      "فراغ رأس الهاء الأولى = 1.3 بياض + 0.8 جذع (عينان كلٌّ منهما أوسع من نصف البياض، وبينهما القاطع)", DERIVED, "الهاء")
+param("heh.counter", lambda st: 1.3 * st.white + 0.8 * st.stem + 0.6 * st.hair,
+      "فراغ رأس الهاء الأولى = 1.3 بياض + 0.8 جذع + 0.6 خط شعري (عينان كلٌّ منهما أوسع من نصف البياض، وبينهما القاطع بسمك قلمه)", DERIVED, "الهاء")
+param("heh.lower_w", lambda st: 0.62, "عرض العين السفلى للهاء الوسطى = 0.62 من عرض رأسها", BY_EYE, "الهاء")
+param("heh.lower_side", lambda st: 0.63 * st.stem, "سمك جانب العين السفلى = 0.63 جذع", BY_EYE, "الهاء")
 param("heh.cut_top", lambda st: 0.3, "رأس قاطع الهاء الأولى على 0.3 من عرضها من اليمين", BY_EYE, "الهاء")
 param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى على 0.62 من عرضها من اليمين", BY_EYE, "الهاء")
 
@@ -890,8 +935,8 @@ def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     if form == "M":
         # ـهـ in the reference typefaces: an eye above the baseline and a smaller one hanging under it.
         # The upper eye is the head; the lower one is the same ring, 0.62 as wide, down to the descender
-        side = 0.63 * U
-        wl = max(0.62 * w, 2 * side + 0.45 * st.white)
+        side = val(st, "heh.lower_side")
+        wl = max(val(st, "heh.lower_w") * w, 2 * side + 0.45 * st.white)
         cx = xl / 2
         shapes = [_ring(st, xl, 0, 0, X),
                   _named(g.ring(st, cx - wl / 2, cx + wl / 2, -st.descender, h, side=side), "عين سفلى")]

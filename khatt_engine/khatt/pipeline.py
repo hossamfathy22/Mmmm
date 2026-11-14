@@ -106,6 +106,10 @@ def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) 
     if "corner_r" in f: st.corner_r = float(np.clip(f["corner_r"], 0, 1.5 * st.stem))
     if "tail_drop" in f: st.tail_drop = float(np.clip(f["tail_drop"], 0, 1))
     if "top_join" in f: st.top_join = float(f["top_join"])
+    # the logo's own dash mark: a short hairline that is not a long bar over a letter
+    own = [p.size * k for p in L.dashes if p.size <= 2.6 * L.stem and not (p.cy > 0.9 * L.x_height and p.size > 2.2 * L.stem)]
+    if own:
+        st.dash = float(np.median(own))
     return st
 
 
