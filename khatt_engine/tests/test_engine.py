@@ -471,3 +471,29 @@ def test_joined_feh_stands_on_a_neck_only_where_there_is_room():
     fx = [p for p in lay.placed if p.char == "ف"][0].x
     assert not light.contains(Point(fx - 12.0, 7.0))          # white between baseline and head, beside the neck
     assert max(y for _, y in light.exterior.coords) <= 66.0 + 1e-6   # and the head stays under the x-height
+
+
+def test_every_letter_passes_the_critic_in_a_one_weight_curved_style():
+    """A pen of one weight that draws curves (most sans typefaces): the hairline is as thick as the
+    stem, so seams, pile-ups and thin strokes are judged for such a pen, and ح takes its leaning arm."""
+    from khatt.critic import specimen_defects
+    mono = Style(stem=24.0, hair=24.0, x_height=130.0, white=65.0, ascender=90.0, descender=60.0, slant=0.0,
+                 join_in=0.25, join_out=0.12, contrast_power=6.0, dot=28.0)
+    assert [d.text() for d in specimen_defects(mono)] == []
+    body, _ = _body("حب", mono)
+    xs, ys = zip(*body.exterior.coords)
+    top_left = max(y for x, y in zip(xs, ys) if x < min(xs) + 0.2 * (max(xs) - min(xs)) or True)
+    assert abs(top_left - 130.0) < 1.0                       # the arm starts at the x-height on the left
+    nose = [y for x, y in zip(xs, ys) if x > max(xs) - 1.0]
+    assert 0.5 * 130 < sum(nose) / len(nose) < 0.85 * 130    # and comes down to a nose at the right
+
+
+def test_critic_still_sees_a_real_seam_in_a_one_weight_pen():
+    from khatt.critic import critique
+    from khatt.library import Tagged
+    mono = Style(stem=24.0, hair=24.0, x_height=130.0, white=65.0, ascender=90.0, descender=60.0, slant=0.0)
+    lay = typeset("ب", mono)
+    # two blocks that fail to meet by a sliver
+    lay.shapes = [Tagged([[(0, 0), (60, 0), (60, 130), (0, 130)]], "engine", "a"),
+                  Tagged([[(63, 0), (120, 0), (120, 130), (63, 130)]], "engine", "b")]
+    assert any(d.kind == "crack" for d in critique(lay, "x"))

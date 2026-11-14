@@ -213,12 +213,29 @@ def teardrop(st: Style, x0: float, xr: float) -> Shape:
     inner = ([tip] + _pts(cubic((xr - 1.48 * U, h), (xr - 1.13 * U, h), (xr - U, 0.21 * X), (xr - U, 0.455 * X)))
              + _pts(cubic((xr - U, 0.455 * X), (xr - U, 0.7 * X), (xr - 1.13 * U, X - h), top_in))[1:]
              + _pts(cubic(top_in, (top_in[0] - 0.19 * S, X - h), c, e))[1:])
-    from shapely.geometry import Polygon
+    from shapely.geometry import Polygon, box
     o, i = Polygon(outer).buffer(0), Polygon(inner).buffer(0)
+    # the white between the slope and the stem ends in a sharp wedge at the foot: with the stem's
+    # right half in place its tip is filled, as ink fills it (the part under the stem is hidden by it)
+    r = 0.45 * min(h, 0.3 * U)
+    blunt = o.union(box(x0 - U / 2, 0.0, x0, 0.75 * X)).buffer(r, 8).buffer(-r, 8)
+    if blunt.geom_type == "Polygon" and not blunt.is_empty:
+        o = blunt
+        outer = list(o.exterior.coords)[:-1]
     i = i.intersection(o.buffer(-0.5 * h))               # the counter never breaks the outer edge
     if i.is_empty or i.area < 0.2 * U * U:
         return [outer]
     big = max(getattr(i, "geoms", [i]), key=lambda q: q.area)
+    # the counter comes to a point at the stem; where the slope is shallow that point is a long thin
+    # sliver of white, which a pen does not leave: the tip is rounded to the width a seam is judged by
+    # (a pen with thin hairlines keeps its point: there the slope is steep and the point is short)
+    if h >= 0.5 * U:
+        r2 = 0.38 * min(h, 0.3 * U)
+        opened = big.buffer(-r2, 8).buffer(r2, 8)
+        if not opened.is_empty:
+            big = max(getattr(opened, "geoms", [opened]), key=lambda q: q.area)
+    if big.area < 0.2 * U * U:
+        return [outer]
     return [outer, list(big.exterior.coords)[:-1]]
 
 

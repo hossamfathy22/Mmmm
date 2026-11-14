@@ -82,8 +82,10 @@ def critique(lay: Layout, where: str = "") -> List[Defect]:
         return []
     out: List[Defect] = []
     U, h = st.stem * s, st.hair * s
-    # crack: a seam the pen would never leave, long but thinner than half the hairline
-    r = max(1, int(round(0.35 * h)))
+    # crack: a seam the pen would never leave, long but thinner than half the hairline. In a pen of
+    # one weight the "hairline" is as thick as the stem, and a white that wide is an ordinary inner
+    # corner, not a seam: there the seam is judged against a third of the stem.
+    r = max(1, int(round(0.35 * min(h, 0.3 * U))))
     closed = ndi.binary_closing(body, structure=np.ones((2 * r + 1, 2 * r + 1)), iterations=1)
     seams = closed & ~body
     lab, n = ndi.label(seams, structure=np.ones((3, 3)))
@@ -99,10 +101,14 @@ def critique(lay: Layout, where: str = "") -> List[Defect]:
         if open_side < 0.3:
             out.append(Defect("crack", where, length / U, 0.45))
     # blob: ink thicker than the pen, where pieces are piled on each other
+    # In a contrast pen a stem meets hairlines, and anything much thicker than the stem is a pile-up.
+    # In a pen of one weight two full strokes meet at every join, and a join carries up to 1.75 pens.
+    mono = float(np.clip((st.hair / st.stem - 0.5) / 0.5, 0.0, 1.0)) if st.stem else 0.0
+    blob_limit = 1.32 + 0.43 * mono
     dist = ndi.distance_transform_edt(body)
     thick = 2 * float(dist.max())
-    if thick > 1.32 * U:
-        out.append(Defect("blob", where, thick / U, 1.32))
+    if thick > blob_limit * U:
+        out.append(Defect("blob", where, thick / U, blob_limit))
     # thin: strokes thinner than the hairline (5th percentile of the centre-line widths)
     from skimage.morphology import skeletonize
     sk = skeletonize(body)
@@ -117,8 +123,9 @@ def critique(lay: Layout, where: str = "") -> List[Defect]:
     w = 2 * dist[sk]
     if len(w) > 20:
         w5 = float(np.percentile(w, 5))
-        if w5 < 0.6 * h:
-            out.append(Defect("thin", where, w5 / max(h, 1e-6), 0.6))
+        thin_limit = 0.6 - 0.1 * mono        # an angled cut at the top of a one-weight stem ends in a tip
+        if w5 < thin_limit * h:
+            out.append(Defect("thin", where, w5 / max(h, 1e-6), thin_limit))
     # grid: nothing above the ascender line or below the descender line (dots excluded)
     rows = np.flatnonzero(body.any(axis=1))
     top_y = ytop - rows[0] / s

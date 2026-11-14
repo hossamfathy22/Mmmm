@@ -358,6 +358,7 @@ def _jeem_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 
 param("hah.span", lambda st: 1.78 * st.pitch, "عرض رأس الحاء = 1.78 خطوة", BY_EYE, "الحاء")
+param("hah.turn", lambda st: 0.62, "نصف قطر انعطاف أنف الحاء = 0.62 من سمك الذراع (أكثر من النصف، فلا ينسدّ داخله)", DERIVED, "الحاء")
 param("hah.nose_y", lambda st: 0.65 * st.x_height, "ارتفاع طرف أنف الحاء في صيغة الذراع المائل = 0.65 × ارتفاع الحروف", FITTED, "الحاء")
 
 
@@ -367,24 +368,72 @@ def _hah_default(st: Style) -> str:
     return "أنف" if st.hair < 0.5 * st.stem else "ذراع مائل"
 
 
+def _hah_path(st: Style, span: float, yn: float, wa: float):
+    """Centre line of the leaning-arm ح: the arm from the top left, a round turn at the nose whose
+    inside never closes (its radius is more than half the pen), and the way down to the baseline.
+    Returns the samples and the landing point on the baseline."""
+    X, h = st.x_height, st.hair
+    r = max(val(st, "hah.turn") * wa, 0.08 * X)                             # radius of the turn
+    cx, cy = -r - wa / 2, yn
+    xa, xj = -span, -0.78 * span
+    a = (xa, X - wa / 2)
+    f1 = math.atan2(a[1] - (cy + r), cx - a[0])                             # lean of the upper arm
+    f2 = math.radians(42.0)                                                 # lean of the lower arm
+    t1, t2 = math.pi / 2 - f1, f2 - math.pi / 2
+    pts = g.line(a, (cx + r * math.cos(t1), cy + r * math.sin(t1)))
+    n = 14
+    for i in range(1, n + 1):
+        t = t1 + (t2 - t1) * i / n
+        pts.append((cx + r * math.cos(t), cy + r * math.sin(t), math.sin(t), -math.cos(t)))
+    p2 = (pts[-1][0], pts[-1][1])
+    d2 = (-math.cos(f2), -math.sin(f2))
+    b = (xj, h / 2)
+    k = 0.4 * math.hypot(p2[0] - b[0], p2[1] - b[1])
+    low = g.cubic(p2, (p2[0] + d2[0] * k, p2[1] + d2[1] * k), (b[0] + k, b[1]), b)
+    return g.path(pts, low), b, low
+
+
 def _hah_slanted(st: Style, form: str, mark: Optional[str]) -> Glyph:
-    """حـ ـحـ with a leaning upper arm: from the top left the pen comes down to the right to a pointed
-    nose at mid height, turns back, and runs down to the baseline and on to the next letter."""
+    """حـ ـحـ with a leaning upper arm: from the top left the pen comes down to the right, turns round
+    at the nose at mid height, and runs down to the baseline and on to the next letter."""
     U, u, P, X, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair
     span, yn = val(st, "hah.span"), val(st, "hah.nose_y")
-    xa, xj = -span, -0.78 * span
+    xa = -span
     wa = st.width_at(math.sin(math.atan2(X - yn, span)))             # the arm's own width, for its lean
-    a, n, b = (xa, X - wa / 2), (-0.5 * wa, yn), (xj, h / 2)
+    path, b, low = _hah_path(st, span, yn, wa)
+    xj = b[0]
+    if form in ("i", "F"):
+        # ح ـح: after landing on the baseline the same stroke turns down into the bowl and swings back
+        # to the right under the letter; a join from the right meets it where it lands, lying flat
+        D = st.descender
+        xl, reach, yb = xj - 0.5 * P, 2.2 * P, -D + h / 2
+        bowl = g.path(g.cubic(b, (xj - 0.28 * P, h / 2), (xl, 0.1 * D), (xl, -0.3 * D)),
+                      g.cubic((xl, -0.3 * D), (xl, -0.8 * D), (xl + 0.2 * reach, yb), (xl + 0.5 * reach, yb)),
+                      g.cubic((xl + 0.5 * reach, yb), (xl + 0.8 * reach, yb), (xl + 0.95 * reach, -0.85 * D), (xl + reach, -0.6 * D)))
+        parts = [g.solid_stroke(st, g.path(path, bowl))]
+        if _e(form):
+            rise = [q[0] for q in low if q[1] - st.width_at(q[3]) / 2 <= 2.6 * h]
+            parts.append(g.rect(xj, min(max(rise) if rise else xj + 0.4 * span, -0.05 * span), 0, h))
+            parts.append(g.rect(xj, 0.0, 0, h))
+        shapes = [_named(g.fuse(parts, 0.6 * min(h, 0.3 * U) if _e(form) else 0.0), "الحاء")]
+        if mark and mark[0] == "b":
+            d = st.dot
+            base_y = yb + h / 2 + 0.45 * d + d / 2
+            spots = [(xl + f * reach, base_y + k * 0.25 * d) for k in (0, 1, 2) for f in (0.62, 0.55, 0.48, 0.7, 0.4)]
+            spots += [(xl + f * reach, yb - h / 2 - 0.45 * d - d / 2) for f in (0.55, 0.45)]
+            shapes += clear_marks(st, shapes, mark, spots)
+        else:
+            shapes += marks(st, mark, -0.5 * span, above_ref=X)
+        return Glyph(shapes, left=min(xa, xl - u), entry_x=0.0, entry_edge=0)
     ex = xj - 0.45 * P
-    path = g.path(g.line(a, n), g.cubic(n, (n[0] - 0.25 * span, n[1] - 0.45 * yn), (b[0] + 0.3 * span, b[1]), b), g.line(b, (ex, h / 2)))
-    parts = [g.solid_stroke(st, path)]
+    parts = [g.solid_stroke(st, g.path(path, g.line(b, (ex, h / 2))))]
     if _e(form):
-        rise = [q[0] for q in g.cubic(n, (n[0] - 0.25 * span, n[1] - 0.45 * yn), (b[0] + 0.3 * span, b[1]), b) if q[1] <= 2.6 * h]
+        rise = [q[0] for q in low if q[1] - st.width_at(q[3]) / 2 <= 2.6 * h]
         entry = min(max(rise) if rise else xj + 0.4 * span, -0.05 * span)
         parts.append(g.rect(xj, entry, 0, h))
     else:
         entry = 0.0
-    shapes = [_named(g.fuse(parts, 0.6 * h if _e(form) else 0.0), "الحاء")]
+    shapes = [_named(g.fuse(parts, 0.6 * min(h, 0.3 * U) if _e(form) else 0.0), "الحاء")]
     shapes += marks(st, mark, -0.5 * span - (0.1 * P if mark and mark[0] == "b" else 0),
                     above_ref=X if not (mark and mark[0] == "b") else None)
     return Glyph(shapes, left=xa, entry_x=entry, entry_edge=0, exit_x=ex + 1, exit_edge=xa)
@@ -403,7 +452,7 @@ def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
     yt = X - h / 2
     if st.angular >= 0.5:
         return _jeem_square(st, form, mark)
-    if form in ("I", "M") and (st.variants.get(f"ح.{form}") or st.variants.get("ح") or _hah_default(st)) == "ذراع مائل":
+    if (st.variants.get(f"ح.{form}") or st.variants.get("ح") or _hah_default(st)) == "ذراع مائل":
         return _hah_slanted(st, form, mark)
     top = [g.nose_top(st, d0, xa)]
     if form in ("I", "M"):
@@ -692,7 +741,7 @@ def _ain_open(st: Style, form: str, mark: Optional[str]) -> Glyph:
                                           st.corner_r), "رأس العين")]
     else:
         shapes = [g.open_arc(st, cx, cy, a, b, 35, 325)]
-    shapes += marks(st, mark, cx)
+    shapes += marks(st, mark, cx, above_ref=X + st.hair / 2)      # the head's top stroke stands half a pen over the line
     if form == "I":
         shapes.append(g.stem(st, xs, cy, exit=True))
         return Glyph(shapes, left=xs - u, exit_x=xs - u, exit_edge=xs - u, stems=[(xs, cy, 0)])
