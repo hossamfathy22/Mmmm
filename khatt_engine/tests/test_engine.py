@@ -497,3 +497,25 @@ def test_critic_still_sees_a_real_seam_in_a_one_weight_pen():
     lay.shapes = [Tagged([[(0, 0), (60, 0), (60, 130), (0, 130)]], "engine", "a"),
                   Tagged([[(63, 0), (120, 0), (120, 130), (63, 130)]], "engine", "b")]
     assert any(d.kind == "crack" for d in critique(lay, "x"))
+
+
+# ---------------------------------------------------------------- the self-check
+def test_self_check_redraws_the_logo_word_and_says_what_differs():
+    from khatt.pipeline import analyse
+    from khatt.selfcheck import self_check
+    an = analyse(EXAMPLE.read_bytes(), texts=["بيدوناق"])
+    L, st, k = an["lines"][an["src"]], an["style"], an["k"]
+    good = self_check(L, "بيدوناق", st, k)
+    assert good["overall"] > 0.9 and all(x["verdict"] == "يطابق" for x in good["letters"])
+    assert [x["letter"] for x in good["letters"]] == list("بيدوناق") and not good["notes"]
+    # the same logo read with a rule that is wrong for one letter: that letter is the one named
+    wrong = Style(**{**st.__dict__, "params": {"dal.base": 5 * st.stem, "dal.flag": 3 * st.stem}})
+    bad = self_check(L, "بيدوناق", wrong, k)
+    by = {x["letter"]: x["match"] for x in bad["letters"]}
+    assert by["د"] < 0.75 and by["د"] == min(by.values()) and bad["overall"] < good["overall"]
+
+
+def test_run_reports_the_self_check(tmp_path):
+    r = run(EXAMPLE.read_bytes(), "ناب", texts=["بيدوناق"], out_dir=str(tmp_path))
+    assert r["self_check"]["text"] == "بيدوناق" and r["self_check"]["overall"] > 0.9
+    assert (tmp_path / "selfcheck.png").exists() and "الفحص الذاتي" in r["report_md"]

@@ -29,6 +29,14 @@ def main() -> int:
         print("  صُحّح:", n["text"])
     for n in h["warnings"]:
         print("  تنبيه:", n["text"])
+    c = r.get("self_check")
+    if c:
+        print(f"الفحص الذاتي: «{c['text']}» تطابق الشعار {c['overall'] * 100:.0f}% — "
+              + "، ".join(f"{x['letter']} {x['match'] * 100:.0f}%" for x in c["letters"]))
+        for n in c["notes"]:
+            print("  تنبيه:", n)
+    else:
+        print("الفحص الذاتي: لم يُجرَ (اكتب نص الشعار بـ --text)")
     for l in r["lines"]:
         print(f"السطر {l['line']} ({l['script']}): جذع {l['stem']} · شعري {l['hairline']} · ميل {l['slant_deg']}° · ارتفاع {l['x_height']}"
               + (f" · قرأ: {l['text_guess']}" if l["text_guess"] else ""))
