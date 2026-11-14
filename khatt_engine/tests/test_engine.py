@@ -430,3 +430,44 @@ def test_reading_metric_knows_the_same_skeleton_from_another():
     assert distance(tooth_light, tall) > 2 * same and distance(tooth_light, ring) > 0.15   # another height, another shape
     assert read(tooth_bold, {"ب": tooth_light, "ل": tall, "و": ring})[0] == "ب"
     assert read(draw(lambda d: d.ellipse([x - 2 * PX - 4, b - PX, x - 4, b], outline=1, width=10)), {"ب": tooth_light, "ل": tall, "و": ring})[0] == "و"
+
+
+# ---------------------------------------------------------------- recipes: named parameters and variants
+def test_every_parameter_has_a_rule_and_a_source():
+    from khatt.recipes import BY_EYE, DERIVED, FITTED, MEASURED, PARAMS, handles
+    assert PARAMS, "no named parameters registered"
+    hs = handles(Style())
+    assert {h["name"] for h in hs} == set(PARAMS)
+    for h in hs:
+        assert h["rule"] and h["source"] in (BY_EYE, DERIVED, FITTED, MEASURED)
+        assert h["value"] == h["rule_value"] and not h["set_by_designer"]      # nothing moved yet
+
+
+def test_a_designer_moves_a_parameter_without_touching_code():
+    from khatt.recipes import handles
+    plain, _ = _body("م", Style())
+    moved, _ = _body("م", Style(params={"meem.height": 40.0}))
+    assert abs(plain.bounds[3] - 0.88 * 66.0) < 0.5           # the rule: 0.88 of the x-height
+    assert abs(moved.bounds[3] - 40.0) < 0.5                  # the designer's value
+    h = {x["name"]: x for x in handles(Style(params={"meem.height": 40.0}))}["meem.height"]
+    assert h["set_by_designer"] and h["value"] == 40.0 and h["rule_value"] == round(0.88 * 66.0, 3)
+
+
+def test_a_designer_picks_another_variant_of_a_letter():
+    from khatt.recipes import choices
+    funnel, _ = _body("بعب", Style())
+    ring, _ = _body("بعب", Style(variants={"ع.M": "حلقة بشقّ"}))
+    assert funnel.symmetric_difference(ring).area > 50        # two different drawings
+    cs = {(c["letter"], c["form"]): c for c in choices(Style())}
+    assert cs[("ع", "M")]["chosen"] == "قمع" and {"قمع", "حلقة بشقّ"} <= {o["name"] for o in cs[("ع", "M")]["options"]}
+    assert {(c["letter"], c["form"]): c for c in choices(Style(variants={"ع.M": "حلقة بشقّ"}))}[("ع", "M")]["set_by_designer"]
+
+
+def test_joined_feh_stands_on_a_neck_only_where_there_is_room():
+    light, _ = _body("بفب", Style())                          # hairline 4.5: white under the head
+    heavy, _ = _body("بفب", Style(hair=16.0))                 # a heavy hairline would leave a crack
+    from shapely.geometry import Point
+    lay = typeset("بفب", Style())
+    fx = [p for p in lay.placed if p.char == "ف"][0].x
+    assert not light.contains(Point(fx - 12.0, 7.0))          # white between baseline and head, beside the neck
+    assert max(y for _, y in light.exterior.coords) <= 66.0 + 1e-6   # and the head stays under the x-height

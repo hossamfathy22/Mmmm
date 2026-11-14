@@ -264,6 +264,18 @@ def nose_turn(st: Style, d0: float, m: Pt, beta: float) -> Poly:
             + [(d0 - U, yn + 0.01)])
 
 
+def soften(shape: Shape, r: float) -> Shape:
+    """Round the outward corners of a shape with radius r (its counters keep theirs)."""
+    from shapely.geometry import Polygon
+    if r <= 0 or not shape:
+        return shape
+    outer = Polygon(shape[0]).buffer(0)
+    rounded = outer.buffer(-r, 12).buffer(r, 12)
+    if rounded.is_empty or rounded.geom_type != "Polygon":
+        return shape
+    return [list(rounded.exterior.coords)[:-1]] + list(shape[1:])
+
+
 def fuse(shapes: Sequence[Shape], r: float) -> Shape:
     """Merge shapes into one and fill the sharp white wedges where two of them meet at a shallow angle
     (narrower than 2r), the way ink closes them."""

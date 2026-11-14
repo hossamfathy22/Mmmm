@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from typing import Dict
 
 
 @dataclass
@@ -35,6 +36,10 @@ class Style:
     corner_r: float = 0.0       # outer radius of those corners (0 = sharp)
     tail_drop: float = 1.0      # how far tails go below the baseline, fraction of the descender
     top_join: float = 0.0       # 1 = the logo joins its ر from the top of the tooth before it
+    # ---- the designer's hand (recipes.py): a named parameter set here replaces its rule, and a letter
+    # form named here is drawn in the chosen variant
+    params: Dict[str, float] = field(default_factory=dict)
+    variants: Dict[str, str] = field(default_factory=dict)
 
     @property
     def pitch(self) -> float:

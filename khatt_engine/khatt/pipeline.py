@@ -19,6 +19,7 @@ import numpy as np
 
 from .analyze import find_lines
 from .guard import assess, prepare
+from .recipes import choices, handles
 from .bezier import to_path
 from .features import measure_features
 from .library import ACTIVE, build_library
@@ -235,6 +236,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "input": health,
         "parts": lib.summary(), "parts_json": parts_json, "features": feats,
         "style": style.to_dict(), "recipes": recipes, "skipped": lay.skipped,
+        "handles": handles(lay.style), "choices": choices(lay.style),
         "verification": checks, "corrections": corrections,
         "word": word, "word_svg": to_svg(lay), "word_png": to_png(lay, height=height),
         "construction_svg": sheet_svg(lay, title=word, white=style.white),
@@ -252,6 +254,13 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     result["critic"] = {"word": [d.text() for d in word_defects], "alphabet": [d.text() for d in alpha_defects]}
     result["specimen_png"] = specimen_png(lay.style, alpha_defects)
     result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats, health)
+    hs, cs = result["handles"], result["choices"]
+    result["report_md"] += "\n".join(["", "## المقابض: ما يستطيع المصمم تحريكه", "",
+        "كل معامل له قاعدة تشتقه من قياسات الشعار. `style.params[الاسم] = قيمة` يبدّل القاعدة، و`style.variants[\"ه.I\"] = \"اسم الصيغة\"` يبدّل الصيغة.", "",
+        "| المعامل | الشكل | القيمة لهذا الشعار | القاعدة | المصدر |", "|---|---|---|---|---|",
+        *[f"| `{x['name']}` | {x['shape']} | {x['value']} | {x['rule']} | {x['source']} |" for x in hs], "",
+        "| الحرف | الموضع | الصيغة المختارة | الصيغ المتاحة |", "|---|---|---|---|",
+        *[f"| {x['letter']} | {x['form']} | {x['chosen']} | {'، '.join(o['name'] for o in x['options'])} |" for x in cs], ""])
     crit = result["critic"]
     result["report_md"] += "\n".join(["", "## الناقد (specimen.png)", "",
         "يرسم المحرك كل حرف بأشكاله الأربعة بأسلوب الشعار، ويفحصه بالعيوب التي يراها المصمم بعينه: "
