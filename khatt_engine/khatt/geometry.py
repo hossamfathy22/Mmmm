@@ -178,8 +178,9 @@ def _pts(seg) -> Poly:
 
 def loop_length(st: Style) -> float:
     """Length of the loop of ص ط, from the foot of its stem to its round end: the slope needs 0.8 of
-    the x-height to come down at about 45 degrees, the round end 1.35 stems."""
-    return 0.8 * st.x_height + 1.35 * st.stem
+    the x-height to come down at about 45 degrees, the round end 1.35 stems. (recipes: loop.length)"""
+    from .recipes import P
+    return P(st, "loop.length")
 
 
 def teardrop(st: Style, x0: float, xr: float) -> Shape:
