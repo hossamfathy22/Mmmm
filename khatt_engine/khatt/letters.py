@@ -751,11 +751,16 @@ def _ain_open(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 param("fa.top", lambda st: st.x_height, "قمة رأس الفاء والقاف الموصولتين = ارتفاع الحروف", DERIVED, "الفاء والقاف")
 param("fa.counter", lambda st: st.white, "فراغ رأس الفاء والقاف الموصولتين = البياض", DERIVED, "الفاء والقاف")
-# typefaces stand the joined head on a short neck; read right 46% so, 35% with the head on the baseline.
-# (Higher still, above the x-height, reads better again, but the letters of a logo stay between its lines.)
-# A neck needs room: with a heavy hairline the white under the head would be a crack, so the head stays down.
+# Typefaces stand the joined head on a short neck. A neck needs room: with a heavy hairline the white
+# under the head would be a crack, so there the head stays down. (A taller neck with a real white under
+# it was tried on all the typefaces: initial ف reads a little better, medial ف worse; no gain.)
 param("fa.lift", lambda st: 0.15 * st.x_height if 0.15 * st.x_height >= 2.2 * st.hair else 0.0,
-      "ارتفاع رأس الفاء والقاف الموصولتين عن السطر = 0.15 × ارتفاع الحروف (وصفر إن لم يبقَ تحته بياض بسمك خط شعري)", FITTED, "الفاء والقاف")
+      "ارتفاع رأس الفاء والقاف عن السطر = 0.15 × ارتفاع الحروف (وصفر إن لم يبقَ تحته بياض بسمك خط شعري)", FITTED, "الفاء والقاف")
+
+
+# two pitches by eye; the typefaces keep it shorter: isolated ف read right 38% so, 49% at 1.4 pitches
+param("fa.tail", lambda st: 1.4 * st.pitch, "طول ذيل الفاء على السطر = 1.4 خطوة", FITTED, "الفاء والقاف")
+param("fa.end", lambda st: 0.5 * st.x_height, "ارتفاع طرف ذيل الفاء = نصف ارتفاع الحروف", BY_EYE, "الفاء والقاف")
 
 
 def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
@@ -771,7 +776,14 @@ def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
         shapes += marks(st, mark, xl / 2, above_ref=top)
         return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
     xl, w = head_box(st)
-    shapes = [_ring(st, xl, 0, 0, X)]
+    if form in ("i", "F") and st.angular < 0.5:
+        # free at the left: the same head, on its neck where there is room, then the tail or the cup
+        lift = val(st, "fa.lift") if not qaf else 0.0
+        shapes = [_ring(st, xl, 0, lift, X)]
+        if lift > 0.5:
+            shapes += [_named(g.rect(xl / 2 - u, xl / 2 + u, 0, lift + st.hair), "عنق"), g.connector(st, xl, 0)]
+    else:
+        shapes = [_ring(st, xl, 0, 0, X)]
     shapes += marks(st, mark, xl / 2)
     if form in ("I", "M"):
         return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
@@ -781,9 +793,10 @@ def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
         bw = max(val(st, "cup.width") * 3.5 / 3.4, -xl + 0.5 * st.white)
         shapes.append(bowl_down(st, -u, X / 2, bw, 0.6 * X))
         return Glyph(shapes, left=xl, **common)
-    post = xl - 2.0 * P
-    shapes += [g.connector(st, post + u, xl + U), g.stem(st, post, 0.5 * X, entry=True, round_bl=True)]
-    return Glyph(shapes, left=post - u, stems=[(post, 0.5 * X, 0)], **common)
+    post = xl - val(st, "fa.tail")
+    end = val(st, "fa.end")
+    shapes += [g.connector(st, post + u, xl + U), g.stem(st, post, end, entry=True, round_bl=True)]
+    return Glyph(shapes, left=post - u, stems=[(post, end, 0)], **common)
 
 
 def kaf(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
