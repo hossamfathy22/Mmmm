@@ -83,7 +83,7 @@ def held_out(folder: Path) -> List[Dict]:
         base = self_check(L, text, st, k)
         if not base:
             continue
-        general, measured, with_cuts = [], [], []
+        general, measured, with_cuts, with_parts, covered = [], [], [], [], []
         for i, x in enumerate(base["letters"]):
             t = _Trial(L, text, st, k, hide=i)
             if not t.ok:
@@ -108,10 +108,26 @@ def held_out(folder: Path) -> List[Dict]:
                 if r2 and len(r2["letters"]) == len(base["letters"]):
                     got = r2["letters"][i]["match"]
             with_cuts.append(got)
+            # and with the parts of the other letters cut from the logo (a head, a cup, a tail)
+            from ..letters import LETTERS as _L
+            from ..selfcheck import PART_KINDS, take_parts
+            from ..typeset import flat as _flat
+            st_fit = Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on})
+            parts = take_parts(L, text, st_fit, k, skip=i)
+            mine = {getattr(sh, "name", "") for sh in _flat(_L[x["letter"]][1](st_fit, x["form"]).shapes)} & set(PART_KINDS)
+            seen_others = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i)
+            got_p = r["letters"][i]["match"]
+            if mine and mine & set(parts):
+                r3 = self_check(L, text, Style(**{**st_fit.__dict__, "parts": parts, "seen": seen_others}), k)
+                if r3 and len(r3["letters"]) == len(base["letters"]):
+                    got_p = r3["letters"][i]["match"]
+                covered.append((x["match"], r["letters"][i]["match"], got_p))
+            with_parts.append(got_p)
         if general:
             rows.append({"name": name, "text": text, "general": sum(general) / len(general),
                          "measured": sum(measured) / len(measured), "letters": len(general),
                          "with_cuts": sum(with_cuts) / len(with_cuts),
+                         "with_parts": sum(with_parts) / len(with_parts), "covered": covered,
                          "better_cuts": sum(m > g + 0.02 for g, m in zip(general, with_cuts)),
                          "worse_cuts": sum(m < g - 0.02 for g, m in zip(general, with_cuts)),
                          "better": sum(m > g + 0.02 for g, m in zip(general, measured)),
@@ -183,6 +199,53 @@ def reference_summary(rows: List[Dict]) -> str:
     return "\n".join(lines)
 
 
+PART_WORDS = ("مفقود", "قلم ونور", "فن ولين", "سفر وزن")
+
+
+def parts_exam(words=PART_WORDS) -> Dict:
+    """Do the parts of a logo's letters build the letters it lacks? The open typefaces stand in for
+    logos (many more letters than sixteen logos give): each word, set in each typeface, is measured
+    as a logo; every letter with a head, a cup or a tail is hidden in turn, the parts are cut from
+    the other letters, and the hidden letter is drawn with them, against the engine's own."""
+    import numpy as np
+    from ..letters import LETTERS
+    from ..pipeline import TAKE_MIN, analyse
+    from ..selfcheck import PART_KINDS, self_check, take_parts
+    from ..style import Style
+    from ..typeset import flat
+    from .fonts import font_files, load
+    from .truth import png, word_image
+    rows = []
+    for f in [p for p in font_files() if p.name.endswith("-400.woff2")]:
+        face = load(str(f))
+        for w in words:
+            try:
+                an = analyse(png(word_image(face, w, x_px=90)[0]), texts=[w], read=False)
+            except Exception:
+                continue
+            if an["health"]["confidence"] < TAKE_MIN:
+                continue
+            L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+            base = self_check(L, w, st, k)
+            if not base:
+                continue
+            for i, x in enumerate(base["letters"]):
+                mine = {getattr(sh, "name", "") for sh in flat(LETTERS[x["letter"]][1](st, x["form"]).shapes)} & set(PART_KINDS)
+                parts = take_parts(L, w, st, k, skip=i) if mine else {}
+                use = mine & set(parts)
+                if not use:
+                    continue
+                seen = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i)
+                r = self_check(L, w, Style(**{**st.__dict__, "parts": parts, "seen": seen}), k)
+                if r and len(r["letters"]) == len(base["letters"]):
+                    rows.append({"font": f.stem, "word": w, "letter": f"{x['letter']}.{x['form']}", "parts": sorted(use),
+                                 "engine": x["match"], "with_parts": r["letters"][i]["match"]})
+    a = np.array([(r["engine"], r["with_parts"]) for r in rows]) if rows else np.zeros((0, 2))
+    return {"rows": rows, "cases": len(rows), "engine": float(a[:, 0].mean()) if rows else 0.0,
+            "with_parts": float(a[:, 1].mean()) if rows else 0.0,
+            "better": int((a[:, 1] > a[:, 0] + 0.02).sum()), "worse": int((a[:, 1] < a[:, 0] - 0.02).sum())}
+
+
 def held_out_summary(rows: List[Dict]) -> str:
     lines = ["| الشعار | الحرف المخفي بالقواعد العامة | بالقواعد المقيسة من بقية الحروف | تحسّن / ساء | ومع أجسام الحروف الشقيقة من الشعار | تحسّن / ساء |",
              "|---|---|---|---|---|---|"]
@@ -197,6 +260,14 @@ def held_out_summary(rows: List[Dict]) -> str:
               f"من بقية حروف الشعار (تحسّن {sum(r['better'] for r in rows)} وساء {sum(r['worse'] for r in rows)})، "
               f"و{c * 100:.1f}% حين تُرسم من أجسام الحروف الشقيقة المقصوصة من الشعار أيضًا "
               f"(تحسّن {sum(r['better_cuts'] for r in rows)} وساء {sum(r['worse_cuts'] for r in rows)})."]
+    cov = [t for r in rows for t in r.get("covered", [])]
+    if cov:
+        import numpy as _np
+        a = _np.array(cov)
+        lines += ["", f"الحروف المخفية التي فيها قطعة قُصّت من حرف آخر في الشعار ({len(cov)} حرفًا): "
+                  f"{a[:, 0].mean() * 100:.1f}% بالقواعد العامة، و{a[:, 1].mean() * 100:.1f}% بالقواعد المقيسة، "
+                  f"و{a[:, 2].mean() * 100:.1f}% بقطع الشعار (تحسّن {int((a[:, 2] > a[:, 1] + 0.02).sum())} وساء {int((a[:, 2] < a[:, 1] - 0.02).sum())} "
+                  f"عن القواعد المقيسة)."]
     return "\n".join(lines)
 
 
@@ -226,12 +297,18 @@ def main() -> int:
     p.add_argument("--no-read", action="store_true", help="لا تجرّب القراءة دون نص (أسرع)")
     p.add_argument("--held-out", action="store_true", help="امتحان الحرف المخفي: هل يفهم المحرك الشعار أم ينسخه")
     p.add_argument("--reference", action="store_true", help="امتحان الحرف المخفي ببنية أقرب خط مرجعي")
+    p.add_argument("--parts", action="store_true", help="امتحان قطع الحروف على الخطوط المفتوحة بديلًا عن الشعارات")
     a = p.parse_args()
     warnings.filterwarnings("ignore")
     folder = Path(a.folder)
-    if not (folder / "texts.json").exists():
+    if not a.parts and not (folder / "texts.json").exists():
         print("يلزم ملف texts.json في المجلد: {\"اسم الصورة\": \"النص العربي\"}", file=sys.stderr)
         return 1
+    if a.parts:
+        r = parts_exam()
+        print(f"على {r['cases']} حرفًا مخفيًا: {r['engine'] * 100:.1f}% بصيغة المحرك، و{r['with_parts'] * 100:.1f}% بقطع "
+              f"الحروف الأخرى المقصوصة من الشعار (تحسّن {r['better']} وساء {r['worse']}).")
+        return 0
     if a.reference:
         text = reference_summary(reference_exam(folder))
         print(text)

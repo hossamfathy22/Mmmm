@@ -934,3 +934,36 @@ def test_measuring_the_letters_gives_the_same_rules_on_every_run():
                           env={**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": root}).stdout.strip().splitlines()[-1]
            for seed in ("1", "2")]
     assert out[0] == out[1] and "dal.base" in out[0]
+
+
+# ---------------------------------------------------------------- letters built from the logo's parts
+def test_a_part_cut_from_the_logo_builds_the_letters_the_logo_lacks():
+    """A head as the logo draws it (here: a plain square) goes into every letter with a head that the
+    logo lacks, in place of the engine's; a letter the logo has keeps its own; a part of another
+    shape under the same name is left alone."""
+    from khatt.typeset import _same_part
+    st = Style(slant=0.0)
+    X = st.x_height
+    meem = LETTERS["م"][1](st, "I")
+    head = [sh for sh in flat(meem.shapes) if getattr(sh, "name", "") == "رأس"][0]
+    xr = max(x for p in head for x, _ in p)
+    engine_head = [[(x - xr, y) for x, y in p] for p in head]
+    square = [[(-0.9 * X, 0.0), (0.0, 0.0), (0.0, 0.8 * X), (-0.9 * X, 0.8 * X)]]
+    logo = Style(**{**st.__dict__, "parts": {"رأس": {"polys": square, "engine": engine_head, "from": "م.I"}}, "seen": "م.I"})
+    fa = typeset("فب", logo).placed[0]
+    assert ("logo", "رأس") in fa.parts                                 # ف takes the logo's head
+    assert ("logo", "رأس") not in typeset("مب", logo).placed[0].parts  # م is in the logo: its own drawing
+    assert _same_part(engine_head, engine_head) == pytest.approx(1.0)
+    odd = Style(**{**logo.__dict__, "parts": {"رأس": {"polys": square, "engine": [[(-5 * X, 3 * X), (-4 * X, 3 * X), (-4 * X, 4 * X)]], "from": "?"}}})
+    assert ("logo", "رأس") not in typeset("فب", odd).placed[0].parts    # not the same part: left alone
+
+
+def test_parts_are_cut_from_a_logo_drawn_with_them():
+    """A logo drawn by the engine: its letters' parts are cut back out of it, with the letter they came from."""
+    from khatt.pipeline import analyse
+    from khatt.selfcheck import take_parts
+    png = to_png(typeset("مور", Style(slant=0.0)), height=300)
+    an = analyse(png, texts=["مور"], read=False)
+    parts = take_parts(an["lines"][an["src"]], "مور", an["style"], an["k"])
+    assert "رأس" in parts and parts["رأس"]["from"] in ("م.I", "و.F")
+    assert "ذيل" in parts and parts["ذيل"]["polys"]

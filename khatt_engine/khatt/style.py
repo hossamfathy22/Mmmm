@@ -45,6 +45,9 @@ class Style:
     variants: Dict[str, str] = field(default_factory=dict)
     # letters the logo draws its own way, cut out of it by the self-check: "letter.form" -> outlines
     taken: Dict[str, Dict] = field(default_factory=dict)
+    # parts of letters as the logo draws them (selfcheck.take_parts): part name -> outlines, relative to
+    # the right end of the engine's part; they stand in for that part in every letter the logo lacks
+    parts: Dict[str, Dict] = field(default_factory=dict)
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
     # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them

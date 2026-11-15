@@ -494,6 +494,19 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
 
 
 def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -> Optional[Dict[str, Any]]:
+    """The self-check and everything read off the logo's own word (see _check_and_take), and then the
+    parts of its letters, cut from it for the letters it lacks."""
+    r = _check_and_take(L, text, st, k, take)
+    if r and take:
+        st.parts = take_parts(L, text, st, k)
+        if st.parts:
+            r["parts"] = {q: v["from"] for q, v in st.parts.items()}
+            r["notes"].append("قُصّت من حروف الشعار قطعها لتُبنى بها الحروف التي لا يحويها: "
+                              + "، ".join(f"{q} (من «{v['from'].split('.')[0]}»)" for q, v in st.parts.items()) + ".")
+    return r
+
+
+def _check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -> Optional[Dict[str, Any]]:
     """The self-check, and when the logo draws some letters its own way, the same check again with
     those letters cut out of the logo: `st.taken` is filled, and the result says how far it helped.
     With take=False (the logo's word is only a guess) nothing is cut: a wrong reading would cut a
@@ -559,6 +572,92 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
         first["letters_after"] = [{"letter": x["letter"], "form": x["form"], "match": x["match"]} for x in again["letters"]]
         first["overlay_after_png"] = again["overlay_png"]
     return _lengthen(L, text, st, k, first, again) if take else first
+
+
+# the parts that carry a logo's manner from letter to letter (named by the letter builders)
+PART_KINDS = ("كأس سفلي", "رأس", "ذيل", "ذيل الميم", "عروة", "ذراع الكاف", "كأس أيمن", "أنف الحاء")
+
+
+def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = None) -> Dict[str, Dict]:
+    """Cut the parts of the logo's letters out of the logo: each letter of the word is drawn in the
+    engine's construction and laid on the logo where it covers it best; the logo's ink that is that
+    letter's is shared among the letter's parts, each pixel to the nearest; a part's share is that
+    part as the logo draws it. Kept where the letter matches the logo at least roughly and the part
+    is of a size with the engine's. The best-matching letter gives each kind of part.
+    `skip`: a letter whose ink gives nothing (the held-out examination)."""
+    from skimage.measure import find_contours
+    text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
+    if not text or not L.stems:
+        return {}
+    upright = Style(**{**st.__dict__, "slant": 0.0, "taken": {}, "parts": {}})
+    lay = typeset(text, upright)
+    if not lay.placed:
+        return {}
+    logo = np.asarray(L.B, bool)
+    H, W = logo.shape
+    s = 1.0 / k
+    base_row = L.row_of_y(0.0)
+    xs = [p[0] for sh in lay.shapes for poly in sh for p in poly]
+    x_of = float(np.flatnonzero(logo.any(axis=0))[-1]) - max(xs) * s
+    pitch = st.pitch * s
+    slid = _slide(lay, upright, logo, s, x_of, base_row, pitch)
+    if not slid:
+        return {}
+    dist = np.stack([ndi.distance_transform_edt(~m) for _, m, _, _ in slid])
+    owner = dist.argmin(axis=0)
+    near = dist.min(axis=0) <= 0.6 * pitch
+    out: Dict[str, Dict] = {}
+    for i, (p, m, dx, _) in enumerate(slid):
+        if i == skip:
+            continue
+        mine = logo & (owner == i) & near
+        uni = float((m | mine).sum())
+        match = float((m & mine).sum()) / uni if uni else 0.0
+        if match < 0.35:
+            continue
+        subs = []
+        for sh in flat(p.glyph.shapes):
+            polys = [[(x + p.x, y) for x, y in poly] for poly in sh if len(poly) >= 3]
+            if not polys:
+                continue
+            mm = _shift(_mask([polys], s, W, H, x_of, base_row), dx)
+            if mm.any():
+                subs.append((getattr(sh, "name", ""), mm, max(x for poly in polys for x, _ in poly)))
+        if not any(n in PART_KINDS for n, _, _ in subs):
+            continue
+        part_of = np.stack([ndi.distance_transform_edt(~mm) for _, mm, _ in subs]).argmin(axis=0)
+        for q, (name, mm, xr) in enumerate(subs):
+            if name not in PART_KINDS or (name in out and out[name]["match"] >= match):
+                continue
+            ink = mine & (part_of == q)
+            if not (0.4 * mm.sum() <= ink.sum() <= 2.5 * mm.sum()):
+                continue
+            rings = []
+            for c in find_contours(np.pad(ink.astype(float), 1), 0.5):
+                pts = [(((col - 1) - dx - x_of) / s - xr, (base_row - (row - 1)) / s) for row, col in c]
+                if len(pts) >= 4:
+                    rings.append(pts)
+            if not rings:
+                continue
+            from shapely.geometry import Polygon
+            shape = None
+            for ring in rings:                               # even-odd: an outline inside another is a counter
+                q_ = Polygon(ring).buffer(0)
+                shape = q_ if shape is None else shape.symmetric_difference(q_)
+            shape = shape.simplify(max(0.25 / s, 0.012 * st.pitch), preserve_topology=True)
+            polys = []
+            for poly in getattr(shape, "geoms", [shape]):
+                if poly.geom_type == "Polygon" and not poly.is_empty:
+                    polys.append([[round(x, 2), round(y, 2)] for x, y in list(poly.exterior.coords)[:-1]])
+                    polys += [[[round(x, 2), round(y, 2)] for x, y in list(h.coords)[:-1]] for h in poly.interiors]
+            if polys:
+                # the engine's own part in that letter, in the same frame: a letter that would take this
+                # part must have a part of the same shape (the tail of و is not the tail of ر)
+                # (the letter's shapes are in its own frame; xr is in the word's, where the letter stands at p.x)
+                eng = [[[round(x + p.x - xr, 2), round(y, 2)] for x, y in poly]
+                       for sh in flat(p.glyph.shapes) if getattr(sh, "name", "") == name for poly in sh if len(poly) >= 3]
+                out[name] = {"polys": polys, "engine": eng, "from": f"{p.char}.{p.form}", "index": i, "match": round(match, 3)}
+    return out
 
 
 def _judge_tails(L: Line, text: str, st: Style, k: float) -> None:

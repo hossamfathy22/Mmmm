@@ -274,6 +274,49 @@ def extension(st: Style, key: str) -> float:
     return stretch_of(st, key)
 
 
+PART_SAME = 0.6          # how alike the engine's two parts must be (IoU) for the logo's part to pass between them
+
+
+def _same_part(a, b) -> float:
+    """IoU of two engine parts drawn in the same frame (right ends together, on the same baseline)."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+
+    def geom(rings):
+        return unary_union([Polygon(r).buffer(0) for r in rings if len(r) >= 3])
+    A, B = geom(a), geom(b)
+    if A.is_empty or B.is_empty:
+        return 0.0
+    u = A.union(B).area
+    return A.intersection(B).area / u if u else 0.0
+
+
+def with_parts(glyph: Glyph, st: Style) -> Glyph:
+    """The letter with each of its parts the logo draws (st.parts) put in place of the engine's: the
+    logo's part keeps where it stood against the engine's part in the letter it was cut from."""
+    used = [False]
+
+    def swap(sh):
+        if isinstance(sh, Compound):
+            return Compound(swap(sub) for sub in sh)
+        name = getattr(sh, "name", "")
+        part = st.parts.get(name)
+        if not part or not any(len(poly) >= 3 for poly in sh):
+            return sh
+        xr = max(x for poly in sh for x, _ in poly)
+        if part.get("engine") and _same_part(part["engine"], [[(x - xr, y) for x, y in poly] for poly in sh]) < PART_SAME:
+            return sh                        # the same name, another part (the tail of و is not the tail of ر)
+        used[0] = True
+        return Tagged([[(x + xr, y) for x, y in ring] for ring in part["polys"]], "logo", name)
+    shapes = [swap(s) for s in glyph.shapes]
+    if not used[0]:
+        return glyph
+    xs = [x for sh in flat(shapes) for poly in sh for x, _ in poly]
+    return Glyph(shapes, left=min(glyph.left, min(xs)) if xs else glyph.left, entry_x=glyph.entry_x,
+                 entry_edge=glyph.entry_edge, exit_x=glyph.exit_x, exit_edge=glyph.exit_edge, stems=glyph.stems,
+                 tail=glyph.tail)
+
+
 def find_cut(st: Style, c: str, form: str):
     """The letter as the logo draws it, for `c` in `form`: cut in this form, else in the other form
     that differs only by the join from the right (isolated/final, initial/medial), else the same of a
@@ -353,6 +396,9 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             got = ref_glyph(st.reference, c, form, st, st.ref_wide, engine=glyph)
             if got is not None:
                 glyph = got
+        if st.parts and f"{c}.{form}" not in st.seen.split():
+            # a letter the logo lacks: its parts as the logo draws them, where the logo has them
+            glyph = with_parts(glyph, st)
         cut, borrowed, kin = find_cut(st, c, form)
         ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":
