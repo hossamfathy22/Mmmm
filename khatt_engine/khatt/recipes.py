@@ -94,6 +94,24 @@ def angular(st: Style) -> bool:
     return st.angular >= 0.5
 
 
+# Variants chosen inside a builder rather than by a registered function are declared here, so that
+# they are listed and can be picked like the others.
+DECLARED: Dict[str, Tuple[List[Tuple[str, str]], Callable[[Style], str]]] = {}
+
+
+def declare(letter: str, forms: str, options: List[Tuple[str, str]], default: Callable[[Style], str]) -> None:
+    for f in forms:
+        DECLARED[f"{letter}.{f}"] = (options, default)
+
+
+# which letters a parameter's shape belongs to: the editor shows a handle when its letter is in the word
+SHAPE_LETTERS = {"الميم": "م", "العين": "عغ", "الفاء والقاف": "فڤق", "الهاء": "هة", "الياء": "يیىئ", "الحاء": "حجخچ",
+                 "الكأس": "نلقسشصضيیىئ", "الكأس الراجع": "حجخچعغ", "العروة": "صضطظ", "الصاد": "صض", "الباء": "بتثپ", "النون": "ن",
+                 "الدال": "دذ", "الراء": "رزژ", "الكاف": "كکگ", "النقاط": "بتثپنيیئجخچذزژشضظغفڤقة"}
+SKELETON = {"غ": "ع", "ج": "ح", "خ": "ح", "چ": "ح", "ة": "ه", "ی": "ي", "ى": "ي", "ئ": "ي", "ڤ": "ف", "ق": "ف",
+            "ض": "ص", "ظ": "ط", "ش": "س", "ذ": "د", "ز": "ر", "ژ": "ر", "ت": "ب", "ث": "ب", "پ": "ب"}
+
+
 # ------------------------------------------------------------------ what a designer can move
 def handles(st: Style) -> List[Dict]:
     """Every named parameter with its value for this logo, its rule and where the rule came from,
@@ -101,13 +119,15 @@ def handles(st: Style) -> List[Dict]:
     out = []
     for p in PARAMS.values():
         rule = float(p.rule(st))
+        span = [p.lo * rule, p.hi * rule] if rule > 0 else [0.0, 0.5 * st.x_height]     # a rule of 0 still has somewhere to go
         out.append({"name": p.name, "shape": p.shape, "value": round(P(st, p.name), 3), "rule_value": round(rule, 3),
-                    "rule": p.text, "source": p.source, "range": [round(p.lo * rule, 3), round(p.hi * rule, 3)],
+                    "rule": p.text, "source": p.source, "range": [round(span[0], 3), round(span[1], 3)],
                     "set_by_designer": p.name in st.params})
     return out
 
 
 def choices(st: Style) -> List[Dict]:
+    """Every letter form that has more than one construction, with the one in force for this logo."""
     out = []
     for key, options in VARIANTS.items():
         if len(options) < 2:
@@ -116,5 +136,12 @@ def choices(st: Style) -> List[Dict]:
         cur = choose(st, letter, form)
         out.append({"letter": letter, "form": form, "chosen": cur.name if cur else "",
                     "options": [{"name": v.name, "note": v.note} for v in options],
+                    "set_by_designer": key in st.variants or letter in st.variants})
+    for key, (options, default) in DECLARED.items():
+        letter, form = key.split(".")
+        want = st.variants.get(key) or st.variants.get(letter)
+        names = [n for n, _ in options]
+        out.append({"letter": letter, "form": form, "chosen": want if want in names else default(st),
+                    "options": [{"name": n, "note": note} for n, note in options],
                     "set_by_designer": key in st.variants or letter in st.variants})
     return out

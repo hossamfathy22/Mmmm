@@ -519,3 +519,59 @@ def test_run_reports_the_self_check(tmp_path):
     r = run(EXAMPLE.read_bytes(), "ناب", texts=["بيدوناق"], out_dir=str(tmp_path))
     assert r["self_check"]["text"] == "بيدوناق" and r["self_check"]["overall"] > 0.9
     assert (tmp_path / "selfcheck.png").exists() and "الفحص الذاتي" in r["report_md"]
+
+
+# ---------------------------------------------------------------- the editor (the judge's seat)
+@pytest.fixture(scope="module")
+def read_example():
+    from khatt.editor import read_logo
+    return read_logo(EXAMPLE.read_bytes(), "بيدوناق")
+
+
+def test_editor_reads_a_logo_once(read_example):
+    import json
+    r = read_example
+    json.dumps(r)                                              # everything goes over the wire as JSON
+    assert r["health"]["confidence"] == 1.0 and r["read"] == "بيدوناق" and r["read_sure"]
+    assert r["self_check"]["overall"] > 0.9 and r["self_check_png"]
+    assert abs(r["style"]["stem"] - 46.4) < 0.5 and "الجذع" in r["measures"]
+
+
+def test_editor_draws_with_the_designers_changes(read_example):
+    from khatt.editor import draw
+    plain = draw(read_example["style"], "معهد")
+    assert plain["svg"].startswith("<svg") and plain["critic"] == []
+    used = {h["name"] for h in plain["handles"] if h["used"]}
+    assert {"meem.height", "ain.eye_w", "dal.base"} <= used and "kaf.arm" not in used      # the word's own letters
+    assert [(c["letter"], c["form"], c["chosen"]) for c in plain["choices"]] == [("ع", "M", "قمع")]
+    rule = {h["name"]: h for h in plain["handles"]}["meem.height"]
+    assert rule["range"][0] < rule["value"] < rule["range"][1] and not rule["set_by_designer"]
+    moved = draw(read_example["style"], "معهد", {"meem.height": rule["range"][0]}, {"ع.M": "حلقة بشقّ"})
+    assert moved["svg"] != plain["svg"]
+    h = {x["name"]: x for x in moved["handles"]}["meem.height"]
+    assert h["set_by_designer"] and h["value"] == rule["range"][0] and h["rule_value"] == rule["rule_value"]
+    assert moved["choices"][0]["chosen"] == "حلقة بشقّ" and moved["choices"][0]["set_by_designer"]
+    with pytest.raises(ValueError):
+        draw(read_example["style"], "abc")
+
+
+def test_editor_logs_what_was_changed(read_example, tmp_path):
+    from khatt.editor import draw, load_edits, save_edit, summarise
+    style = read_example["style"]
+    rule = {h["name"]: h for h in draw(style, "معهد", check=False)["handles"]}["meem.height"]["rule_value"]
+    log = tmp_path / "edits.jsonl"
+    out = save_edit(style, "معهد", {"meem.height": 0.8 * rule, "dal.base": None}, {"ع.M": "حلقة بشقّ"},
+                    {"meem.height": "always"}, "logo-a.png", log)
+    assert out["params"] == 1 and out["variants"] == 1
+    # a value equal to the rule, or a variant that is already the default, is not an edit
+    assert save_edit(style, "معهد", {"meem.height": rule}, {"ع.M": "قمع"}, {}, "logo-a.png", log)["saved"] == 0
+    save_edit(style, "ميم", {"meem.height": 0.7 * rule}, {}, {}, "logo-b.png", log)
+    edits = load_edits(log)
+    assert len(edits) == 3 and edits[0]["measures"]["stem"] == style["stem"]
+    (m,) = edits[0]["params"]
+    assert m["name"] == "meem.height" and m["scope"] == "always" and abs(m["rule"] - rule) < 1e-2
+    assert abs(m["chosen"] - 0.8 * rule) < 1e-3 and abs(m["ratio"] - 0.8) < 1e-3
+    assert edits[0]["variants"] == [{"form": "ع.M", "chosen": "حلقة بشقّ", "instead_of": "قمع", "scope": "logo"}]
+    s = summarise(edits)[0]
+    assert s["name"] == "meem.height" and s["times"] == 2 and s["logos"] == 2 and s["same_way"] and s["always"] == 1
+    assert abs(s["median_ratio"] - 0.75) < 1e-3

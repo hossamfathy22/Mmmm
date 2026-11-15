@@ -13,7 +13,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from . import geometry as g
 from .library import ACTIVE, Compound, Tagged
-from .recipes import BY_EYE, DERIVED, FITTED, MEASURED, angular, choose, curved, param, variant
+from .recipes import BY_EYE, DERIVED, FITTED, MEASURED, angular, choose, curved, declare, param, variant
 from .recipes import P as val
 from .style import Style
 
@@ -152,7 +152,7 @@ def clear_marks(st: Style, body: List[g.Shape], spec: Optional[str], spots: List
 param("cup.width", lambda st: max(3.4 * st.stem, 1.18 * st.x_height), "عرض الكأس السفلي = الأكبر من 3.4 جذع و1.18 × ارتفاع الحروف", DERIVED, "الكأس")
 param("cup.arm", lambda st: 0.4 * st.x_height, "حيث ينزل ذراع الكأس الأيمن من جذعه = 0.4 × ارتفاع الحروف", BY_EYE, "الكأس")
 param("cup.left", lambda st: 0.45 * st.x_height, "ارتفاع طرف الكأس الأيسر = 0.45 × ارتفاع الحروف", BY_EYE, "الكأس")
-param("bowl.reach", lambda st: 2.0 * st.pitch, "امتداد الكأس الراجع إلى اليمين تحت ح ع = خطوتان", BY_EYE, "الكأس")
+param("bowl.reach", lambda st: 2.0 * st.pitch, "امتداد الكأس الراجع إلى اليمين تحت ح ع = خطوتان", BY_EYE, "الكأس الراجع")
 param("mark.gap", lambda st: 0.44 * st.dot, "البياض بين النقطة وحرفها = 0.44 من قطرها", BY_EYE, "النقاط")
 param("mark.dash", lambda st: st.dash if st.dash > 0 else 1.5 * st.dot,
       "طول شرطة النقطتين = طول شرطة الشعار إن وُجدت، وإلا 1.5 من قطر النقطة", MEASURED, "النقاط")
@@ -969,6 +969,16 @@ def hamza(st: Style, form: str, mark: Optional[str]) -> Glyph:
 def tatweel(st: Style, form: str, mark: Optional[str]) -> Glyph:
     P = st.pitch
     return Glyph([g.connector(st, -P, 0)], left=-P, entry_x=0, exit_x=-P, exit_edge=-P)
+
+
+# variants chosen inside the builders above, declared so that they can be listed and picked
+declare("ح", "iIMF", [("أنف", "شرطة شعرية وأنف قائم بسمك الجذع: لقلم التباين"),
+                      ("ذراع مائل", "ذراع ينحدر إلى أنف مستدير: لقلم السمك الواحد")],
+        lambda st: "مربّع" if st.angular >= 0.5 else _hah_default(st))
+declare("ه", "I", [("عينان", "رأس عريض بقاطع يصنع عينين"), ("حلقة وجذع", "حلقة منخفضة وجذع قائم على يمينها")],
+        lambda st: "حلقة وجذع" if st.angular >= 0.5 else "عينان")
+declare("ي", "i", [("رأس وكأس", "رأس مفتوح إلى اليمين ثم كأس واسع"), ("كأس", "كأس فقط")],
+        lambda st: "كأس" if st.angular >= 0.5 else "رأس وكأس")
 
 
 # ---------------------------------------------------------------- the table
