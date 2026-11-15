@@ -75,21 +75,28 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
         left, right = b
         return (right is None or c <= right) and (left is None or c >= left)
     out: Dict[str, Dict] = {}
+    # Joined letters are one piece of ink: the piece is shared pixel by pixel, each pixel to the nearest
+    # letter that did not match (giving a whole piece to one letter took its joined neighbour with it:
+    # the و of موتنرو came with its م, and drew مو in every new word).
+    nearest = dist.argmin(axis=0)
+    columns = np.arange(logo.shape[1])
+    kept = np.zeros_like(rest)
+    for piece in range(1, n + 1):
+        sel = lab == piece
+        if sel.sum() < 4:
+            continue
+        r = np.bincount(runs[sel]).argmax()
+        if run_area[r] and run_good[r] / run_area[r] >= 0.5:
+            continue
+        kept |= sel
     for j, (i, p, m, dx) in enumerate(bad):
-        mine = np.zeros_like(rest)
-        for piece in range(1, n + 1):
-            sel = lab == piece
-            if sel.sum() < 4 or not inside(bounds[j], centre[piece]):
-                continue
-            r = np.bincount(runs[sel]).argmax()
-            if run_area[r] and run_good[r] / run_area[r] >= 0.5:
-                continue
-            # a piece in this letter's territory alone is this letter's; where territories overlap
-            # (two letters in a row that did not match), the nearest one takes it
-            claim = [q for q in range(len(bad)) if inside(bounds[q], centre[piece])]
-            d = dist[:, sel].mean(axis=1)
-            if len(claim) == 1 or min(claim, key=lambda q: d[q]) == j:
-                mine |= sel
+        left, right = bounds[j]
+        span = np.ones(logo.shape[1], bool)
+        if right is not None:
+            span &= columns <= right
+        if left is not None:
+            span &= columns >= left
+        mine = kept & (nearest == j) & span[None, :]
         if mine.sum() < 0.05 * m.sum():
             continue
         # The letter that did not match was placed by a poor fit; its neighbour on the right matched,
