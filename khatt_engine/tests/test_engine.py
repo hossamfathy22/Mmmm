@@ -609,3 +609,28 @@ def test_a_learned_factor_sits_on_top_of_the_rule_and_can_be_removed(tmp_path):
         assert abs(recipes.P(st, "meem.height") - plain) < 1e-9
     finally:
         recipes.LEARNED.clear()
+
+
+def test_a_letter_the_logo_draws_its_own_way_is_taken_from_it(monkeypatch):
+    """The engine builds ق wrongly (as ا) on the example: the self-check names it, cuts the logo's ق
+    out of the logo, the logo's word matches again, and a new word with an isolated ق uses the cut."""
+    from khatt import letters
+    from khatt.pipeline import analyse
+    from khatt.recipes import choices
+    from khatt.selfcheck import check_and_take
+    monkeypatch.setitem(letters.LETTERS, "ق", ("D", lambda s, f: letters.alef(s, f, None)))
+    an = analyse(EXAMPLE.read_bytes(), texts=["بيدوناق"])
+    L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+    r = check_and_take(L, "بيدوناق", st, k)
+    assert {x["letter"]: x["verdict"] for x in r["letters"]}["ق"] == "يختلف"
+    assert list(r["taken"]) == ["ق.i"] and set(st.taken) == {"ق.i"}
+    after = {x["letter"]: x["match"] for x in r["letters_after"]}
+    assert after["ق"] > 0.85 and r["overall_after"] > r["overall"] + 0.05
+    q = [p for p in typeset("بق ق", st).placed if p.char == "ق"]
+    assert all([s.name for s in p.glyph.shapes] == ["من الشعار"] for p in q if p.form == "i")
+    # the designer can still ask for the engine's letter
+    st2 = Style(**{**st.__dict__, "variants": {"ق.i": "المحرك"}})
+    q2 = [p for p in typeset("ق", st2).placed][0]
+    assert "من الشعار" not in [getattr(s, "name", "") for s in q2.glyph.shapes]
+    c = {(x["letter"], x["form"]): x for x in choices(st)}[("ق", "i")]
+    assert c["chosen"] == "من الشعار" and {o["name"] for o in c["options"]} == {"من الشعار", "المحرك"}

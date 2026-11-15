@@ -41,6 +41,8 @@ class Style:
     # form named here is drawn in the chosen variant
     params: Dict[str, float] = field(default_factory=dict)
     variants: Dict[str, str] = field(default_factory=dict)
+    # letters the logo draws its own way, cut out of it by the self-check: "letter.form" -> outlines
+    taken: Dict[str, Dict] = field(default_factory=dict)
 
     @property
     def pitch(self) -> float:

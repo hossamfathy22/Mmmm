@@ -33,6 +33,9 @@ def main() -> int:
     if c:
         print(f"الفحص الذاتي: «{c['text']}» تطابق الشعار {c['overall'] * 100:.0f}% — "
               + "، ".join(f"{x['letter']} {x['match'] * 100:.0f}%" for x in c["letters"]))
+        if c.get("overall_after"):
+            print(f"  بعد أخذ ما يرسمه الشعار بطريقته منه: {c['overall_after'] * 100:.0f}% — "
+                  + "، ".join(f"{x['letter']} {x['match'] * 100:.0f}%" for x in c["letters_after"]))
         for n in c["notes"]:
             print("  تنبيه:", n)
     else:

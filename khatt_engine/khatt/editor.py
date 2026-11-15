@@ -24,7 +24,7 @@ from .letters import LETTERS
 from .pipeline import analyse
 from .recipes import PARAMS, SHAPE_LETTERS, SKELETON, choices, handles, rule_value
 from .render import to_svg
-from .selfcheck import self_check
+from .selfcheck import check_and_take
 from .style import Style
 from .typeset import shape_forms, typeset
 
@@ -57,10 +57,13 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     an = analyse(image, texts=[text] if text.strip() else None)
     L, R, st, k = an["lines"][an["src"]], an["readings"][an["src"]], an["style"], an["k"]
     own = R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else "")
-    check = self_check(L, own, st, k) if own else None
+    check = check_and_take(L, own, st, k) if own else None
     overlay = None
     if check:
         overlay = base64.b64encode(check.pop("overlay_png")).decode("ascii")
+        after = check.pop("overlay_after_png", None)
+        if after:
+            check["overlay_after_png"] = base64.b64encode(after).decode("ascii")
     return _plain({
         "style": st.to_dict(), "health": an["health"], "read": R.text_given or R.text_guess, "read_sure": bool(own),
         "self_check": check, "self_check_png": overlay,

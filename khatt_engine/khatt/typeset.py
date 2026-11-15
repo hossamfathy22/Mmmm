@@ -90,6 +90,25 @@ def _shift(shape: g.Shape, dx: float) -> g.Shape:
     return [[(x + dx, y) for x, y in poly] for poly in shape]
 
 
+def from_logo(built: Glyph, cut: dict, form: str = "M") -> Glyph:
+    """The letter as the logo draws it, standing in for the engine's: the engine's letter is kept
+    only for where joins arrive and leave. A letter nothing joins from the right (isolated, initial)
+    keeps its right edge where the engine's is, so it does not reach into the white before it."""
+    polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
+    xs = [x for ring in polys for x, _ in ring]
+    if form in ("i", "I") and max(xs) > 0:
+        over = max(xs)
+        polys = [[(x - over, y) for x, y in ring] for ring in polys]
+        xs = [x - over for x in xs]
+    # the next letter joins at the cut's own left end, not where the engine's letter would have ended
+    reach = min(0.0, min(xs) - built.left)
+    exit_x = built.exit_x + reach if built.exit_x is not None else None
+    exit_edge = built.exit_edge + reach if built.exit_edge is not None else None
+    return Glyph([Tagged(polys, "logo", "من الشعار")], left=min(min(xs), built.left), entry_x=built.entry_x,
+                 entry_edge=built.entry_edge, exit_x=exit_x, exit_edge=exit_edge, stems=built.stems,
+                 tail=built.tail)
+
+
 def typeset(word: str, st: Style) -> Layout:
     lay = Layout(text=word, style=st)
     x = 0.0
@@ -115,6 +134,9 @@ def typeset(word: str, st: Style) -> Layout:
             glyph = LETTERS[c][1](st, form)
         finally:
             JOIN.reset(tok)
+        cut = st.taken.get(f"{c}.{form}")
+        if cut and st.variants.get(f"{c}.{form}") != "المحرك":
+            glyph = from_logo(glyph, cut, form)
         glyph.below = _below_range(glyph)
         joined = prev is not None and form in ("M", "F")
         if prev is not None:

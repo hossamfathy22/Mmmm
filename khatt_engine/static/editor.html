@@ -197,6 +197,8 @@ function showFacts(){
     $('selfcheck').innerHTML = `<img class="overlay" alt="كلمة الشعار كما أعاد المحرك كتابتها فوق الشعار" src="data:image/png;base64,${logo.self_check_png}">
       <p style="margin:6px 0 0"><span class="pill ${oc}">التطابق ${o}%</span> <span class="muted">الأزرق الشعار وحده، الأحمر المحرك وحده</span></p>
       <div class="chips">${s.letters.map(x => `<span class="chip"><b>${esc(x.letter)}</b>${Math.round(x.match*100)}%</span>`).join('')}</div>
+      ${s.overall_after ? `<p style="margin:8px 0 0">بعد أخذ ما يرسمه الشعار بطريقته منه: <span class="pill ${s.overall_after >= .75 ? 'ok' : 'warn'}">${Math.round(s.overall_after * 100)}%</span></p>
+        <img class="overlay" style="margin-top:6px" alt="كلمة الشعار بعد أخذ الحروف المختلفة منه" src="data:image/png;base64,${s.overlay_after_png}">` : ''}
       ${s.notes.length ? '<ul class="notes">' + s.notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>' : ''}`;
   }
   $('facts').classList.remove('hidden');

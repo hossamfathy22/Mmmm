@@ -20,7 +20,7 @@ import numpy as np
 from .analyze import find_lines
 from .guard import assess, prepare
 from .recipes import choices, handles
-from .selfcheck import self_check
+from .selfcheck import check_and_take
 from .bezier import to_path
 from .features import measure_features
 from .library import ACTIVE, build_library
@@ -224,6 +224,10 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     lib, feats, style = an["lib"], an["feats"], an["style"]
     L, R = lines[src], readings[src]
     obs = observations(lines, readings, k)
+    # the self-check: the logo's own word, redrawn with the rules read from it; letters the logo draws
+    # its own way are cut out of it and used for the new word
+    own_text = R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else "")
+    check = check_and_take(L, own_text, style, k) if own_text else None
 
     # 5-6. build and verify
     def build(st: Style):
@@ -269,10 +273,9 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     result["critic"] = {"word": [d.text() for d in word_defects], "alphabet": [d.text() for d in alpha_defects]}
     result["specimen_png"] = specimen_png(lay.style, alpha_defects)
     result["report_md"] = report(name, lines_js, obs, lib, style, recipes, checks, word, src, lay.style, feats, health)
-    # the self-check: the logo's own word, redrawn with the rules read from it
-    own_text = R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else "")
-    check = self_check(L, own_text, style, k) if own_text else None
     result["self_check_png"] = check.pop("overlay_png") if check else None
+    if check:
+        check.pop("overlay_after_png", None)
     result["self_check"] = check
     if check:
         result["report_md"] += "\n".join(["", "## الفحص الذاتي: كلمة الشعار نفسها بقواعد المحرك (selfcheck.png)", "",
@@ -280,6 +283,8 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
             "الأزرق ما في الشعار وحده، والأحمر ما رسمه المحرك وحده، والداكن ما تطابق.", "",
             "| الحرف | الموضع | التطابق | الحكم | الإزاحة |", "|---|---|---|---|---|",
             *[f"| {x['letter']} | {FORM_AR[x['form']]} | {x['match'] * 100:.0f}% | {x['verdict']} | {x['shift']} |" for x in check["letters"]],
+            *([f"", f"بعد أخذ ما يرسمه الشعار بطريقته من الشعار نفسه: التطابق الكلي {check['overall_after'] * 100:.0f}% "
+               f"(" + "، ".join(f"{x['letter']} {x['match'] * 100:.0f}%" for x in check["letters_after"]) + ")."] if check.get("overall_after") else []),
             "", *[f"- {n}" for n in check["notes"]], ""])
     else:
         result["report_md"] += "\n".join(["", "## الفحص الذاتي", "",
