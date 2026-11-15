@@ -52,8 +52,10 @@ class Style:
     # hidden letters it drew worse than the parts as they are, above all the cups of ل ن ي)
     derive_parts: bool = False
     # a part of the logo fitted to the letter it goes into: its centre line lengthened or shortened, made
-    # taller or lower to the size of the engine's part there, and drawn again with its own widths
-    part_fit: bool = True
+    # taller or lower to the size of the engine's part there, and drawn again with its own widths.
+    # Off: on 455 hidden letters the parts as the logo draws them matched 50.3%, fitted 47.9% (the
+    # logo's own proportions are nearer the truth than the engine's part they would be fitted to)
+    part_fit: bool = False
     # the logo's parts may change how a letter looks, not what it reads as (legible.py)
     part_legible: bool = True
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
