@@ -72,6 +72,35 @@ def P(st: Style, name: str) -> float:
     return float(v) if v is not None else rule_value(st, name)
 
 
+# ------------------------------------------------------------------ the length of a letter (kashida)
+STRETCH = "مد."                  # handle names for lengths: "مد.ك.I"
+PARTNER = {"i": "F", "F": "i", "I": "M", "M": "I"}
+
+
+def fitted_stretch(st: Style, key: str) -> float:
+    """How much longer the logo draws a letter form than the engine builds it, as fitted on the logo's
+    own word (selfcheck.fit_stretch). A form the logo did not show takes its partner's: isolated and
+    final share a body, as do initial and medial, which share their join to the left."""
+    if key in st.stretch:
+        return float(st.stretch[key])
+    letter, form = key.split(".")
+    return float(st.stretch.get(f"{letter}.{PARTNER[form]}", 0.0))
+
+
+def stretch_of(st: Style, key: str) -> float:
+    v = st.params.get(STRETCH + key)
+    return float(v) if v is not None else fitted_stretch(st, key)
+
+
+def is_handle(name: str) -> bool:
+    return name in PARAMS or (name.startswith(STRETCH) and name.count(".") == 2 and name[-1] in PARTNER)
+
+
+def handle_rule(st: Style, name: str) -> float:
+    """What a handle is worth before the designer moves it."""
+    return fitted_stretch(st, name[len(STRETCH):]) if name.startswith(STRETCH) else rule_value(st, name)
+
+
 # ------------------------------------------------------------------ variants of a letter form
 @dataclass
 class Variant:
@@ -148,6 +177,17 @@ def handles(st: Style) -> List[Dict]:
                     "rule": p.text + (f" (× {LEARNED[p.name]:.3g} مما تعلّمه من تعديلاتك)" if p.name in LEARNED else ""),
                     "source": p.source, "range": [round(span[0], 3), round(span[1], 3)],
                     "set_by_designer": p.name in st.params})
+    # the lengths the logo gives its letters, and any the designer set
+    keys = list(st.stretch) + [n[len(STRETCH):] for n in st.params if n.startswith(STRETCH) and n[len(STRETCH):] not in st.stretch]
+    for key in keys:
+        letter, form = key.split(".")
+        rule, name = fitted_stretch(st, key), STRETCH + key
+        out.append({"name": name, "shape": "المدّ", "letters": letter, "form": form, "value": round(stretch_of(st, key), 3),
+                    "rule_value": round(rule, 3), "source": MEASURED,
+                    "rule": f"مدّ «{letter}» ({ {'i': 'منفصلًا', 'I': 'أولًا', 'M': 'وسطًا', 'F': 'آخرًا'}[form]}) كما يمدّه الشعار: "
+                            + ("وصلته إلى ما بعده" if form in "IM" else "جسمه على السطر، أو البياض بعده"),
+                    "range": [round(min(0.0, rule) if form in "IM" else -0.3 * st.x_height, 3), round(max(2 * rule, 1.5 * st.x_height), 3)],
+                    "set_by_designer": name in st.params})
     return out
 
 

@@ -10,6 +10,7 @@ from typing import List, Optional, Tuple
 from . import geometry as g
 from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
+from .recipes import stretch_of
 from .style import Style
 
 TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
@@ -23,6 +24,7 @@ class Placed:
     x: float          # where the glyph's right edge sits
     glyph: Glyph
     parts: List[Tuple[str, str]] = field(default_factory=list)   # (source, part name)
+    join_out: Optional[Tuple[float, float]] = None   # the join leaving this letter to the left: (x left, x right)
 
 
 @dataclass
@@ -151,7 +153,100 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
                  tail=built.tail)
 
 
-def typeset(word: str, st: Style) -> Layout:
+MARK_NAMES = ("نقطة", "شرطة", "همزة")
+
+
+def _is_mark(sh, st: Style) -> bool:
+    name = getattr(sh, "name", "") or ""
+    if any(m in name for m in MARK_NAMES):
+        return True
+    ys = [y for poly in sh for _, y in poly]
+    return bool(ys) and (max(ys) < -0.05 * st.x_height or min(ys) > 1.02 * st.x_height)
+
+
+def _section(shape, x: float) -> List[Tuple[float, float]]:
+    """The y intervals an even-odd shape covers in the column at x."""
+    ys = []
+    for poly in shape:
+        n = len(poly)
+        for j in range(n):
+            (x1, y1), (x2, y2) = poly[j], poly[(j + 1) % n]
+            if (x1 <= x) != (x2 <= x):
+                ys.append(y1 + (x - x1) * (y2 - y1) / (x2 - x1))
+    ys.sort()
+    return [(ys[i], ys[i + 1]) for i in range(0, len(ys) - 1, 2)]
+
+
+def _merged(spans: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    out: List[List[float]] = []
+    for a, b in sorted(spans):
+        if out and a <= out[-1][1] + 1e-6:
+            out[-1][1] = max(out[-1][1], b)
+        else:
+            out.append([a, b])
+    return [(a, b) for a, b in out]
+
+
+def stretch_run(glyph: Glyph, st: Style) -> Optional[Tuple[float, float]]:
+    """Where a letter can be drawn longer: the longest stretch of columns in which its body is one
+    flat band lying on the baseline (the floor of ب، ي، ك، س ...), as a kashida lengthens it.
+    None when the letter has no such floor (ا، د، ر، و، م ...)."""
+    body = [sh for sh in flat(glyph.shapes) if not _is_mark(sh, st)]
+    xs = [x for sh in body for poly in sh for x, _ in poly]
+    if not xs:
+        return None
+    pen = max(st.stem, st.hair)
+    step = max(0.05 * st.stem, 0.25)
+    lo, hi = min(xs) + 0.3 * st.stem, max(xs) - 0.3 * st.stem
+    best, run = None, None
+    prev = None
+    for x in np.arange(lo, hi, step):
+        sec = _merged([iv for sh in body for iv in _section(sh, x)])
+        ok = (len(sec) == 1 and abs(sec[0][0]) <= 0.4 * pen and sec[0][1] - sec[0][0] <= 1.35 * pen
+              and sec[0][1] <= 0.6 * st.x_height
+              and (prev is None or (abs(prev[0] - sec[0][0]) < 0.06 * pen and abs(prev[1] - sec[0][1]) < 0.06 * pen)))
+        prev = sec[0] if len(sec) == 1 else None
+        if ok:
+            run = (run[0], x) if run else (x, x)
+            if best is None or run[1] - run[0] > best[1] - best[0]:
+                best = run
+        else:
+            run = None
+    if best is None or best[1] - best[0] < 0.3 * st.stem:
+        return None
+    return best
+
+
+def stretch_glyph(glyph: Glyph, e: float, st: Style) -> Optional[Glyph]:
+    """The letter drawn longer by e along its floor (see stretch_run); None if it has no floor."""
+    run = stretch_run(glyph, st)
+    if run is None or e <= 0:
+        return None
+    xc = 0.5 * (run[0] + run[1])
+
+    def move(sh):
+        if _is_mark(sh, st):
+            cx = 0.5 * (min(x for poly in sh for x, _ in poly) + max(x for poly in sh for x, _ in poly))
+            d = -e if cx < run[0] else (-0.5 * e if cx <= run[1] else 0.0)    # a mark over the floor stays over its middle
+            new = [[(x + d, y) for x, y in poly] for poly in sh]
+        else:
+            new = [[(x - e if x < xc else x, y) for x, y in poly] for poly in sh]
+        return Tagged(new, getattr(sh, "source", "engine"), getattr(sh, "name", "")) if isinstance(sh, Tagged) else new
+    shapes = [Compound(move(sub) for sub in s) if isinstance(s, Compound) else move(s) for s in glyph.shapes]
+    at = lambda v: (v - e if v < xc else v) if v is not None else None
+    return Glyph(shapes, left=at(glyph.left), entry_x=glyph.entry_x, entry_edge=glyph.entry_edge,
+                 exit_x=at(glyph.exit_x), exit_edge=at(glyph.exit_edge),
+                 stems=[(at(x), t, b) for x, t, b in glyph.stems], tail=at(glyph.tail))
+
+
+def extension(st: Style, key: str) -> float:
+    """How much longer the logo draws this letter form: the designer's value, else the fitted one."""
+    return stretch_of(st, key)
+
+
+def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
+    """Lay out `word` right to left. `cache` (a dict kept by the caller) reuses the letters built for
+    an earlier layout with the same style: for trying many lengths of the same word."""
     lay = Layout(text=word, style=st)
     x = 0.0
     prev: Optional[Placed] = None
@@ -161,8 +256,10 @@ def typeset(word: str, st: Style) -> Layout:
     # In a curved logo the bar needs a tooth or a stem at the left end of the letter before it.
     top = {i for i, (c, f) in enumerate(forms) if f == "F" and c in "رزژ" and top_joins(st)
            and (st.angular >= 0.5 or forms[i - 1][0] in TOOTH_END)}
+    extra = 0.0                          # the white or join length the letter before asks to leave after it
     for i, (c, form) in enumerate(forms):
         if form == " ":
+            extra = 0.0
             if prev is not None:
                 x = prev.x + prev.glyph.left - 3 * st.pitch
             prev = None
@@ -171,19 +268,33 @@ def typeset(word: str, st: Style) -> Layout:
             lay.skipped.append(c)
             continue
         flags = frozenset((["no_exit"] if i + 1 in top else []) + (["top_entry"] if i in top else []))
-        tok = JOIN.set(flags)
-        try:
-            glyph = LETTERS[c][1](st, form)
-        finally:
-            JOIN.reset(tok)
+        glyph = cache.get((c, form, flags)) if cache is not None else None
+        if glyph is None:
+            tok = JOIN.set(flags)
+            try:
+                glyph = LETTERS[c][1](st, form)
+            finally:
+                JOIN.reset(tok)
+            if cache is not None:
+                cache[(c, form, flags)] = glyph
         cut, borrowed = st.taken.get(f"{c}.{form}"), None
         if cut is None:
             # the same body in the other form that differs only by the join from the right
             other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
             if f"{c}.{other}" in st.taken:
                 cut, borrowed = st.taken[f"{c}.{other}"], other
+        ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":
             glyph = from_logo(glyph, cut, form, borrowed, st.stem)
+            ext = 0.0                    # the letter as the logo draws it already has the logo's length
+        if ext > 0 and form in ("i", "F"):
+            longer = stretch_glyph(glyph, ext, st)
+            if longer is not None:
+                glyph, ext = longer, 0.0
+        if form in ("I", "M"):
+            ext = max(0.0, ext)          # a join is lengthened, never shortened past the white between teeth
+        else:
+            ext = max(-0.8 * group_gap, ext)
         glyph.below = _below_range(glyph)
         joined = prev is not None and form in ("M", "F")
         if prev is not None:
@@ -199,11 +310,13 @@ def typeset(word: str, st: Style) -> Layout:
                 if prev.glyph.tail is not None and glyph.below is not None:
                     # a dot under this letter must not sit on the tail of the letter before
                     x = min(x, prev.x + prev.glyph.tail - 0.4 * st.dot - glyph.below[1])
+            x -= extra
         here = Placed(c, form, x, glyph)
         if joined and prev.glyph.exit_x is not None:
             a, b = x + glyph.entry_x, prev.x + prev.glyph.exit_x
             lay.shapes.insert(0, Tagged(g.connector(st, a, b), "engine", "وصلة"))
             lay.joins.append((a, b))
+            prev.join_out = (min(a, b), max(a, b))
         for s in glyph.shapes:
             for sub in (s if isinstance(s, Compound) else [s]):
                 src, name = getattr(sub, "source", "engine"), getattr(sub, "name", "") or "قطعة"
@@ -211,4 +324,5 @@ def typeset(word: str, st: Style) -> Layout:
                 lay.shapes.append(Tagged(_shift(sub, x), src, name))
         lay.placed.append(here)
         prev = here
+        extra = ext
     return lay

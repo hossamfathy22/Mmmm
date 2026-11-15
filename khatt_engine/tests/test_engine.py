@@ -676,3 +676,72 @@ def test_a_typed_arabic_text_makes_the_line_arabic():
     assert read_line(L, "بيدوناق").script == "arabic"
     R = read_line(L, "Sirang")
     assert R.script == an["readings"][an["src"]].script          # a Latin text changes nothing
+
+
+# ---------------------------------------------------------------- the length of a letter (kashida)
+def test_a_letter_with_a_floor_can_be_drawn_longer_and_one_without_cannot():
+    from khatt.typeset import stretch_glyph, stretch_run
+    st = Style()
+    beh = LETTERS["ب"][1](st, "i")
+    alef = LETTERS["ا"][1](st, "i")
+    assert stretch_run(beh, st) is not None and stretch_run(alef, st) is None
+    e = 2.0 * st.stem
+    longer = stretch_glyph(beh, e, st)
+    w = lambda gl: (lambda xs: max(xs) - min(xs))([x for sh in flat(gl.shapes) for poly in sh for x, _ in poly])
+    assert w(longer) == pytest.approx(w(beh) + e, abs=0.05 * st.stem)
+    assert longer.left == pytest.approx(beh.left - e) and longer.entry_x == beh.entry_x
+    assert stretch_glyph(alef, e, st) is None
+
+
+def test_a_joining_letter_lengthens_its_join_and_a_missing_form_borrows_its_partner():
+    st = Style()
+    plain = typeset("كا", st)
+    e = 0.8 * st.x_height
+    long = typeset("كا", Style(**{**st.__dict__, "stretch": {"ك.I": e}}))
+    assert (plain.bbox()[2] - plain.bbox()[0]) + e == pytest.approx(long.bbox()[2] - long.bbox()[0], abs=0.05 * st.stem)
+    (a0, b0), (a1, b1) = plain.joins[0], long.joins[0]
+    assert (b1 - a1) - (b0 - a0) == pytest.approx(e, abs=1e-6)
+    assert long.placed[0].join_out is not None
+    # the medial ك was not seen: it takes the initial's length; the designer's handle wins over both
+    mid = typeset("بكا", Style(**{**st.__dict__, "stretch": {"ك.I": e}}))
+    base = typeset("بكا", st)
+    assert (mid.bbox()[2] - mid.bbox()[0]) - (base.bbox()[2] - base.bbox()[0]) == pytest.approx(e, abs=0.05 * st.stem)
+    set_ = typeset("كا", Style(**{**st.__dict__, "stretch": {"ك.I": e}, "params": {"مد.ك.I": 0.0}}))
+    assert set_.bbox()[2] - set_.bbox()[0] == pytest.approx(plain.bbox()[2] - plain.bbox()[0], abs=1e-6)
+
+
+def test_the_length_a_logo_gives_a_letter_is_measured_back():
+    """A logo drawn by the engine with its medial ي one x-height longer: the self-check finds the
+    length again, the word matches better with it, and it is offered as a handle."""
+    from PIL import Image
+    from khatt.pipeline import analyse
+    from khatt.recipes import handles
+    from khatt.selfcheck import check_and_take
+    an = analyse(EXAMPLE.read_bytes(), texts=["بيدوناق"], read=False)
+    st = an["style"]
+    long = Style(**{**st.__dict__, "stretch": {"ي.M": 1.0 * st.x_height}})
+    png = to_png(typeset("بيدوناق", long), height=300)
+    an2 = analyse(png, texts=["بيدوناق"], read=False)
+    L, k, st2 = an2["lines"][an2["src"]], an2["k"], an2["style"]
+    r = check_and_take(L, "بيدوناق", st2, k)
+    # the letters after ي no longer have to be slid to their places, and the word matches no worse
+    slid = lambda xs: sum(abs(x["shift"]) for x in xs) / len(xs)
+    assert r["overall_after"] >= r["overall"] and slid(r["letters_after"]) < 0.3 * slid(r["letters"])
+    got = st2.stretch.get("ي.M", 0.0) / st2.x_height
+    assert 0.75 <= got <= 1.25 and r["stretch"]
+    assert sum(abs(v) for q, v in st2.stretch.items() if q != "ي.M") < 0.3 * st2.x_height
+    h = {x["name"]: x for x in handles(st2)}["مد.ي.M"]
+    assert h["shape"] == "المدّ" and h["value"] == pytest.approx(st2.stretch["ي.M"], abs=1e-3)
+
+
+def test_the_editor_offers_the_length_and_saves_its_change(tmp_path):
+    from khatt.editor import draw, save_edit, style_of
+    st = Style(stretch={"ك.I": 30.0})
+    d = st.to_dict()
+    assert style_of(d, {"مد.ك.I": 10.0}).params == {"مد.ك.I": 10.0}
+    out = draw(d, "كتاب")
+    h = {x["name"]: x for x in out["handles"]}["مد.ك.I"]
+    assert h["used"] and h["value"] == pytest.approx(30.0)
+    assert not {x["name"]: x for x in draw(d, "باب")["handles"]}["مد.ك.I"]["used"]
+    rec = save_edit(d, "كتاب", {"مد.ك.I": 10.0}, {}, path=tmp_path / "e.jsonl")
+    assert rec["params"] == 1

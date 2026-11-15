@@ -22,7 +22,7 @@ import numpy as np
 from .critic import critique
 from .letters import LETTERS
 from .pipeline import TAKE_MIN, analyse, own_text
-from .recipes import PARAMS, SHAPE_LETTERS, SKELETON, choices, handles, rule_value
+from .recipes import SHAPE_LETTERS, SKELETON, choices, handle_rule, handles, is_handle
 from .render import to_svg
 from .selfcheck import check_and_take
 from .style import Style
@@ -46,7 +46,7 @@ def _plain(v: Any) -> Any:
 
 def style_of(d: Dict[str, Any], params: Optional[Dict[str, float]] = None, variants: Optional[Dict[str, str]] = None) -> Style:
     st = Style(**{k: v for k, v in d.items() if k in Style.__dataclass_fields__ and k not in ("params", "variants")})
-    st.params = {k: float(v) for k, v in {**(d.get("params") or {}), **(params or {})}.items() if k in PARAMS and v is not None}
+    st.params = {k: float(v) for k, v in {**(d.get("params") or {}), **(params or {})}.items() if is_handle(k) and v is not None}
     st.variants = {str(k): str(v) for k, v in {**(d.get("variants") or {}), **(variants or {})}.items() if v}
     return st
 
@@ -84,7 +84,8 @@ def draw(style: Dict[str, Any], word: str, params: Optional[Dict[str, float]] = 
     in_word = {c for c, _ in forms}
     hs = handles(st)
     for h in hs:
-        h["used"] = bool(in_word & set(SHAPE_LETTERS.get(h["shape"], "")))
+        h["used"] = (any(c == h["letters"] and f == h["form"] or (c == h["letters"] and {f, h["form"]} in ({"i", "F"}, {"I", "M"}))
+                         for c, f in forms) if "letters" in h else bool(in_word & set(SHAPE_LETTERS.get(h["shape"], ""))))
     present = {(SKELETON.get(c, c), f) for c, f in forms}
     cs = [dict(c, form_ar=FORM_AR[c["form"]]) for c in choices(st) if (c["letter"], c["form"]) in present]
     out = {"svg": to_svg(lay, background=None), "handles": hs, "choices": cs, "skipped": lay.skipped,
@@ -108,9 +109,9 @@ def save_edit(style: Dict[str, Any], word: str, params: Dict[str, float], varian
     scopes = scopes or {}
     moved = []
     for name, v in (params or {}).items():
-        if name not in PARAMS or v is None:
+        if not is_handle(name) or v is None:
             continue
-        rule = rule_value(base, name)
+        rule = handle_rule(base, name)
         # values reach the page rounded to three places: a handle left where the rule put it is not an edit
         if abs(float(v) - rule) <= max(2e-3, 1e-4 * abs(rule)):
             continue

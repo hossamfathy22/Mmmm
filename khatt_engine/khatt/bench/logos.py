@@ -5,7 +5,8 @@ texts.json beside them mapping each file's name (without extension) to the word 
 Real logos belong to their owners and are not part of this project: keep the folder outside it.
 
 For every logo it reports how far the measuring is trusted, the self-check before and after letters
-are taken from the logo, which letters were taken, and how the word is read when it is not typed.
+are taken from the logo, which letters were taken, which the logo draws longer than the engine (and
+the engine now lengthens), and how the word is read when it is not typed.
 Run it before and after a change: a change that helps the typefaces and hurts real logos is not
 an improvement.
 """
@@ -41,6 +42,7 @@ def examine(folder: Path, read: bool = True) -> List[Dict]:
         c = r["self_check"] or {}
         row.update({"confidence": r["health"]["confidence"], "check": c.get("overall"),
                     "after": c.get("overall_after"), "taken": sorted((c.get("taken") or {}).keys()),
+                    "stretch": {q: round(v / r["style"]["x_height"], 2) for q, v in (c.get("stretch") or {}).items()},
                     "angular": r["style"]["angular"], "seconds": round(time.time() - t, 1)})
         if read:
             try:
@@ -55,14 +57,15 @@ def examine(folder: Path, read: bool = True) -> List[Dict]:
 def summary(rows: List[Dict]) -> str:
     ok = [r for r in rows if "error" not in r]
     best = [r.get("after") or r.get("check") or 0.0 for r in ok]
-    lines = ["| الشعار | الثقة | الفحص الذاتي | بعد الأخذ منه | أُخذ | القراءة دون نص |", "|---|---|---|---|---|---|"]
+    lines = ["| الشعار | الثقة | الفحص الذاتي | بعد الأخذ منه | أُخذ | مُدّ | القراءة دون نص |", "|---|---|---|---|---|---|---|"]
     for r in rows:
         if "error" in r:
-            lines.append(f"| {r['text']} | — | لم يُقَس: {r['error']} | | | |")
+            lines.append(f"| {r['text']} | — | لم يُقَس: {r['error']} | | | | |")
             continue
         pct = lambda v: f"{v * 100:.0f}%" if v is not None else "—"
         lines.append(f"| {r['text']} | {pct(r['confidence'])} | {pct(r['check'])} | {pct(r['after'])} | "
                      f"{'، '.join(k.split('.')[0] for k in r['taken']) or '—'} | "
+                     f"{'، '.join(q.split('.')[0] for q, v in r.get('stretch', {}).items() if v > 0) or '—'} | "
                      f"{r.get('read', '') or '—'}{' ✓' if r.get('read_right') else ''} |")
     mean = sum(best) / max(1, len(best))
     lines += ["", f"متوسط الفحص الذاتي بعد الأخذ: {mean * 100:.1f}% على {len(ok)} شعارًا قيس من {len(rows)}. "
