@@ -1,6 +1,8 @@
 """Arabic shaping and right-to-left layout."""
 from __future__ import annotations
 
+import numpy as np
+
 import unicodedata
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
@@ -90,11 +92,36 @@ def _shift(shape: g.Shape, dx: float) -> g.Shape:
     return [[(x + dx, y) for x, y in poly] for poly in shape]
 
 
-def from_logo(built: Glyph, cut: dict, form: str = "M") -> Glyph:
+def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] = None, stem: float = 0.0) -> Glyph:
     """The letter as the logo draws it, standing in for the engine's: the engine's letter is kept
     only for where joins arrive and leave. A letter nothing joins from the right (isolated, initial)
-    keeps its right edge where the engine's is, so it does not reach into the white before it."""
+    keeps its right edge where the engine's is, so it does not reach into the white before it.
+    `borrowed`: the cut was taken in another form of the letter (final for isolated, medial for
+    initial, and back); a join that arrived from the right is cut off when this form has none."""
     polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
+    if borrowed in ("F", "M") and form in ("i", "I"):
+        from shapely.geometry import Polygon, box
+        acc = None
+        for ring in polys:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+        if acc is not None:
+            # the incoming join is the thin ink right of the letter's own body
+            right = max(x for ring in polys for x, _ in ring)
+            body_right = right
+            for xc in np.arange(right, right - 6 * stem, -0.25 * stem if stem else -1.0):
+                band = acc.intersection(box(xc - 0.25 * stem, -1e4, xc, 1e4))
+                if band.area > 0.6 * stem * stem:              # thicker than a hairline: the body begins
+                    body_right = xc
+                    break
+            acc = acc.intersection(box(-1e6, -1e6, body_right, 1e6))
+            polys = []
+            for poly in getattr(acc, "geoms", [acc]):
+                if poly.geom_type == "Polygon" and not poly.is_empty:
+                    polys.append(list(poly.exterior.coords)[:-1])
+                    polys += [list(h.coords)[:-1] for h in poly.interiors]
+    if not polys:
+        return built
     xs = [x for ring in polys for x, _ in ring]
     if form in ("i", "I") and max(xs) > 0:
         over = max(xs)
@@ -134,9 +161,14 @@ def typeset(word: str, st: Style) -> Layout:
             glyph = LETTERS[c][1](st, form)
         finally:
             JOIN.reset(tok)
-        cut = st.taken.get(f"{c}.{form}")
+        cut, borrowed = st.taken.get(f"{c}.{form}"), None
+        if cut is None:
+            # the same body in the other form that differs only by the join from the right
+            other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
+            if f"{c}.{other}" in st.taken:
+                cut, borrowed = st.taken[f"{c}.{other}"], other
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":
-            glyph = from_logo(glyph, cut, form)
+            glyph = from_logo(glyph, cut, form, borrowed, st.stem)
         glyph.below = _below_range(glyph)
         joined = prev is not None and form in ("M", "F")
         if prev is not None:

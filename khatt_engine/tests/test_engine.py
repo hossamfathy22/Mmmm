@@ -627,7 +627,8 @@ def test_a_letter_the_logo_draws_its_own_way_is_taken_from_it(monkeypatch):
     after = {x["letter"]: x["match"] for x in r["letters_after"]}
     assert after["ق"] > 0.85 and r["overall_after"] > r["overall"] + 0.05
     q = [p for p in typeset("بق ق", st).placed if p.char == "ق"]
-    assert all([s.name for s in p.glyph.shapes] == ["من الشعار"] for p in q if p.form == "i")
+    assert {p.form for p in q} == {"i", "F"}
+    assert all([s.name for s in p.glyph.shapes] == ["من الشعار"] for p in q)      # the final form borrows the isolated cut
     # the designer can still ask for the engine's letter
     st2 = Style(**{**st.__dict__, "variants": {"ق.i": "المحرك"}})
     q2 = [p for p in typeset("ق", st2).placed][0]

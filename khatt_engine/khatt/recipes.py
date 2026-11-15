@@ -162,7 +162,10 @@ def choices(st: Style) -> List[Dict]:
         out.append({"letter": letter, "form": form, "chosen": cur.name if cur else "",
                     "options": [{"name": v.name, "note": v.note} for v in options],
                     "set_by_designer": key in st.variants or letter in st.variants})
-    for key in st.taken:
+    partner = {"i": "F", "F": "i", "I": "M", "M": "I"}
+    keys = list(st.taken) + [f"{k.split('.')[0]}.{partner[k.split('.')[1]]}" for k in st.taken
+                             if f"{k.split('.')[0]}.{partner[k.split('.')[1]]}" not in st.taken]
+    for key in keys:
         letter, form = key.split(".")
         out.append({"letter": letter, "form": form, "chosen": "المحرك" if st.variants.get(key) == "المحرك" else "من الشعار",
                     "options": [{"name": "من الشعار", "note": "الحرف كما رسمه الشعار، مقصوصًا منه"},
