@@ -99,6 +99,21 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
     `borrowed`: the cut was taken in another form of the letter (final for isolated, medial for
     initial, and back); a join that arrived from the right is cut off when this form has none."""
     polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
+    from shapely.geometry import Polygon as _P
+
+    def area(rings):
+        acc = None
+        for ring in rings:
+            if len(ring) >= 3:
+                q = _P(ring).buffer(0)
+                acc = q if acc is None else acc.symmetric_difference(q)
+        return acc.area if acc is not None else 0.0
+    full = area(polys)
+    # a cut far from the size of the letter it stands for is a fragment or a swallowed neighbour
+    mine = area([poly for sh in built.shapes for poly in sh
+                 if getattr(sh, "name", "") not in ("نقطة", "شرطة", "همزة")])
+    if mine > 0 and not (0.35 <= full / mine <= 3.0):
+        return built
     if borrowed in ("F", "M") and form in ("i", "I"):
         from shapely.geometry import Polygon, box
         acc = None
@@ -120,8 +135,8 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
                 if poly.geom_type == "Polygon" and not poly.is_empty:
                     polys.append(list(poly.exterior.coords)[:-1])
                     polys += [list(h.coords)[:-1] for h in poly.interiors]
-    if not polys:
-        return built
+    if not polys or (borrowed and area(polys) < 0.5 * full):
+        return built                                     # trimming the join left too little of the letter
     xs = [x for ring in polys for x, _ in ring]
     if form in ("i", "I") and max(xs) > 0:
         over = max(xs)
