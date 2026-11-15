@@ -420,7 +420,15 @@ def find_cut(st: Style, c: str, form: str):
     other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
     # a letter form the logo has keeps its own drawing (the engine's, or its own cut); another letter's
     # body serves only letters the logo does not have
-    kin_ok = f"{c}.{form}" not in st.seen.split()
+    seen = st.seen.split()
+    kin_ok = f"{c}.{form}" not in seen
+    if kin_ok:
+        # A sibling the logo has and the engine draws (not cut) says the body is not shared in this logo:
+        # موتنرو cuts its tall ن but draws its ت as a plain tooth, so ن's body is no ب's or ي's.
+        for q in siblings(c, form) + siblings(c, other):
+            for fq in (form, other):
+                if f"{q}.{fq}" in seen and f"{q}.{fq}" not in st.taken and (q in siblings(c, fq) or c in siblings(q, fq)):
+                    kin_ok = False
     for letter, kin in [(c, False)] + [(q, True) for q in (siblings(c, form) if kin_ok else [])]:
         if f"{letter}.{form}" in st.taken:
             return st.taken[f"{letter}.{form}"], None, kin
@@ -464,7 +472,7 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             continue
         flags = frozenset((["no_exit"] if i + 1 in top else []) + (["top_entry"] if i in top else []))
         glyph = None
-        ltok = BUILDING.set(c)
+        ltok = BUILDING.set(f"{c}.{form}")
         if cache is not None and (c, form, flags) in cache:
             kept, deps = cache[(c, form, flags)]
             if all(_dep_value(st, d) == v for d, v in deps.items()):
@@ -491,6 +499,14 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             got = ref_glyph(st.reference, c, form, st, st.ref_wide, engine=glyph)
             if got is not None:
                 glyph = got
+        if (st.legible_fallback and st.seen and f"{c}.{form}" not in st.seen.split()
+                and not (cut_here := st.taken.get(f"{c}.{form}"))):
+            # a letter the logo lacks that real typefaces would not read as itself: on a reference
+            # structure that they do read, with the logo's pen
+            from .legible import readable_reference
+            better = readable_reference(glyph, c, form, st)
+            if better is not None:
+                glyph = better
         if st.parts and f"{c}.{form}" not in st.seen.split():
             # a letter the logo lacks: its parts as the logo draws them, where the logo has them, as
             # long as it still reads as the letter it is

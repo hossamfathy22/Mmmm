@@ -165,3 +165,36 @@ def reads_as_real(glyph: Glyph, form: str, st: Style) -> Optional[str]:
     if x is None or x.empty or not refs:
         return None
     return read(x, refs)[0].split("|")[0]
+
+
+# ------------------------------------------------------------------ a readable letter, when the engine's is not
+_FALLBACK: Dict[Tuple, Optional[str]] = {}
+
+
+def readable_reference(glyph: Glyph, char: str, form: str, st: Style) -> Optional[Glyph]:
+    """When real typefaces do not read the engine's drawing of `char` as itself, the letter built on a
+    reference typeface's structure with the logo's pen (reference.ref_glyph) that they do read right;
+    None when the engine's letter reads right, or no reference does better."""
+    from .bench.__main__ import _same
+    from .reference import faces, family, ref_glyph
+    key = (_key(st, form), char, st.reference, st.ref_skip)
+    if key in _FALLBACK:
+        path = _FALLBACK[key]
+        return ref_glyph(path, char, form, st, st.ref_wide if path == st.reference else 1.0, engine=glyph) if path else None
+    path = None
+    got = reads_as_real(glyph, form, st)
+    if got is not None and not _same(got, char, form):
+        paths = [f for f in faces() if f.endswith("-400.woff2")]
+        order = ([st.reference] if st.reference else []) + sorted(
+            (f for f in paths if family(f) in READERS and family(f) != st.ref_skip and f != st.reference),
+            key=lambda f: READERS.index(family(f)))
+        for cand in order:
+            g = ref_glyph(cand, char, form, st, st.ref_wide if cand == st.reference else 1.0, engine=glyph)
+            r = reads_as_real(g, form, st) if g is not None else None
+            if r is not None and _same(r, char, form):
+                path = cand
+                break
+    if len(_FALLBACK) > 4096:
+        _FALLBACK.clear()
+    _FALLBACK[key] = path
+    return ref_glyph(path, char, form, st, st.ref_wide if path == st.reference else 1.0, engine=glyph) if path else None

@@ -64,7 +64,14 @@ class Style:
     # fitted by real typefaces 50.8% (by the engine's own proportions 47.9%): a designer keeps a
     # part one size across its letters more than the typefaces' median says
     part_ref_fit: bool = False
-    ref_skip: str = ""          # a typeface family left out of the references (the one playing the logo in the examination)
+    ref_skip: str = ""
+    # a letter the logo lacks that real typefaces do not read as itself in the engine's construction is
+    # built on a reference typeface's structure instead, with the logo's pen, when that one reads right.
+    # Off: the readers judge by ordinary letters, and a logo's style is often not ordinary on purpose
+    # (Mootanroo's ت is a tall stem, which the readers take for ا, and the fallback drew it short).
+    # Hidden letters of the 16 logos the readers misread: 7 better with it, 10 worse, likeness to the
+    # logo's own letter 0.398 -> 0.366. The designer chooses it, letter by letter ("من المرجع")
+    legible_fallback: bool = False          # a typeface family left out of the references (the one playing the logo in the examination)
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
     # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them
@@ -79,7 +86,7 @@ class Style:
     # a letter form's construction read off the logo's own word. They stand in for the rule (the
     # designer's `params` and `variants` still win), and serve every letter that shares them.
     fitted: Dict[str, float] = field(default_factory=dict)
-    measured_on: str = ""       # the letters (by skeleton) `fitted` was measured on: it serves only them
+    measured_on: str = ""       # the letter forms (by skeleton, "م.I ر.F") `fitted` was measured on: it serves only them
     # the designer's general manner, measured on all the logo's letters at once, applied to every
     # letter (also those the logo does not contain): trait -> factor on the rules of that kind
     traits: Dict[str, float] = field(default_factory=dict)

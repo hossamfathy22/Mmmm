@@ -186,6 +186,12 @@ def _draw(got, char: str, form: str, st: Style, wide: float, engine: Optional[Gl
             elif abs(Y0 + R - X) < edge and abs(ty) < 0.5:
                 Y0 = X - w / 2
             pts.append((X0, Y0, tx, ty, w, R))
+        # the pen's width follows the line's direction, and a skeleton's direction wavers from point
+        # to point: the widths are smoothed along the stroke, or the edge comes out notched
+        if len(pts) >= 3:
+            ws = [p[4] for p in pts]
+            ws = [sum(ws[max(0, i - 2):i + 3]) / len(ws[max(0, i - 2):i + 3]) for i in range(len(ws))]
+            pts = [(X0, Y0, tx, ty, w, R) for (X0, Y0, tx, ty, _, R), w in zip(pts, ws)]
         # every stroke ends where the typeface ends it: the centre line stops short by its half-width
         for end, j in ((0, 1), (len(pts) - 1, len(pts) - 2)):
             if len(pts) < 2:
@@ -207,9 +213,10 @@ def _draw(got, char: str, form: str, st: Style, wide: float, engine: Optional[Gl
             quads.append(Polygon([(x0 + nx * w0 / 2, y0 + ny * w0 / 2), (x1 + nx * w1 / 2, y1 + ny * w1 / 2),
                                   (x1 - nx * w1 / 2, y1 - ny * w1 / 2), (x0 - nx * w0 / 2, y0 - ny * w0 / 2)]).buffer(0))
         # the joints between pieces, so that a turn does not leave a notch
-        quads += [Point(x, y).buffer(w / 2, 12) for x, y, _, _, w, _ in pts[1:-1:3]]
+        quads += [Point(x, y).buffer(w / 2, 12) for x, y, _, _, w, _ in pts[1:-1]]
         if quads:
-            shapes.append(unary_union(quads))
+            # a hair's breadth in and out again: the steps where two pieces meet at an angle go
+            shapes.append(unary_union(quads).buffer(0.02 * X, 8).buffer(-0.02 * X, 8))
     if not shapes:
         return None
     body = unary_union(shapes)

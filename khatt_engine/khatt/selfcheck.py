@@ -13,6 +13,8 @@ question from shape.
 """
 from __future__ import annotations
 
+import math
+
 import io
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -31,6 +33,61 @@ GOOD, FAIR = 0.75, 0.55          # share of common ink over all ink (IoU)
 # contains is the designer's own drawing. Whether the cut is kept is judged by check_and_take.
 CUT_BELOW = GOOD
 FORM_AR = {"i": "منفصل", "I": "أول", "M": "وسط", "F": "آخر"}
+
+
+SHARP = 60.0       # a turn of the outline sharper than this many degrees is a corner the logo drew
+
+
+def clean_outline(shape, px: float):
+    """A cut traced off the logo's pixels, as the logo drew it rather than as the pixels hold it:
+    notches narrower than a pixel and a half are filled (where ink was shared out between two letters,
+    or a JPEG block), and the facets a curve is traced in are rounded off, while a corner the logo
+    drew sharp (a turn of more than SHARP degrees) stays sharp.
+    `px`: one pixel of the logo in the outline's units."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    if shape is None or shape.is_empty:
+        return shape
+    r = 0.75 * px
+    closed = shape.buffer(r, join_style=2, mitre_limit=2.0).buffer(-r, join_style=2, mitre_limit=2.0)
+    if not closed.is_empty and abs(closed.area - shape.area) <= 0.08 * shape.area:
+        shape = closed
+    cos_sharp = math.cos(math.radians(SHARP))
+
+    def cut(ring):
+        # two passes of corner cutting: each traced point gives way to two, a quarter of the way along
+        # its sides (the outline moves in by a fraction of a pixel where the facets are a few pixels
+        # long, as they are)
+        pts = list(ring)
+        for _ in range(2):
+            n = len(pts)
+            if n < 4:
+                return pts
+            out = []
+            for i in range(n):
+                a, v, b = pts[i - 1], pts[i], pts[(i + 1) % n]
+                ux, uy, wx, wy = v[0] - a[0], v[1] - a[1], b[0] - v[0], b[1] - v[1]
+                du, dw = math.hypot(ux, uy), math.hypot(wx, wy)
+                if du < 1e-9 or dw < 1e-9:
+                    continue
+                if (ux * wx + uy * wy) / (du * dw) < cos_sharp:          # turns sharply: the logo's corner
+                    out.append(v)
+                    continue
+                out.append((v[0] - 0.25 * ux, v[1] - 0.25 * uy))
+                out.append((v[0] + 0.25 * wx, v[1] + 0.25 * wy))
+            pts = out
+        return pts
+    polys = []
+    for poly in getattr(shape, "geoms", [shape]):
+        if poly.geom_type != "Polygon" or poly.is_empty:
+            continue
+        ext = cut(list(poly.exterior.coords)[:-1])
+        holes = [h for h in (cut(list(h.coords)[:-1]) for h in poly.interiors) if len(h) >= 3]
+        if len(ext) >= 3:
+            q = Polygon(ext, holes).buffer(0)
+            if not q.is_empty:
+                polys.append(q)
+    return unary_union(polys) if polys else shape
 
 
 def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: float, pitch: float,
@@ -122,6 +179,7 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
         for q in polys:                                      # even-odd: an outline inside another is a counter
             shape = q if shape is None else shape.symmetric_difference(q)
         shape = shape.simplify(max(0.25 / s, 0.012 * pitch / s), preserve_topology=True)   # a quarter of a pixel, or a hundredth of a pitch
+        shape = clean_outline(shape, 1.0 / s)
         rings = []
         for poly in getattr(shape, "geoms", [shape]):
             if poly.geom_type != "Polygon" or poly.is_empty:
@@ -661,6 +719,7 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
                 q_ = Polygon(ring).buffer(0)
                 shape = q_ if shape is None else shape.symmetric_difference(q_)
             shape = shape.simplify(max(0.25 / s, 0.012 * st.pitch), preserve_topology=True)
+            shape = clean_outline(shape, 1.0 / s)
             polys = []
             for poly in getattr(shape, "geoms", [shape]):
                 if poly.geom_type == "Polygon" and not poly.is_empty:
@@ -705,7 +764,8 @@ def _measure_rules(L: Line, text: str, st: Style, k: float, first: Dict[str, Any
     if not fitted and not chosen and not traits:
         return first
     from .recipes import SKELETON
-    on = "".join(sorted({SKELETON.get(c, c) for c in text if c in LETTERS}))
+    from .typeset import shape_forms
+    on = " ".join(sorted({f"{SKELETON.get(c, c)}.{f}" for c, f in shape_forms(text) if c in LETTERS and f in "iIMF"}))
     trial = Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on})
     r = self_check(L, text, trial, k)
     if not r or r["overall"] < first["overall"] + 0.01:

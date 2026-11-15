@@ -68,8 +68,8 @@ def load_learned(path=None) -> Dict[str, float]:
 READS: ContextVar = ContextVar("khatt_reads", default=None)
 
 
-# The letter being built (set by typeset): a parameter measured on the logo's letters serves only those
-# letters; any other takes the rule turned by the logo's general manner.
+# The letter form being built ("م.I", set by typeset): a parameter measured on the logo's letters serves
+# only those letter forms; any other takes the rule turned by the logo's general manner.
 BUILDING: ContextVar = ContextVar("khatt_letter", default=None)
 
 
@@ -115,7 +115,10 @@ def rule_value(st: Style, name: str) -> float:
     v = st.fitted.get(name)
     cur = BUILDING.get()
     if st.measured_on and cur is not None:
-        if SKELETON.get(cur, cur) in st.measured_on:          # a letter of the logo: its own measure
+        # a letter form of the logo takes its own measure; the same letter in another form does not (the
+        # first م of موتنرو measured tall with a small counter drew its last م as a box)
+        letter, _, form = cur.partition(".")
+        if f"{SKELETON.get(letter, letter)}.{form}" in st.measured_on.split():
             return float(v) if v is not None else general_rule(st, name)
         return trait_rule(st, name)                           # any other letter: the logo's manner
     return float(v) if v is not None else trait_rule(st, name)

@@ -776,12 +776,61 @@ def test_measured_rules_serve_the_logos_letters_and_the_manner_serves_the_others
     width = lambda lay: lay.bbox()[2] - lay.bbox()[0]
     from khatt.recipes import general_rule
     m = Style(**{**st.__dict__, "fitted": {"dal.base": 2 * general_rule(st, "dal.base"), "beh.width": 0.5 * general_rule(st, "beh.width")},
-                 "measured_on": "د", "traits": {"عرض": 1.5}})
+                 "measured_on": "د.i", "traits": {"عرض": 1.5}})
     assert width(typeset("د", m)) > width(plain_d) + 0.5 * general_rule(st, "dal.base")   # د is in the logo: its own measure
     assert width(typeset("ذ", m)) > width(typeset("ذ", st)) + 0.5 * general_rule(st, "dal.base")   # ذ shares its skeleton
     assert width(typeset("ب", m)) > width(plain_b)              # ب is not: the logo's manner (wider), not ب's own value
-    on_b = Style(**{**m.__dict__, "measured_on": "بد"})
+    on_b = Style(**{**m.__dict__, "measured_on": "ب.i د.i"})
     assert width(typeset("ب", on_b)) < width(plain_b)           # once ب is a letter of the logo, its measure
+
+
+def test_a_measure_serves_the_letter_form_it_was_measured_on():
+    """م.I's measures are not م.F's: a logo that shows one form of a letter says nothing of its other forms."""
+    from khatt.recipes import general_rule
+    st = Style()
+    width = lambda lay: lay.bbox()[2] - lay.bbox()[0]
+    m = Style(**{**st.__dict__, "fitted": {"dal.base": 2 * general_rule(st, "dal.base")}, "measured_on": "د.F"})
+    assert width(typeset("بد", m)) > width(typeset("بد", st)) + 0.5 * general_rule(st, "dal.base")   # د.F: measured
+    assert width(typeset("د", m)) == pytest.approx(width(typeset("د", st)), abs=1e-6)              # د.i: not
+
+
+def test_a_siblings_body_is_not_borrowed_when_the_logo_draws_another_sibling_its_own_way():
+    """موتنرو cuts a tall ن and draws its ت as a plain tooth: ن's body is no ب's in that logo."""
+    from khatt.typeset import find_cut
+    cut = {"polys": [[[0, 0], [-4, 0], [-4, 30], [0, 30]]]}
+    st = Style(taken={"ن.M": cut}, seen="م.I و.F ن.M")
+    got, _, kin = find_cut(st, "ب", "M")
+    assert got is cut and kin                                # nothing says otherwise: the sibling's body serves
+    st2 = Style(taken={"ن.M": cut}, seen="م.I و.F ت.M ن.M")
+    assert find_cut(st2, "ب", "M")[0] is None                # ت is drawn, not cut: the bodies differ here
+    assert find_cut(st2, "ن", "M")[0] is cut                 # ن keeps its own
+
+
+def test_a_cut_outline_is_cleaned_of_pixel_notches_and_facets_but_keeps_its_corners():
+    from shapely.geometry import Polygon, Point
+    from khatt.selfcheck import clean_outline
+    # a square with a notch half a pixel wide cut into its top
+    sq = Polygon([(0, 0), (10, 0), (10, 10), (5.25, 10), (5.25, 8), (4.75, 8), (4.75, 10), (0, 10)])
+    got = clean_outline(sq, 1.0)
+    assert got.area == pytest.approx(100, rel=0.02)          # the notch is filled
+    ring = list(got.exterior.coords)
+    for corner in ((0, 0), (10, 0), (10, 10), (0, 10)):      # the square's corners stay sharp
+        assert min((x - corner[0]) ** 2 + (y - corner[1]) ** 2 for x, y in ring) < 1e-6
+    # a bowl 20 pixels across traced in facets 3 pixels long comes out rounder (gentler turns), as
+    # thick as it was (the outline moves in by a fraction of a pixel)
+    import math
+    def sharpest(poly):
+        pts = list(poly.exterior.coords)[:-1]
+        worst = 0.0
+        for i in range(len(pts)):
+            a, v, b = pts[i - 1], pts[i], pts[(i + 1) % len(pts)]
+            t = math.atan2(b[1] - v[1], b[0] - v[0]) - math.atan2(v[1] - a[1], v[0] - a[0])
+            worst = max(worst, abs((t + math.pi) % (2 * math.pi) - math.pi))
+        return worst
+    facets = Point(0, 0).buffer(10, 5)                       # 20 facets of about 3 pixels
+    round_ = clean_outline(facets, 1.0)
+    assert sharpest(round_) < 0.5 * sharpest(facets)
+    assert round_.area == pytest.approx(facets.area, rel=0.03)
 
 
 def test_the_layout_cache_rebuilds_only_what_a_change_touches():
