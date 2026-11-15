@@ -367,6 +367,7 @@ def fit_part(part: Dict, target) -> Optional[List[List[Tuple[float, float]]]]:
 REF_WORDS = ("مفقود", "قلم ونور", "فن ولين", "سفر وزن", "صوم فطر", "يعمل قعد", "نبع وكد", "طمع وفم",
              "همم قمر", "فول قمح", "ممر عين", "نقد وفن", "هوى وفم", "ضرب وطن")
 _LIBRARY: Optional[Dict[str, Dict[str, Tuple[float, float]]]] = None
+_SHAPES: Dict[str, Dict[str, list]] = {}        # typeface -> "letter.form|part" -> outlines in x-heights (right end at 0)
 
 
 def family(path_or_stem: str) -> str:
@@ -388,8 +389,10 @@ def part_library(rebuild: bool = False, log=None) -> Dict[str, Dict[str, Tuple[f
     if cache.exists() and not rebuild:
         try:
             data = json.loads(cache.read_text(encoding="utf-8"))
-            if data.get("fonts") == sorted(Path(p).stem for p in paths) and data.get("words") == list(REF_WORDS):
+            if (data.get("fonts") == sorted(Path(p).stem for p in paths) and data.get("words") == list(REF_WORDS)
+                    and "shapes" in data):
                 _LIBRARY = {f: {k: tuple(v) for k, v in d.items()} for f, d in data["parts"].items()}
+                _SHAPES.clear(); _SHAPES.update(data["shapes"])
                 return _LIBRARY
         except (ValueError, KeyError):
             pass
@@ -398,9 +401,11 @@ def part_library(rebuild: bool = False, log=None) -> Dict[str, Dict[str, Tuple[f
     from .pipeline import TAKE_MIN, analyse
     from .selfcheck import take_parts
     lib: Dict[str, Dict[str, Tuple[float, float]]] = {}
+    shapes: Dict[str, Dict[str, list]] = {}
     for p in paths:
         face = load(p)
         got: Dict[str, Tuple[float, float, float]] = {}
+        outl: Dict[str, list] = {}
         for w in REF_WORDS:
             try:
                 an = analyse(png(word_image(face, w, x_px=90)[0]), texts=[w], read=False)
@@ -414,13 +419,17 @@ def part_library(rebuild: bool = False, log=None) -> Dict[str, Dict[str, Tuple[f
                 key = f"{e['from']}|{e['name']}"
                 if key not in got or e["match"] > got[key][2]:
                     got[key] = ((x1 - x0) / st.x_height, (y1 - y0) / st.x_height, e["match"])
+                    X = st.x_height
+                    outl[key] = [[[round(x / X, 4), round(y / X, 4)] for x, y in ring] for ring in e["polys"]]
         lib[Path(p).stem] = {k: (round(v[0], 4), round(v[1], 4)) for k, v in got.items()}
+        shapes[Path(p).stem] = outl
         if log:
             log(f"{Path(p).stem}: {len(got)}")
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps({"fonts": sorted(lib), "words": list(REF_WORDS), "parts": lib}, ensure_ascii=False),
-                     encoding="utf-8")
+    cache.write_text(json.dumps({"fonts": sorted(lib), "words": list(REF_WORDS), "parts": lib, "shapes": shapes},
+                                ensure_ascii=False), encoding="utf-8")
     _LIBRARY = lib
+    _SHAPES.clear(); _SHAPES.update(shapes)
     return lib
 
 
@@ -439,3 +448,41 @@ def part_ratio(source: str, target: str, name: str, skip: str = "", least: int =
     if len(kx) < least:
         return None
     return float(np.median(kx)), float(np.median(ky))
+
+
+
+# ------------------------------------------------------------------ which part can stand for which, by real designs
+_SUBS: Dict[str, Dict[Tuple[str, str, str, str], float]] = {}
+
+
+def substitutions(skip: str = "", least: int = 3) -> Dict[Tuple[str, str, str, str], float]:
+    """{(source "letter.form|part", target "letter.form|part", transform, ""): median IoU over real
+    typefaces}: how alike a part of one letter, mirrored or turned, is to another part of another
+    letter in real designs (right ends together, and bottoms together when turned). Only pairs found
+    in `least` typefaces or more; `skip`: a typeface family left out."""
+    if skip in _SUBS:
+        return _SUBS[skip]
+    from .typeset import TRANSFORMS, _placement, _same_part
+    part_library()
+    per: Dict[Tuple[str, str, str, str], List[float]] = {}
+    for font, parts in _SHAPES.items():
+        if skip and family(font) == skip:
+            continue
+        keys = list(parts)
+        for a in keys:
+            for b in keys:
+                if a == b or a.split("|")[1] == b.split("|")[1]:
+                    continue                 # the same kind of part passes as it is, not by substitution
+                for t in TRANSFORMS:
+                    got = _placement(parts[a], parts[b], t)
+                    if got is None:
+                        continue
+                    per.setdefault((a, b, t, ""), []).append(_same_part(got[2], parts[b]))
+    out = {k: float(np.median(v)) for k, v in per.items() if len(v) >= least}
+    # and by kinds of part alone, for letters the words did not show: every pair of letters pooled
+    kinds: Dict[Tuple[str, str, str, str], List[float]] = {}
+    for (a, b, t, _), v in per.items():
+        kinds.setdefault((a.split("|")[1], b.split("|")[1], t, "kind"), []).extend(v)
+    out.update({k: float(np.median(v)) for k, v in kinds.items() if len(v) >= least})
+    _SUBS[skip] = out
+    return out

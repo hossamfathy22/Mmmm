@@ -50,7 +50,7 @@ class Style:
     parts: Dict[str, Dict] = field(default_factory=dict)
     # a part the logo lacks made from another of its parts, mirrored or turned: tried, and off (on 551
     # hidden letters it drew worse than the parts as they are, above all the cups of ل ن ي)
-    derive_parts: bool = False
+    derive_parts: object = False   # False, "engine" (alike in the engine's construction) or "real" (in real typefaces)
     # a part of the logo fitted to the letter it goes into: its centre line lengthened or shortened, made
     # taller or lower to the size of the engine's part there, and drawn again with its own widths.
     # Off: on 455 hidden letters the parts as the logo draws them matched 50.3%, fitted 47.9% (the

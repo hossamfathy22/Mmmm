@@ -320,15 +320,20 @@ def with_parts(glyph: Glyph, st: Style, key: str = "") -> Glyph:
     two parts match so (the loop of ص from the head of و, the back cup of ع from the cup of ن)."""
     used = [False]
 
+    real = st.derive_parts == "real"
+    subs = None
+    if real:
+        from .reference import substitutions
+        subs = substitutions(st.ref_skip)
+
     def best_source(name, target):
         best = None
         for kind, part in st.parts.items():
             if not part.get("engine"):
                 continue
             for t in TRANSFORMS:
-                if t == "id" and kind != name and not st.derive_parts:
-                    continue
-                if t != "id" and not st.derive_parts:
+                same = kind == name and t == "id"
+                if not same and not st.derive_parts:
                     continue
                 if kind == name and t != "id":
                     continue                       # the part itself is used as it is
@@ -336,8 +341,16 @@ def with_parts(glyph: Glyph, st: Style, key: str = "") -> Glyph:
                 if got is None:
                     continue
                 v = _same_part(got[2], target)
-                need = PART_SAME if (kind == name and t == "id") else PART_DERIVED
-                if v >= need and (best is None or v > best[0]):
+                if same:
+                    ok = v >= PART_SAME
+                elif real:
+                    # a part made from another only where real typefaces draw the two alike so
+                    r = subs.get((f"{part.get('from')}|{kind}", f"{key}|{name}", t, ""),
+                                 subs.get((kind, name, t, "kind"), 0.0))
+                    v, ok = r, r >= PART_DERIVED
+                else:
+                    ok = v >= PART_DERIVED
+                if ok and (best is None or v > best[0]):
                     best = (v, kind, t, got[0], got[1])
         return best
 

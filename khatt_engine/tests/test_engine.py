@@ -1052,3 +1052,16 @@ def test_letters_are_read_against_real_typefaces_too():
     st = Style(slant=0.0)
     for c, f in (("و", "i"), ("ر", "i"), ("ح", "I"), ("ك", "i")):
         assert reads_as_real(LETTERS[c][1](st, f), f, st) == c
+
+
+def test_real_typefaces_say_which_part_can_stand_for_which():
+    """From real designs: the loop of ط ص is drawn like the head of some letters (so it may be made
+    from the logo's head of those), and no part is drawn like a cup of ن ي ل (so no cup is made
+    from another part)."""
+    from khatt.reference import faces, substitutions
+    if not [f for f in faces() if f.endswith("-400.woff2")]:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    subs = substitutions()
+    # between particular letters (the head of ه and the loop of ط), not between every head and loop
+    assert max(v for (a, b, t, kind), v in subs.items() if not kind and a.endswith("|رأس") and b.endswith("|عروة")) >= 0.55
+    assert all(v < 0.55 for (a, b, t, kind), v in subs.items() if b.endswith("كأس سفلي"))

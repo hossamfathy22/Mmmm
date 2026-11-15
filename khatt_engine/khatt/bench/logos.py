@@ -244,18 +244,18 @@ def parts_exam(words=PART_WORDS) -> Dict:
                     continue
                 seen = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i)
                 got = {}
-                for mode, fit in (("as_is", False), ("fitted", True)):
-                    r = self_check(L, w, Style(**{**st.__dict__, "parts": parts, "seen": seen, "part_ref_fit": fit}), k)
+                for mode, derive in (("as_is", False), ("engine_subs", "engine"), ("real_subs", "real")):
+                    r = self_check(L, w, Style(**{**st.__dict__, "parts": parts, "seen": seen, "derive_parts": derive}), k)
                     if r and len(r["letters"]) == len(base["letters"]):
                         got[mode] = r["letters"][i]["match"]
-                if len(got) == 2 and (abs(got["as_is"] - x["match"]) > 1e-9 or abs(got["fitted"] - x["match"]) > 1e-9):
+                if len(got) == 3 and any(abs(v - x["match"]) > 1e-9 for v in got.values()):
                     # and does the letter still read as itself, drawn the engine's way and with the parts?
                     # and does the letter read as itself among real typefaces' letters (not the one playing the logo)?
                     from ..bench.__main__ import _same
                     from ..legible import reads_as_real
                     c, fm = x["letter"], x["form"]
                     up = Style(**{**st.__dict__, "slant": 0.0})
-                    with_p = Style(**{**up.__dict__, "parts": parts, "seen": seen})
+                    with_p = Style(**{**up.__dict__, "parts": parts, "seen": seen, "derive_parts": "real"})
                     from ..typeset import typeset as _ts
                     from .truth import FORMS as _F
                     placed = [p for p in _ts(_F[fm].format(c), with_p).placed if p.char == c]
@@ -334,7 +334,8 @@ def main() -> int:
     if a.parts:
         r = parts_exam()
         print(f"على {r['cases']} حرفًا مخفيًا تغيّر رسمه: {r['engine'] * 100:.1f}% بصيغة المحرك، و{r['as_is'] * 100:.1f}% بقطع "
-              f"الشعار كما هي، و{r['fitted'] * 100:.1f}% بقطع الشعار مكيّفة بنِسَب الخطوط المرجعية بسمكها "
+              f"الشعار كما هي، و{r['engine_subs'] * 100:.1f}% مع قطع مبدّلة بحكم المحرك، "
+              f"و{r['real_subs'] * 100:.1f}% مع قطع مبدّلة بحكم الخطوط الحقيقية "
               f"(تحسّن {r['better']} وساء {r['worse']} عن صيغة المحرك). يقرؤه قارئ الخطوط الحقيقية حرفه: "
               f"{r['reads_engine'] * 100:.0f}% بصيغة المحرك، و{r['reads_parts'] * 100:.0f}% بقطع الشعار.")
         from collections import defaultdict
@@ -343,7 +344,8 @@ def main() -> int:
             by[x["letter"].split(".")[0]].append(x)
         for c, xs in sorted(by.items(), key=lambda kv: -len(kv[1])):
             m = lambda q: sum(x[q] for x in xs) / len(xs) * 100
-            print(f"  {c}: {len(xs)} — المحرك {m('engine'):.0f}%، كما هي {m('as_is'):.0f}%، مكيّفة {m('fitted'):.0f}%")
+            print(f"  {c}: {len(xs)} — المحرك {m('engine'):.0f}%، كما هي {m('as_is'):.0f}%، "
+                  f"مبدّلة بحكم المحرك {m('engine_subs'):.0f}%، بحكم الخطوط {m('real_subs'):.0f}%")
         return 0
     if a.reference:
         text = reference_summary(reference_exam(folder))
