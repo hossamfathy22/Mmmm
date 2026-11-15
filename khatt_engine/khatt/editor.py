@@ -21,7 +21,7 @@ import numpy as np
 
 from .critic import critique
 from .letters import LETTERS
-from .pipeline import analyse, own_text
+from .pipeline import TAKE_MIN, analyse, own_text
 from .recipes import PARAMS, SHAPE_LETTERS, SKELETON, choices, handles, rule_value
 from .render import to_svg
 from .selfcheck import check_and_take
@@ -57,7 +57,7 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     an = analyse(image, texts=[text] if text.strip() else None)
     L, R, st, k = an["lines"][an["src"]], an["readings"][an["src"]], an["style"], an["k"]
     own = own_text(R)
-    check = check_and_take(L, own, st, k, take=not R.text_drawn) if own else None
+    check = check_and_take(L, own, st, k, take=not R.text_drawn and an["health"]["confidence"] >= TAKE_MIN) if own else None
     overlay = None
     if check:
         overlay = base64.b64encode(check.pop("overlay_png")).decode("ascii")

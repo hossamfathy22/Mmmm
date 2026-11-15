@@ -305,6 +305,10 @@ def _same_letter_run(text: str, units: List[Unit], letter: str) -> bool:
 def read_line(L: Line, text: Optional[str] = None) -> Reading:
     joins = _joins(L)
     R = Reading(script=_script(L, joins), joins=joins)
+    # The designer's word outranks the engine's guess: an Arabic text typed for this line makes it an
+    # Arabic line (thin geometric and display logos are often taken for Latin by their stems alone).
+    if text and any("\u0600" <= ch <= "\u06ff" for ch in text):
+        R.script = "arabic"
     joined = {(j.right, j.left) for j in joins}
     for s in L.stems:
         s.joined_left = s.joined_right = False

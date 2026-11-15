@@ -459,8 +459,9 @@ def _pen(L: Line, U0: float) -> None:
         U, hh, pw = p
         return hh + (U - hh) * s ** pw - w
 
-    fit = least_squares(resid, [U0, h0, 2.0], bounds=([0.5 * U0, 1.0, 0.4], [2.0 * U0, U0, 8.0]),
-                        loss="soft_l1", f_scale=max(1.0, 0.08 * U0))
+    lo, hi = [0.5 * U0, 1.0, 0.4], [2.0 * U0, max(U0, 1.0 + 1e-6), 8.0]
+    start = [float(np.clip(v, a + 1e-6, b - 1e-6)) for v, a, b in zip([U0, h0, 2.0], lo, hi)]   # a tiny stem must not start outside
+    fit = least_squares(resid, start, bounds=(lo, hi), loss="soft_l1", f_scale=max(1.0, 0.08 * U0))
     U, hh, pw = fit.x
     rmse = float(np.sqrt(np.median(fit.fun ** 2)))
     L.pen_fit = {"stem": float(U), "hair": float(hh), "power": float(pw), "median_error": rmse, "samples": int(len(s))}

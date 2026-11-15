@@ -665,3 +665,14 @@ def test_nothing_is_taken_from_the_logo_on_a_guessed_reading(monkeypatch):
     L, k, st = an["lines"][an["src"]], an["k"], an["style"]
     r = check_and_take(L, "بيدوناق", st, k, take=False)
     assert r["taken"] == {} and st.taken == {} and any("بالرسم" in n for n in r["notes"])
+
+
+def test_a_typed_arabic_text_makes_the_line_arabic():
+    """A thin line the stems take for Latin: the designer's Arabic word decides."""
+    from khatt.understand import read_line
+    from khatt.pipeline import analyse
+    an = analyse(EXAMPLE.read_bytes(), read=False)
+    L = an["lines"][an["src"]]
+    assert read_line(L, "بيدوناق").script == "arabic"
+    R = read_line(L, "Sirang")
+    assert R.script == an["readings"][an["src"]].script          # a Latin text changes nothing

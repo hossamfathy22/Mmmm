@@ -183,6 +183,7 @@ def _learned() -> None:
 # reading of the hand-made example covers it 83%; a wrong reading of the second example ("سسشی نصع"
 # for "سفينة نجم") 68%, of the square kufi logo 51%.
 DRAWN_MIN = 0.75
+TAKE_MIN = 0.5         # letters are cut from a logo only if its measuring is trusted at least this much
 
 
 def own_text(R) -> str:
@@ -256,7 +257,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     # its own way are cut out of it and used for the new word
     own = own_text(R)
     # letters are taken from the logo only on a sure reading: typed, or read whole from the stems
-    check = check_and_take(L, own, style, k, take=not R.text_drawn) if own else None
+    check = check_and_take(L, own, style, k, take=not R.text_drawn and health["confidence"] >= TAKE_MIN) if own else None
 
     # 5-6. build and verify
     def build(st: Style):

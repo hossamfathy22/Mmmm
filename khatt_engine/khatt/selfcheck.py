@@ -244,20 +244,23 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
     if first and not take and first.get("taken"):
         first["taken"] = {}
         first["notes"] = [n for n in first["notes"] if not n.startswith("أُخذ من الشعار")]
-        first["notes"].append("الكلمة مقروءة بالرسم لا مكتوبة: لم يُؤخذ شيء من الشعار. اكتب نص الشعار ليُؤخذ منه ما يرسمه بطريقته.")
+        first["notes"].append("لم يُؤخذ شيء من الشعار: الكلمة مقروءة بالرسم لا مكتوبة، أو قياس الصورة غير موثوق.")
     if not first or not first.get("taken"):
         return first
     # A cut is kept only if it earns its place: the logo's word matches better with it, and no letter
     # that matched before matches worse (a cut that swallowed its neighbours fails this).
-    before = {(x["letter"], x["form"]): x["match"] for x in first["letters"]}
+    before = [(x["letter"], x["form"], x["match"], x["shift"]) for x in first["letters"]]
     kept = {}
     for key, cut in first["taken"].items():
         trial = Style(**{**st.__dict__, "taken": {**kept, key: cut}})
         r = self_check(L, text, trial, k)
-        if not r:
+        if not r or len(r["letters"]) != len(before):
             continue
-        after = {(x["letter"], x["form"]): x["match"] for x in r["letters"]}
-        hurt = any(before[q] >= FAIR and after.get(q, 0.0) < before[q] - 0.08 for q in before if q != tuple(key.split(".")))
+        # A letter the cut displaced is harmed if it matches worse. A letter left where it was (the
+        # same drawing in the same place) only changes score because the real letter now stands
+        # beside it and takes back its own ink: that is not harm.
+        hurt = any(m0 >= FAIR and x["match"] < m0 - 0.08 and abs(x["shift"] - s0) > 0.15 * st.pitch
+                   for (c0, f0, m0, s0), x in zip(before, r["letters"]) if f"{c0}.{f0}" != key)
         if r["overall"] > first["overall"] + 0.02 and not hurt:
             kept[key] = cut
     if not kept:
