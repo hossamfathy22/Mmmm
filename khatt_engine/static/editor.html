@@ -86,6 +86,41 @@ select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--
 .var b{font-size:20px}
 .muted{color:var(--muted)}
 .hidden{display:none !important}
+/* the parts kit: one card per part; the drawing board opens under the cards */
+.kit-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.kit-head p{margin:0;color:var(--muted);font-size:13.5px;flex:1 1 320px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin-top:10px}
+.card{border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;cursor:pointer;background:var(--surface)}
+.card.on{outline:2px solid var(--accent)}
+.card .pv{background:var(--board);border-radius:6px;height:92px;display:flex;align-items:center;justify-content:center}
+.card .pv svg{max-height:84px;max-width:100%}
+.pv svg .rest,.cand svg .rest{fill:#c3ccd6}
+.pv svg .part,.cand svg .part{fill:#16202c}
+.card b{font-size:13.5px}
+.badge{font-size:12px;border-radius:999px;padding:0 8px;align-self:flex-start;font-weight:700}
+.badge.logo{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.badge.designer,.badge.reference{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.badge.engine{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.uses{font-size:12.5px;color:var(--muted);line-height:1.5}
+.studio{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:14px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+@media (max-width:980px){.studio{grid-template-columns:1fr}}
+.canvas{background:var(--board);border:1px solid var(--line);border-radius:8px;touch-action:none;user-select:none}
+.canvas svg{display:block;width:100%;height:auto;max-height:58vh}
+.canvas .guide{stroke:#9fb0c2;stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:4 4}
+.canvas .guide-t{fill:#7b8a9c;font-family:var(--f-body)}
+.canvas .rest{fill:#d4dbe3}
+.canvas .ghost{fill:none;stroke:#7b8a9c;stroke-width:1.2;vector-effect:non-scaling-stroke;stroke-dasharray:3 3}
+.canvas .drawn{fill:#16202c}
+.canvas .spine{fill:none;stroke:var(--accent);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.canvas .pt{fill:#fff;stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke;cursor:grab}
+.canvas .pt.first{fill:var(--accent)}
+.tools{display:flex;flex-direction:column;gap:10px}
+.tools .row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:13.5px}
+.tools input[type=range]{flex:1;accent-color:var(--accent);direction:ltr}
+.cands{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cand{border:1px solid var(--line);border-radius:6px;background:var(--board);padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:#5b6878}
+.cand svg{height:52px;max-width:100%}
+.cand:hover{outline:2px solid var(--accent)}
 </style>
 </head>
 <body>
@@ -137,6 +172,44 @@ select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--
       <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13.5px"><input type="checkbox" id="showAll"> أظهر مقابض الحروف التي ليست في الكلمة</label>
     </aside>
   </section>
+
+  <section class="panel hidden" id="kitPanel">
+    <div class="kit-head">
+      <h2>طقم القطع</h2>
+      <span class="pill ok" id="kitCount"></span>
+      <p>كل حرف عربي يُبنى من هذه القطع. ما قُصّ من الشعار جاهز؛ وما ينقص يبنيه المحرك بقياسات الشعار حتى تكمله أنت: اختر اقتراحًا من الخطوط أو ارسمه بخط يُرسم بقلم الشعار. كل قطعة تكملها تدخل في كل حرف يحتاجها.</p>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div class="studio hidden" id="studio">
+      <div>
+        <div class="canvas" id="canvas"></div>
+        <p class="muted" style="margin:6px 0 0;font-size:13px">اضغط لتضع نقطة على الخط المركزي، واسحب النقاط لتعدّلها، وانقر نقطة مرتين لحذفها. الرمادي بقية الحرف، والمتقطّع قطعة المحرك. القلم قلم الشعار: يسمك في العمودي ويرقّ في الأفقي.</p>
+      </div>
+      <div class="tools">
+        <div class="row"><b id="studioName"></b><span class="badge" id="studioSrc"></span></div>
+        <div class="row">
+          <button class="btn ghost" id="fromLogo" type="button">ابدأ من خط القطعة الحالية</button>
+          <button class="btn ghost" id="undoPt" type="button">تراجع عن نقطة</button>
+          <button class="btn ghost" id="clearPts" type="button">امسح</button>
+        </div>
+        <div class="row"><label><input type="checkbox" id="closedRing"> حلقة مغلقة</label>
+          <label><input type="checkbox" id="snap" checked> التصاق بخطوط الشبكة</label></div>
+        <div class="row">الأطراف
+          <select id="ends"><option value="round">مستديرة</option><option value="flat">مقطوعة</option><option value="diamond">معيّن</option></select></div>
+        <div class="row">السمك <input type="range" id="thick" min="0.4" max="1.8" step="0.02" value="1"><span class="val" id="thickVal">1.00</span></div>
+        <div class="row">
+          <button class="btn" id="useDrawn" type="button">استعمل ما رسمته</button>
+          <button class="btn ghost" id="toEngine" type="button">أعدها إلى المحرك</button>
+          <button class="btn ghost" id="toLogo" type="button">أعدها كما في الشعار</button>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom:6px"><b>اقتراحات من الخطوط</b><span class="muted" style="font-size:12.5px">مرسومة بقلم الشعار</span></div>
+          <div class="cands" id="cands"><span class="muted" style="font-size:13px">…</span></div>
+        </div>
+        <p class="muted" id="studioMsg" style="margin:0;font-size:13px"></p>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -146,6 +219,7 @@ const fmt = v => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFi
 let logo = null;            // what /api/read returned
 let fileName = '';
 let params = {}, variants = {}, scopes = {};
+let kitParts = {};          // the designer's parts: name -> part (drawn or chosen), or null for the engine's
 let lastSvg = '';
 let seq = 0, timer = null;
 
@@ -171,11 +245,12 @@ $('readForm').addEventListener('submit', async ev => {
     const r = await fetch('/api/read', {method:'POST', body: fd});
     const j = await r.json();
     if(!r.ok) throw new Error(j.detail || 'تعذّرت قراءة الشعار.');
-    logo = j; params = {}; variants = {}; scopes = {};
+    logo = j; params = {}; variants = {}; scopes = {}; kitParts = {}; current = null;
     showFacts();
     if(!$('word').value) $('word').value = logo.read_sure ? logo.read : 'بيدوناق';
     $('work').classList.remove('hidden');
     redraw(true);
+    loadKit();
   }catch(e){ $('readErr').textContent = e.message; $('readErr').classList.remove('hidden'); }
   $('readBtn').disabled = false; $('readBtn').textContent = 'اقرأ الشعار';
 });
@@ -214,7 +289,7 @@ async function redraw(check){
   const mine = ++seq;
   try{
     const r = await fetch('/api/draw', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({style: logo.style, word, params, variants, check})});
+      body: JSON.stringify({style: logo.style, word, params, variants, check, parts: kitParts})});
     const j = await r.json();
     if(mine !== seq) return;                       // a newer drawing is on its way
     if(!r.ok) throw new Error(j.detail || 'تعذّر الرسم.');
@@ -223,7 +298,7 @@ async function redraw(check){
       $('critic').innerHTML = (j.critic || []).map(t => `<li>${esc(t)}</li>`).join('');
       buildControls(j);
     }
-    const n = Object.keys(params).length + Object.keys(variants).length;
+    const n = Object.keys(params).length + Object.keys(variants).length + Object.keys(kitParts).length;
     $('saveBtn').disabled = n === 0;
     $('status').textContent = n ? `${n} تعديل غير محفوظ` : '';
   }catch(e){ if(mine === seq) $('board').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
@@ -281,14 +356,151 @@ document.addEventListener('click', ev => {
 });
 $('variants').addEventListener('change', ev => { if(ev.target.tagName === 'SELECT'){ variants[ev.target.dataset.key] = ev.target.value; schedule(true); } });
 $('showAll').addEventListener('change', () => schedule(true));
-$('resetBtn').addEventListener('click', () => { params = {}; variants = {}; scopes = {}; schedule(true); });
+$('resetBtn').addEventListener('click', () => { params = {}; variants = {}; scopes = {}; kitParts = {}; schedule(true); loadKit(); });
+
+
+// ---- the parts kit
+let kit = null, current = null;                 // the kit as /api/kit returned it; the part on the board
+let pts = [], drawnOutline = null, strokeSeq = 0;
+const SRC = {logo: 'من الشعار', designer: 'رسمها المصمم', reference: 'من خط مرجعي', engine: 'ناقصة: بناء المحرك'};
+async function loadKit(){
+  if(!logo) return;
+  try{
+    const r = await fetch('/api/kit', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, params, variants, parts: kitParts})});
+    const j = await r.json(); if(!r.ok) throw new Error(j.detail || 'تعذّر الطقم.');
+    kit = j; renderKit();
+    if(current) openStudio(current, true);
+  }catch(e){ $('cards').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+function srcText(p){
+  if(p.source === 'logo') return `${SRC.logo} «${(p.from || '').split('.')[0]}»`;
+  return SRC[p.source] || p.source;
+}
+function renderKit(){
+  $('kitPanel').classList.remove('hidden');
+  $('kitCount').textContent = `${kit.complete} من ${kit.total} مكتملة`;
+  $('cards').innerHTML = kit.parts.map(p => `<div class="card ${current === p.name ? 'on' : ''}" data-part="${esc(p.name)}" tabindex="0" role="button" aria-label="${esc(p.label)}">
+      <div class="pv">${p.preview}</div><b>${esc(p.label)}</b>
+      <span class="badge ${p.source}">${esc(srcText(p))}</span>
+      <span class="uses">${p.letters.length} صيغة: ${esc([...new Set(p.letters.map(k => k.split('.')[0]))].join(' '))}</span></div>`).join('');
+}
+$('cards').addEventListener('click', ev => { const c = ev.target.closest('.card'); if(c) openStudio(c.dataset.part); });
+$('cards').addEventListener('keydown', ev => { const c = ev.target.closest('.card'); if(c && (ev.key === 'Enter' || ev.key === ' ')){ ev.preventDefault(); openStudio(c.dataset.part); } });
+
+function part(name){ return kit.parts.find(p => p.name === name); }
+function openStudio(name, keep){
+  const p = part(name); if(!p) return;
+  const fresh = current !== name || !keep;
+  current = name; renderKit();
+  $('studio').classList.remove('hidden');
+  $('studioName').textContent = p.label;
+  $('studioSrc').className = 'badge ' + p.source; $('studioSrc').textContent = srcText(p);
+  if(fresh){
+    pts = []; drawnOutline = null;
+    $('closedRing').checked = p.board.closed; $('thick').value = p.board.thickness; $('thickVal').textContent = (+p.board.thickness).toFixed(2);
+    $('ends').value = p.board.ends || 'round';
+    if(p.source === 'designer') pts = p.board.line.map(q => q.slice());
+    $('studioMsg').textContent = p.source === 'engine' ? 'الشعار لا يحوي هذه القطعة: ارسمها أو اختر اقتراحًا.' : '';
+    loadCands(name);
+  }
+  drawBoard();
+}
+
+// the board: the letter's frame, y up, in the logo's units
+let view = null;
+function drawBoard(){
+  const p = part(current); if(!p) return;
+  const b = p.board, [x0, y0, x1, y1] = b.box, pad = 14;
+  view = {x: x0 - pad, y: -(y1 + pad), w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad};
+  const path = rings => rings.map(r => 'M' + r.map(([x, y]) => `${x.toFixed(1)},${(-y).toFixed(1)}`).join('L') + 'Z').join('');
+  const lines = Object.entries({ascender: 'الطالع', x_height: 'ارتفاع الحروف', baseline: 'السطر', descender: 'النازل'})
+    .map(([k, t]) => `<line class="guide" x1="${view.x}" x2="${view.x + view.w}" y1="${-b.lines[k]}" y2="${-b.lines[k]}"/>
+      <text class="guide-t" x="${view.x + view.w - 4}" y="${-b.lines[k] - 3}" text-anchor="start" font-size="${(view.h / 70).toFixed(1)}">${t}</text>`).join('');
+  const shown = drawnOutline || b.part;          // what is drawn now, else the part in use
+  const spine = pts.length ? `<path class="spine" d="M${pts.map(([x, y]) => `${x},${-y}`).join('L')}${$('closedRing').checked ? 'Z' : ''}"/>` : '';
+  const r = Math.max(view.w, view.h) / 75;
+  const handles = pts.map(([x, y], i) => `<circle class="pt ${i === 0 ? 'first' : ''}" data-i="${i}" cx="${x}" cy="${-y}" r="${r}"/>`).join('');
+  $('canvas').innerHTML = `<svg viewBox="${view.x} ${view.y} ${view.w} ${view.h}" role="img" aria-label="لوحة رسم القطعة">${lines}
+    <path class="rest" fill-rule="evenodd" d="${path(b.letter)}"/>
+    ${shown ? `<path class="drawn" fill-rule="evenodd" d="${path(shown)}"/>` : ''}
+    <path class="ghost" d="${path(b.engine_part)}"/>${spine}${handles}</svg>`;
+}
+function toUnits(ev){
+  const svg = $('canvas').querySelector('svg'); const pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY; const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+  let x = q.x, y = -q.y;
+  if($('snap').checked){                       // close to a line of the grid: on it
+    const L = part(current).board.lines, tol = (L.x_height - L.baseline) * 0.05;
+    for(const v of Object.values(L)) if(Math.abs(y - v) < tol) y = v;
+  }
+  return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+}
+let dragging = -1, moved = false;
+$('canvas').addEventListener('pointerdown', ev => {
+  if(!current) return;
+  const t = ev.target;
+  if(t.classList && t.classList.contains('pt')){ dragging = +t.dataset.i; moved = false; t.setPointerCapture(ev.pointerId); return; }
+  pts.push(toUnits(ev)); drawBoard(); stroke();
+});
+$('canvas').addEventListener('pointermove', ev => {
+  if(dragging < 0) return;
+  pts[dragging] = toUnits(ev); moved = true; drawBoard(); stroke(true);
+});
+$('canvas').addEventListener('pointerup', () => { if(dragging >= 0 && moved) stroke(); dragging = -1; });
+$('canvas').addEventListener('dblclick', ev => {
+  const t = ev.target; if(t.classList && t.classList.contains('pt')){ pts.splice(+t.dataset.i, 1); drawBoard(); stroke(); }
+});
+let strokeTimer = null;
+function stroke(quick){
+  clearTimeout(strokeTimer);
+  strokeTimer = setTimeout(async () => {
+    if(pts.length < 2){ drawnOutline = null; drawBoard(); return; }
+    const mine = ++strokeSeq;
+    const r = await fetch('/api/kit/stroke', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, name: current, points: pts, closed: $('closedRing').checked,
+                            thickness: +$('thick').value, ends: $('ends').value})});
+    const j = await r.json(); if(mine !== strokeSeq || !r.ok) return;
+    const xr = part(current).board.xr;
+    drawnOutline = j.part.polys.map(rg => rg.map(([x, y]) => [x + xr, y]));
+    lastDrawn = j.part; drawBoard();
+  }, quick ? 60 : 0);
+}
+let lastDrawn = null;
+['closedRing', 'ends'].forEach(id => $(id).addEventListener('change', () => { drawBoard(); stroke(); }));
+$('thick').addEventListener('input', () => { $('thickVal').textContent = (+$('thick').value).toFixed(2); stroke(true); });
+$('undoPt').addEventListener('click', () => { pts.pop(); drawBoard(); stroke(); });
+$('clearPts').addEventListener('click', () => { pts = []; drawnOutline = null; lastDrawn = null; drawBoard(); });
+$('fromLogo').addEventListener('click', () => { pts = part(current).board.line.map(q => q.slice()); drawBoard(); stroke(); });
+function applyPart(p){ kitParts[current] = p; $('studioMsg').textContent = 'استُعملت في كل حرف يحتاجها.'; schedule(true); loadKit(); }
+$('useDrawn').addEventListener('click', () => { if(lastDrawn) applyPart(lastDrawn); else $('studioMsg').textContent = 'ارسم نقطتين على الأقل.'; });
+$('toEngine').addEventListener('click', () => { kitParts[current] = null; pts = []; drawnOutline = null; lastDrawn = null; schedule(true); loadKit(); });
+$('toLogo').addEventListener('click', () => { delete kitParts[current]; pts = []; drawnOutline = null; lastDrawn = null; schedule(true); loadKit(); });
+let cands = [];
+async function loadCands(name){
+  $('cands').innerHTML = '<span class="muted" style="font-size:13px">…</span>';
+  try{
+    const r = await fetch('/api/kit/candidates', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, name})});
+    const j = await r.json(); if(!r.ok || name !== current) return;
+    cands = j.candidates;
+    $('cands').innerHTML = cands.length ? cands.map((c, i) => `<button type="button" class="cand" data-c="${i}" title="${esc(c.font)}">${c.preview}<span>${esc(c.font)}</span></button>`).join('')
+                                        : '<span class="muted" style="font-size:13px">لا اقتراح لهذه القطعة.</span>';
+  }catch(e){ $('cands').innerHTML = ''; }
+}
+$('cands').addEventListener('click', ev => {
+  const c = ev.target.closest('.cand'); if(!c) return;
+  const cand = cands[+c.dataset.c]; applyPart(cand.part);
+  pts = (cand.part.line || []).map(q => q.slice());                 // its centre line, to go on from
+  drawnOutline = null;
+});
 
 // ---- saving and exporting
 $('saveBtn').addEventListener('click', async () => {
   $('saveBtn').disabled = true;
   try{
     const r = await fetch('/api/save', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({style: logo.style, word: $('word').value.trim(), params, variants, scopes, logo: fileName})});
+      body: JSON.stringify({style: logo.style, word: $('word').value.trim(), params, variants, scopes, logo: fileName, parts: kitParts})});
     const j = await r.json();
     if(!r.ok) throw new Error(j.detail || 'تعذّر الحفظ.');
     $('status').textContent = j.saved ? `حُفظ ${j.saved} تعديل في السجلّ` : 'لا تعديل يختلف عن القواعد';

@@ -82,10 +82,25 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     })
 
 
+def with_designer_parts(st: Style, parts: Optional[Dict[str, Any]]) -> Style:
+    """The kit with the designer's parts in it: a part given replaces the logo's (or fills a gap), a
+    part given as None goes back to the engine's construction."""
+    if not parts:
+        return st
+    merged = dict(st.parts)
+    for name, part in parts.items():
+        if part is None:
+            merged.pop(name, None)
+        elif isinstance(part, dict) and part.get("polys"):
+            merged[name] = part
+    return Style(**{**st.__dict__, "parts": merged})
+
+
 def draw(style: Dict[str, Any], word: str, params: Optional[Dict[str, float]] = None,
-         variants: Optional[Dict[str, str]] = None, check: bool = True) -> Dict[str, Any]:
+         variants: Optional[Dict[str, str]] = None, check: bool = True,
+         parts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The word in the logo's style with the designer's changes. Fast: nothing is measured again."""
-    st = style_of(style, params, variants)
+    st = with_designer_parts(style_of(style, params, variants), parts)
     lay = typeset(word, st)
     if not lay.shapes:
         raise ValueError("الكلمة لا تحتوي على حروف عربية يعرف المحرك رسمها.")
@@ -114,7 +129,8 @@ def log_path() -> Path:
 
 
 def save_edit(style: Dict[str, Any], word: str, params: Dict[str, float], variants: Dict[str, str],
-              scopes: Optional[Dict[str, str]] = None, logo: str = "", path: Optional[Path] = None) -> Dict[str, Any]:
+              scopes: Optional[Dict[str, str]] = None, logo: str = "", path: Optional[Path] = None,
+              parts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Record what the designer changed for this logo: for every handle moved, the logo's measures,
     the rule's value, the chosen value, and whether it is meant for this logo only or always; for
     every variant picked, what was picked and what it replaced. One JSON line per save."""
@@ -133,14 +149,24 @@ def save_edit(style: Dict[str, Any], word: str, params: Dict[str, float], varian
     was = {f"{c['letter']}.{c['form']}": c["chosen"] for c in choices(base)}
     picked = [{"form": key, "chosen": name, "instead_of": was.get(key, ""), "scope": scopes.get(key, "logo")}
               for key, name in (variants or {}).items() if name and was.get(key, name) != name]
+    # the parts the designer completed the kit with: what they drew (its line, pen and ends) or chose
+    made = []
+    for name, part in (parts or {}).items():
+        if part is None:
+            made.append({"part": name, "source": "engine"})
+        elif isinstance(part, dict):
+            made.append({"part": name, "source": part.get("source", "designer"), "font": part.get("font", ""),
+                         "from": part.get("from", ""), "line": part.get("line"), "closed": part.get("closed"),
+                         "thickness": part.get("thickness"), "ends": part.get("ends")})
     rec = {"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "logo": logo, "word": word,
            "measures": {k: v for k, v in base.to_dict().items() if isinstance(v, (int, float)) and not isinstance(v, bool)},
-           "params": moved, "variants": picked}
+           "params": moved, "variants": picked, "parts": made}
     p = path or log_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as f:
         f.write(json.dumps(_plain(rec), ensure_ascii=False) + "\n")
-    return {"saved": len(moved) + len(picked), "params": len(moved), "variants": len(picked), "file": str(p)}
+    return {"saved": len(moved) + len(picked) + len(made), "params": len(moved), "variants": len(picked), "parts": len(made),
+            "file": str(p)}
 
 
 def load_edits(path: Optional[Path] = None) -> List[Dict[str, Any]]:
@@ -172,3 +198,96 @@ def summarise(edits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                     "same_way": bool(ratios) and (all(r > 1 for r in ratios) or all(r < 1 for r in ratios)),
                     "always": sum(m.get("scope") == "always" for m in ms)})
     return sorted(out, key=lambda x: (-x["logos"], -x["times"]))
+
+
+
+# ------------------------------------------------------------------ the parts kit
+def _svg_paths(shapes_by_role, box=None, pad=6.0):
+    """Outlines (y up) as an SVG: [(role, rings)] -> svg text; even-odd within a shape."""
+    xs = [x for _, rings in shapes_by_role for r in rings for x, _ in r]
+    ys = [y for _, rings in shapes_by_role for r in rings for _, y in r]
+    if box:
+        x0, y0, x1, y1 = box
+    elif xs:
+        x0, y0, x1, y1 = min(xs), min(ys), max(xs), max(ys)
+    else:
+        return ""
+    w, h = x1 - x0 + 2 * pad, y1 - y0 + 2 * pad
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0 - pad:.1f} {-y1 - pad:.1f} {w:.1f} {h:.1f}">']
+    for role, rings in shapes_by_role:
+        d = "".join("M" + "L".join(f"{x:.1f},{-y:.1f}" for x, y in r) + "Z" for r in rings if len(r) >= 3)
+        if d:
+            out.append(f'<path class="{role}" fill-rule="evenodd" d="{d}"/>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def kit(style: Dict[str, Any], params: Optional[Dict[str, float]] = None, variants: Optional[Dict[str, str]] = None,
+        parts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The parts kit of this logo for the editor: every part, where it comes from, the letters it builds,
+    a picture of it in a letter that shows it, and what the drawing board needs (the letter in the
+    engine's construction, the part's frame, the logo's lines and its centre line to drag)."""
+    from .kit import SAMPLE, centre_line, engine_part, status
+    from .typeset import flat
+    st = with_designer_parts(style_of(style, params, variants), parts)
+    up = Style(**{**st.__dict__, "slant": 0.0, "seen": ""})
+    X, A, D = st.x_height, st.ascender, st.descender
+    lines = {"baseline": 0.0, "x_height": X, "ascender": X + A, "descender": -D}
+    out = []
+    for item in status(st):
+        name = item["name"]
+        eng = engine_part(st, name)
+        if eng is None:
+            continue
+        c, f = SAMPLE[name].split(".")
+        lay = typeset(c if f == "i" else {"I": c + "ـ", "M": "ـ" + c + "ـ", "F": "ـ" + c}[f], up)
+        placed = [p for p in lay.placed if p.char == c]
+        letter = []
+        if placed:
+            p = placed[0]
+            for sh in flat(p.glyph.shapes):
+                role = "part" if getattr(sh, "name", "") == name else "rest"
+                letter.append((role, [[(x, y) for x, y in r] for r in sh if len(r) >= 3]))
+        box = (min(-3.2 * st.pitch, min((x for _, rs in letter for r in rs for x, _ in r), default=0)),
+               -D, max(0.0, max((x for _, rs in letter for r in rs for x, _ in r), default=0)), X + A)
+        here = st.parts.get(name)
+        line = here.get("line") if here and here.get("line") else (centre_line(here["polys"]) if here else centre_line(eng["part"]))
+        out.append({**item, "preview": _svg_paths(letter, box),
+                    "board": {"letter": [[list(map(float, pt)) for pt in r] for role, rs in letter if role == "rest" for r in rs],
+                              "part": [[list(map(float, pt)) for pt in r] for role, rs in letter if role == "part" for r in rs],
+                              "engine_part": [[[x + eng["xr"], y] for x, y in r] for r in eng["part"]],
+                              "xr": eng["xr"], "box": box, "lines": lines,
+                              # the line to drag, in the letter's frame (the part's own frame plus its right end)
+                              "line": [[x + eng["xr"], y] for x, y in line] if here and not here.get("line") else
+                                      ([list(map(float, q)) for q in line] if here else [[x + eng["xr"], y] for x, y in line]),
+                              "closed": bool(here.get("closed")) if here else False,
+                              "thickness": float(here.get("thickness", 1.0)) if here else 1.0,
+                              "ends": here.get("ends", "round") if here else "round"}})
+    return _plain({"parts": out, "pen": {"stem": st.stem, "hair": st.hair, "power": st.contrast_power},
+                   "complete": sum(1 for o in out if o["source"] != "engine"), "total": len(out)})
+
+
+def kit_candidates(style: Dict[str, Any], name: str) -> Dict[str, Any]:
+    """Suggestions for one part of the kit, from real typefaces, drawn with the logo's pen."""
+    from .kit import candidates, engine_part
+    st = style_of(style)
+    eng = engine_part(st, name)
+    out = []
+    for cand in candidates(st, name):
+        polys = [[(x + eng["xr"], y) for x, y in r] for r in cand["polys"]]
+        # its centre line in the letter's frame, as the board draws (and the designer goes on from it)
+        cand["line"] = [[x + eng["xr"], y] for x, y in (cand.get("line") or [])]
+        out.append({"font": cand["font"], "part": cand, "preview": _svg_paths([("part", polys)])})
+    return _plain({"name": name, "candidates": out})
+
+
+def kit_stroke(style: Dict[str, Any], name: str, points, closed: bool = False, thickness: float = 1.0,
+               ends: str = "round") -> Dict[str, Any]:
+    """The designer's line, drawn with the logo's pen into a part of the kit."""
+    from .kit import designer_part
+    st = style_of(style)
+    part = designer_part(st, name, [(float(x), float(y)) for x, y in points], closed, thickness, ends)
+    if part is None:
+        raise ValueError("ارسم نقطتين على الأقل.")
+    return _plain({"name": name, "part": part,
+                   "outline": [[[x + 0.0, y] for x, y in r] for r in part["polys"]]})

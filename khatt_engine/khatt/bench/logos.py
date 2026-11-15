@@ -274,6 +274,76 @@ def parts_exam(words=PART_WORDS) -> Dict:
     return out
 
 
+def kit_exam(words=PART_WORDS) -> Dict:
+    """How far does the parts kit carry once the designer completes it? Each open typeface stands in
+    for a logo; every letter with a named part is hidden in turn; its parts come from the other
+    letters of the word (cut, as from a logo), and the parts the word lacks are completed as a
+    designer would, from the same typeface's other letters (never the hidden letter's own). The
+    hidden letter is drawn: in the engine's construction, with the logo's parts, with the full kit."""
+    import numpy as np
+    from ..kit import engine_part
+    from ..letters import LETTERS
+    from ..pipeline import TAKE_MIN, analyse
+    from ..reference import _SHAPES, family, part_library
+    from ..selfcheck import self_check, take_parts
+    from ..style import Style
+    from ..typeset import flat
+    from .fonts import font_files, load
+    from .truth import png, word_image
+    part_library()
+    rows = []
+    for f in [p for p in font_files() if p.name.endswith("-400.woff2")]:
+        face = load(str(f))
+        lib = _SHAPES.get(f.stem, {})
+        for w in words:
+            try:
+                an = analyse(png(word_image(face, w, x_px=90)[0]), texts=[w], read=False)
+            except Exception:
+                continue
+            if an["health"]["confidence"] < TAKE_MIN:
+                continue
+            L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+            st.ref_skip = family(f.stem)
+            base = self_check(L, w, st, k)
+            if not base:
+                continue
+            for i, x in enumerate(base["letters"]):
+                key = f"{x['letter']}.{x['form']}"
+                names = {getattr(sh, "name", "") for sh in flat(LETTERS[x["letter"]][1](st, x["form"]).shapes)} - {""}
+                if not names:
+                    continue
+                parts = take_parts(L, w, st, k, skip=i)
+                kit = dict(parts)
+                for name in names - set(parts):
+                    src = next((q for q in lib if q.endswith(f"|{name}") and q.split("|")[0] != key), None)
+                    eng = engine_part(st, name, sample=src.split("|")[0]) if src else None
+                    if src and eng:
+                        kit[name] = {"polys": [[(px * st.x_height, py * st.x_height) for px, py in ring] for ring in lib[src]],
+                                     "engine": eng["part"], "from": src.split("|")[0], "source": "designer"}
+                if kit == parts and not parts:
+                    continue
+                seen = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i)
+                got = {}
+                for mode, use in (("logo_parts", parts), ("kit", kit)):
+                    r = self_check(L, w, Style(**{**st.__dict__, "parts": use, "seen": seen}), k) if use else base
+                    if r and len(r["letters"]) == len(base["letters"]):
+                        got[mode] = r["letters"][i]["match"]
+                if len(got) == 2 and any(abs(v - x["match"]) > 1e-9 for v in got.values()):
+                    rows.append({"font": f.stem, "word": w, "letter": key, "engine": x["match"], **got,
+                                 "completed": sorted(set(kit) - set(parts))})
+    out = {"rows": rows, "cases": len(rows)}
+    if rows:
+        a = np.array([(r["engine"], r["logo_parts"], r["kit"]) for r in rows])
+        out.update({"engine": float(a[:, 0].mean()), "logo_parts": float(a[:, 1].mean()), "kit": float(a[:, 2].mean()),
+                    "better": int((a[:, 2] > a[:, 0] + 0.02).sum()), "worse": int((a[:, 2] < a[:, 0] - 0.02).sum())})
+        done = [r for r in rows if r["completed"]]
+        if done:
+            b = np.array([(r["engine"], r["logo_parts"], r["kit"]) for r in done])
+            out["completed"] = {"cases": len(done), "engine": float(b[:, 0].mean()), "logo_parts": float(b[:, 1].mean()),
+                                "kit": float(b[:, 2].mean())}
+    return out
+
+
 def held_out_summary(rows: List[Dict]) -> str:
     lines = ["| الشعار | الحرف المخفي بالقواعد العامة | بالقواعد المقيسة من بقية الحروف | تحسّن / ساء | ومع أجسام الحروف الشقيقة من الشعار | تحسّن / ساء |",
              "|---|---|---|---|---|---|"]
@@ -326,12 +396,25 @@ def main() -> int:
     p.add_argument("--held-out", action="store_true", help="امتحان الحرف المخفي: هل يفهم المحرك الشعار أم ينسخه")
     p.add_argument("--reference", action="store_true", help="امتحان الحرف المخفي ببنية أقرب خط مرجعي")
     p.add_argument("--parts", action="store_true", help="امتحان قطع الحروف على الخطوط المفتوحة بديلًا عن الشعارات")
+    p.add_argument("--kit", action="store_true", help="امتحان طقم القطع حين يكمله المصمم")
     a = p.parse_args()
     warnings.filterwarnings("ignore")
     folder = Path(a.folder)
-    if not a.parts and not (folder / "texts.json").exists():
+    if not a.parts and not a.kit and not (folder / "texts.json").exists():
         print("يلزم ملف texts.json في المجلد: {\"اسم الصورة\": \"النص العربي\"}", file=sys.stderr)
         return 1
+    if a.kit:
+        r = kit_exam()
+        print(f"على {r['cases']} حرفًا مخفيًا: {r.get('engine', 0) * 100:.1f}% بصيغة المحرك، و{r.get('logo_parts', 0) * 100:.1f}% بقطع "
+              f"الشعار، و{r.get('kit', 0) * 100:.1f}% بالطقم مكتملًا (تحسّن {r.get('better', 0)} وساء {r.get('worse', 0)}).")
+        c = r.get("completed")
+        if c:
+            print(f"الحروف التي احتاجت قطعة أكملها المصمم ({c['cases']}): {c['engine'] * 100:.1f}% بصيغة المحرك، "
+                  f"و{c['logo_parts'] * 100:.1f}% بقطع الشعار وحدها، و{c['kit'] * 100:.1f}% بالطقم مكتملًا.")
+        if a.out:
+            out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+            (out / "kit.json").write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
+        return 0
     if a.parts:
         r = parts_exam()
         if a.out:

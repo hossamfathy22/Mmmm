@@ -499,6 +499,8 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 from .legible import keeps_reading
                 # a part the designer has set by hand is their judgement, not the reader's
                 touched = {n.split(".")[1] for n in st.params if n.startswith("قطعة.")}
+                # and so is a part the designer drew or chose for the kit
+                touched |= {n for n, v in st.parts.items() if isinstance(v, dict) and v.get("source") in ("designer", "reference")}
                 mine = {getattr(sh, "name", "") for sh in flat(built.shapes) if getattr(sh, "source", "") == "logo"}
                 if not st.part_legible or (touched & mine) or keeps_reading(glyph, built, c, form, st):
                     glyph = built

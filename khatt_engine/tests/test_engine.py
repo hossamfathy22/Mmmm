@@ -1065,3 +1065,58 @@ def test_real_typefaces_say_which_part_can_stand_for_which():
     # between particular letters (the head of ه and the loop of ط), not between every head and loop
     assert max(v for (a, b, t, kind), v in subs.items() if not kind and a.endswith("|رأس") and b.endswith("|عروة")) >= 0.55
     assert all(v < 0.55 for (a, b, t, kind), v in subs.items() if b.endswith("كأس سفلي"))
+
+
+# ---------------------------------------------------------------- the parts kit, and the designer's hand in it
+def test_the_kit_says_where_each_part_comes_from_and_which_letters_it_builds():
+    from khatt.kit import KIT, status
+    st = Style(slant=0.0)
+    got = {x["name"]: x for x in status(st)}
+    assert set(got) == {n for n, _, _ in KIT} and all(x["source"] == "engine" for x in got.values())
+    assert {"ف.I", "ق.M", "م.I", "و.i"} <= set(got["رأس"]["letters"])
+    head = {"polys": [[(0, 0), (-10, 0), (-10, 10)]], "engine": [[(0, 0), (-10, 0), (-10, 10)]], "from": "و.F"}
+    got = {x["name"]: x for x in status(Style(**{**st.__dict__, "parts": {"رأس": head}}))}
+    assert got["رأس"]["source"] == "logo" and got["رأس"]["from"] == "و.F"
+
+
+def test_a_line_is_drawn_with_the_logos_pen():
+    """Thick across a vertical, thin across a horizontal, as the pen rule of a contrast logo says."""
+    from khatt.kit import pen_line
+    from khatt.reference import box
+    st = Style(slant=0.0)
+    v = box(pen_line([(0, 0), (0, 60)], st, smooth=False, ends="flat"))
+    h = box(pen_line([(0, 0), (60, 0)], st, smooth=False, ends="flat"))
+    assert (v[2] - v[0]) == pytest.approx(st.stem, rel=0.1) and (h[3] - h[1]) == pytest.approx(st.hair, rel=0.15)
+    assert len(pen_line([(0, 0), (40, 0), (40, 40), (0, 40)], st, closed=True)) == 2      # a ring has a counter
+
+
+def test_a_part_the_designer_draws_goes_into_every_letter_that_needs_it():
+    from khatt.kit import designer_part, engine_part
+    st = Style(slant=0.0)
+    eng = engine_part(st, "عروة")
+    pts = [(x + eng["xr"], y) for x, y in [(-10, 10), (-20, 40), (-50, 45), (-60, 15)]]
+    part = designer_part(st, "عروة", pts, closed=True, thickness=0.8)
+    assert part["source"] == "designer" and part["polys"] and part["line"]
+    logo = Style(**{**st.__dict__, "parts": {"عروة": part}})
+    for word in ("صب", "طب", "ضب"):
+        assert ("logo", "عروة") in typeset(word, logo).placed[0].parts        # the reading gate leaves the designer's part alone
+
+
+def test_the_editor_offers_the_kit_suggestions_and_a_board_to_draw_on(tmp_path):
+    from khatt.editor import draw, kit, kit_candidates, kit_stroke, save_edit
+    from khatt.reference import faces
+    st = Style()
+    k = kit(st.to_dict())
+    assert k["total"] >= 12 and k["complete"] == 0
+    loop = {p["name"]: p for p in k["parts"]}["عروة"]
+    assert loop["preview"].startswith("<svg") and loop["board"]["lines"]["x_height"] == pytest.approx(st.x_height)
+    assert len(loop["board"]["line"]) >= 3 and loop["board"]["engine_part"]
+    s = kit_stroke(st.to_dict(), "عروة", loop["board"]["line"], closed=True)
+    d0, d1 = draw(st.to_dict(), "صبر"), draw(st.to_dict(), "صبر", parts={"عروة": s["part"]})
+    assert d0["svg"] != d1["svg"]
+    assert kit(st.to_dict(), parts={"عروة": s["part"]})["complete"] == 1
+    rec = save_edit(st.to_dict(), "صبر", {}, {}, path=tmp_path / "e.jsonl", parts={"عروة": s["part"]})
+    assert rec["parts"] == 1
+    if [f for f in faces() if f.endswith("-400.woff2")]:
+        c = kit_candidates(st.to_dict(), "عروة")["candidates"]
+        assert c and c[0]["part"]["polys"] and c[0]["preview"].startswith("<svg")

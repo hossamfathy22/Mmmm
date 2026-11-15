@@ -65,7 +65,8 @@ def api_draw(body: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
     if not word or not isinstance(body.get("style"), dict):
         raise HTTPException(400, "الكلمة أو قياسات الشعار ناقصة.")
     try:
-        return editor.draw(body["style"], word, body.get("params") or {}, body.get("variants") or {}, bool(body.get("check", True)))
+        return editor.draw(body["style"], word, body.get("params") or {}, body.get("variants") or {}, bool(body.get("check", True)),
+                           body.get("parts") or None)
     except (ValueError, TypeError) as e:
         raise HTTPException(422, str(e))
 
@@ -76,7 +77,36 @@ def api_save(body: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
     if not isinstance(body.get("style"), dict):
         raise HTTPException(400, "قياسات الشعار ناقصة.")
     return editor.save_edit(body["style"], str(body.get("word", "")), body.get("params") or {}, body.get("variants") or {},
-                            body.get("scopes") or {}, str(body.get("logo", "")))
+                            body.get("scopes") or {}, str(body.get("logo", "")), parts=body.get("parts") or None)
+
+
+# ------------------------------------------------------------------ the parts kit
+@app.post("/api/kit")
+def api_kit(body: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """The logo's parts kit: every part, where it comes from, and the drawing board for it."""
+    if not isinstance(body.get("style"), dict):
+        raise HTTPException(400, "قياسات الشعار ناقصة.")
+    return editor.kit(body["style"], body.get("params") or {}, body.get("variants") or {}, body.get("parts") or None)
+
+
+@app.post("/api/kit/candidates")
+def api_kit_candidates(body: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """Suggestions for one part from real typefaces, drawn with the logo's pen."""
+    if not isinstance(body.get("style"), dict) or not body.get("name"):
+        raise HTTPException(400, "قياسات الشعار أو اسم القطعة ناقص.")
+    return editor.kit_candidates(body["style"], str(body["name"]))
+
+
+@app.post("/api/kit/stroke")
+def api_kit_stroke(body: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """The designer's line drawn with the logo's pen into a part."""
+    if not isinstance(body.get("style"), dict) or not body.get("name"):
+        raise HTTPException(400, "قياسات الشعار أو اسم القطعة ناقص.")
+    try:
+        return editor.kit_stroke(body["style"], str(body["name"]), body.get("points") or [], bool(body.get("closed")),
+                                 float(body.get("thickness", 1.0)), str(body.get("ends", "round")))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(422, str(e))
 
 
 @app.get("/api/edits")
