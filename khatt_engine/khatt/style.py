@@ -59,8 +59,11 @@ class Style:
     # the logo's parts may change how a letter looks, not what it reads as (legible.py)
     part_legible: bool = True
     # a part moved from one letter to another takes the difference real typefaces make between the two
-    # letters' parts (reference.part_ratio), its pen kept
-    part_ref_fit: bool = True
+    # letters' parts (reference.part_ratio), its pen kept. Off: on 266 hidden letters (the typeface
+    # playing the logo left out of the references) the parts as the logo draws them matched 53.5%,
+    # fitted by real typefaces 50.8% (by the engine's own proportions 47.9%): a designer keeps a
+    # part one size across its letters more than the typefaces' median says
+    part_ref_fit: bool = False
     ref_skip: str = ""          # a typeface family left out of the references (the one playing the logo in the examination)
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
