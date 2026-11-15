@@ -363,6 +363,19 @@ def with_parts(glyph: Glyph, st: Style) -> Glyph:
                 polys = [[(x + xr, y) for x, y in ring] for ring in got]
         if polys is None:
             polys = [[(x + dx + xr, y + dy) for x, y in ring] for ring in _turn(st.parts[kind]["polys"], t)]
+        # the designer's hand on the part: longer or shorter, taller or lower, thicker or thinner; the
+        # part is drawn again from its centre line, so a longer part keeps its pen unless asked otherwise
+        kl, kh, kw = (float(st.params.get(f"قطعة.{kind}.{w}", 1.0)) for w in ("طول", "ارتفاع", "سمك"))
+        if (kl, kh, kw) != (1.0, 1.0, 1.0):
+            from .reference import draw_strokes, part_strokes
+            strokes = part_strokes(polys)
+            if strokes:
+                x1 = max(x for r in polys for x, _ in r)
+                y0 = min(y for r in polys for _, y in r)
+                redrawn = draw_strokes([[(x, y, w * kw) for x, y, w in st_] for st_ in strokes],
+                                       lambda x, y: (x1 + (x - x1) * kl, y0 + (y - y0) * kh))
+                if redrawn:
+                    polys = redrawn
         used[0] = True
         return Tagged(polys, "logo", name)
     shapes = [swap(s) for s in glyph.shapes]
@@ -459,7 +472,10 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             built = with_parts(glyph, st)
             if built is not glyph:
                 from .legible import keeps_reading
-                if not st.part_legible or keeps_reading(glyph, built, c, form, st):
+                # a part the designer has set by hand is their judgement, not the reader's
+                touched = {n.split(".")[1] for n in st.params if n.startswith("قطعة.")}
+                mine = {getattr(sh, "name", "") for sh in flat(built.shapes) if getattr(sh, "source", "") == "logo"}
+                if not st.part_legible or (touched & mine) or keeps_reading(glyph, built, c, form, st):
                     glyph = built
         cut, borrowed, kin = find_cut(st, c, form)
         ext = extension(st, f"{c}.{form}")

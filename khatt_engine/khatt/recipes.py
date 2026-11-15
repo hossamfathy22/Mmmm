@@ -166,12 +166,21 @@ def stretch_of(st: Style, key: str) -> float:
     return float(v) if v is not None else fitted_stretch(st, key)
 
 
+PART = "قطعة."                   # handles on a part taken from the logo: "قطعة.رأس.طول"
+PART_HANDLES = {"طول": "طول القطعة (يُطال الخط المركزي أو يُقصَّر)", "ارتفاع": "ارتفاع القطعة",
+                "سمك": "سمك القطعة (مضاعف لسمكها كما في الشعار)"}
+
+
 def is_handle(name: str) -> bool:
+    if name.startswith(PART):
+        return name.count(".") == 2 and name.rsplit(".", 1)[1] in PART_HANDLES
     return name in PARAMS or (name.startswith(STRETCH) and name.count(".") == 2 and name[-1] in PARTNER)
 
 
 def handle_rule(st: Style, name: str) -> float:
     """What a handle is worth before the designer moves it."""
+    if name.startswith(PART):
+        return 1.0
     return fitted_stretch(st, name[len(STRETCH):]) if name.startswith(STRETCH) else rule_value(st, name)
 
 
@@ -275,6 +284,14 @@ def handles(st: Style) -> List[Dict]:
                     + (f"؛ × {st.traits[TRAIT_OF[p.name]]:.2f} من {TRAIT_OF[p.name]} الشعار" if not fitted and st.traits.get(TRAIT_OF.get(p.name, "")) else ""),
                     "source": FROM_LOGO if fitted else p.source, "range": [round(span[0], 3), round(span[1], 3)],
                     "set_by_designer": p.name in st.params})
+    # each part taken from the logo: its length, height and thickness, as factors on the logo's drawing
+    for part, info in st.parts.items():
+        for what, text in PART_HANDLES.items():
+            name = f"{PART}{part}.{what}"
+            out.append({"name": name, "shape": "قطع الشعار", "letters": "", "value": round(float(st.params.get(name, 1.0)), 3),
+                        "rule_value": 1.0, "source": MEASURED, "rule": f"{part} (من «{info.get('from', '').split('.')[0]}»): {text}",
+                        "range": [0.5, 1.6] if what != "سمك" else [0.4, 1.6], "set_by_designer": name in st.params,
+                        "part": part})
     # the lengths the logo gives its letters, and any the designer set
     keys = list(st.stretch) + [n[len(STRETCH):] for n in st.params if n.startswith(STRETCH) and n[len(STRETCH):] not in st.stretch]
     for key in keys:

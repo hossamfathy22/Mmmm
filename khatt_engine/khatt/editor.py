@@ -93,8 +93,12 @@ def draw(style: Dict[str, Any], word: str, params: Optional[Dict[str, float]] = 
     in_word = {c for c, _ in forms}
     hs = handles(st)
     for h in hs:
+        if "part" in h:
+            # a part of the logo matters where a letter of the word takes it
+            h["used"] = any(("logo", h["part"]) in p.parts for p in lay.placed)
+            continue
         h["used"] = (any(c == h["letters"] and f == h["form"] or (c == h["letters"] and {f, h["form"]} in ({"i", "F"}, {"I", "M"}))
-                         for c, f in forms) if "letters" in h else bool(in_word & set(SHAPE_LETTERS.get(h["shape"], ""))))
+                         for c, f in forms) if "letters" in h and h["letters"] else bool(in_word & set(SHAPE_LETTERS.get(h["shape"], ""))))
     present = {(SKELETON.get(c, c), f) for c, f in forms} | set(forms)
     cs = [dict(c, form_ar=FORM_AR[c["form"]]) for c in choices(st) if (c["letter"], c["form"]) in present]
     out = {"svg": to_svg(lay, background=None), "handles": hs, "choices": cs, "skipped": lay.skipped,

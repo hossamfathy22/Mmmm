@@ -1002,3 +1002,29 @@ def test_a_part_that_makes_a_letter_read_as_another_is_refused():
     built = with_parts(LETTERS["و"][1](logo, "i"), logo)
     assert not keeps_reading(LETTERS["و"][1](logo, "i"), built, "و", "i", logo)
     assert ("logo", "رأس") not in typeset("و", logo).placed[0].parts      # refused: و keeps the engine's head
+
+
+def test_the_designer_can_lengthen_raise_and_thin_a_part_of_the_logo():
+    """Each part taken from the logo has three handles: length, height, thickness. Moving them redraws
+    the part from its centre line; the editor offers them where the word uses the part."""
+    from khatt.editor import draw
+    from khatt.reference import box
+    from khatt.recipes import handles
+    st = Style(slant=0.0)
+    head = [sh for sh in flat(LETTERS["م"][1](st, "I").shapes) if getattr(sh, "name", "") == "رأس"][0]
+    xr = max(x for p in head for x, _ in p)
+    eng = [[(x - xr, y) for x, y in p] for p in head]
+    logo = Style(**{**st.__dict__, "parts": {"رأس": {"polys": eng, "engine": eng, "from": "م.I"}}, "seen": "م.I"})
+    names = {h["name"] for h in handles(logo)}
+    assert {"قطعة.رأس.طول", "قطعة.رأس.ارتفاع", "قطعة.رأس.سمك"} <= names
+
+    def head_of(st_):
+        sh = [s for s in flat(typeset("فب", st_).placed[0].glyph.shapes) if getattr(s, "name", "") == "رأس"][0]
+        return box(list(sh))
+    x0, y0, x1, y1 = head_of(Style(**{**logo.__dict__, "params": {"قطعة.رأس.طول": 1.0}}))   # set by hand: the designer's eye judges
+    a0, b0, a1, b1 = head_of(Style(**{**logo.__dict__, "params": {"قطعة.رأس.طول": 1.4}}))
+    # the centre line is 1.4 times longer; the pen is not, so the outline grows a little less
+    assert 1.15 * (x1 - x0) < (a1 - a0) < 1.4 * (x1 - x0) and abs((b1 - b0) - (y1 - y0)) < 0.15 * (y1 - y0)
+    out = draw(logo.to_dict(), "فب", params={"قطعة.رأس.سمك": 0.8})
+    h = {x["name"]: x for x in out["handles"]}["قطعة.رأس.طول"]
+    assert h["used"] and h["value"] == 1.0
