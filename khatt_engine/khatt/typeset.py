@@ -110,9 +110,9 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
         return acc.area if acc is not None else 0.0
     full = area(polys)
     # a cut far from the size of the letter it stands for is a fragment or a swallowed neighbour
-    mine = area([poly for sh in built.shapes for poly in sh
-                 if getattr(sh, "name", "") not in ("نقطة", "شرطة", "همزة")])
-    if mine > 0 and not (0.35 <= full / mine <= 3.0):
+    mine = sum(area(sh) for sh in flat(built.shapes) if getattr(sh, "name", "") not in ("نقطة", "شرطة", "همزة"))
+    # (the engine's letter is the one that differs from the logo, so only a clear misfit is refused)
+    if mine > 0 and not (0.15 <= full / mine <= 6.0):
         return built
     if borrowed in ("F", "M") and form in ("i", "I"):
         from shapely.geometry import Polygon, box
