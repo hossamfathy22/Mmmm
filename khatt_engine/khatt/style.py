@@ -71,7 +71,15 @@ class Style:
     # (Mootanroo's ت is a tall stem, which the readers take for ا, and the fallback drew it short).
     # Hidden letters of the 16 logos the readers misread: 7 better with it, 10 worse, likeness to the
     # logo's own letter 0.398 -> 0.366. The designer chooses it, letter by letter ("من المرجع")
-    legible_fallback: bool = False          # a typeface family left out of the references (the one playing the logo in the examination)
+    legible_fallback: bool = False
+    # every letter form the logo shows is taken from the logo, not only those the engine draws badly
+    # (all but those it draws all but exactly): the pixels cannot tell a cup from two stems
+    # (selfcheck._take_rest)
+    take_all: bool = True
+    # ا and ل drawn on the logo's ر when it draws ر as an upright stem (typeset.stem_from_reh). Off: on
+    # the hidden ا of the other logos it fitted worse three times in four; the designer chooses it
+    # ("على الراء"), for every ا and ل or letter by letter
+    stem_kin: bool = False          # a typeface family left out of the references (the one playing the logo in the examination)
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
     # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them

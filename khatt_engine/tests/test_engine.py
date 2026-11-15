@@ -794,17 +794,74 @@ def test_a_measure_serves_the_letter_form_it_was_measured_on():
     assert width(typeset("د", m)) == pytest.approx(width(typeset("د", st)), abs=1e-6)              # د.i: not
 
 
-def test_a_siblings_body_is_not_borrowed_when_the_logo_draws_another_sibling_its_own_way():
-    """موتنرو cuts a tall ن and draws its ت as a plain tooth: ن's body is no ب's in that logo."""
+def test_the_logos_pieces_say_which_letters_they_hold():
+    """A letter that joins nothing after it ends a piece of ink: the word is read piece by piece, not
+    by where the engine's letters slide to."""
+    from khatt.pipeline import analyse
+    from khatt.selfcheck import _align, _slide
+    st = Style()
+    an = analyse(to_png(typeset("بيدوناق", st), height=300), texts=["بيدوناق"], read=False)
+    L, k, st2 = an["lines"][an["src"]], an["k"], an["style"]
+    up = Style(**{**st2.__dict__, "slant": 0.0})
+    lay = typeset("بيدوناق", up)
+    logo = np.asarray(L.B, bool)
+    s = 1.0 / k
+    xs = [p[0] for sh in lay.shapes for poly in sh for p in poly]
+    x_of = float(np.flatnonzero(logo.any(axis=0))[-1]) - max(xs) * s
+    slid = _slide(lay, up, logo, s, x_of, L.row_of_y(0.0), st2.pitch * s)
+    got = _align(logo, [(p, m, dx) for p, m, dx, _ in slid], L.row_of_y(0.0), st2.x_height * s, st2.pitch * s)
+    assert got is not None
+    runs = [(a, b) for _, a, b in got[1]]
+    assert runs == [(0, 3), (3, 4), (4, 6), (6, 7)]            # بيد | و | نا | ق
+
+
+def test_two_cut_cups_share_their_arm_and_a_cup_rises_into_alef():
+    """Cut from the logo, a cup that ends in an upright arm and a letter that begins with an upright
+    stand on one stroke, as the logo's cups do; a bowl's side is no arm."""
+    from khatt.typeset import _upright
+    st = Style()
+    X, w = st.x_height, st.stem
+    cup = {"polys": [[(0, X), (0, 0), (-3 * w, 0), (-3 * w, X), (-2 * w, X), (-2 * w, w), (-w, w), (-w, X)]], "piece": True}
+    lay = typeset("بب", Style(**{**st.__dict__, "taken": {"ب.I": cup, "ب.F": cup}}))
+    a, b = lay.placed
+    assert _upright(a.glyph, st, "left") and _upright(b.glyph, st, "right")
+    assert lay.bbox()[2] - lay.bbox()[0] == pytest.approx(5 * w, abs=0.1 * w)   # two cups of three stems, one arm between
+    assert not lay.joins                                                     # and no join of the engine's
+    pixels = {q: {"polys": v["polys"]} for q, v in (("ب.I", cup), ("ب.F", cup))}
+    assert typeset("بب", Style(**{**st.__dict__, "taken": pixels})).joins     # cut where the engine's letters stood: its joins
+
+
+def test_alef_and_lam_on_the_logos_reh_are_the_designers_choice():
+    from khatt.recipes import ON_REH, choices
+    from khatt.typeset import find_cut, stem_from_reh
+    st = Style()
+    X, w = st.x_height, st.stem
+    # an upright ر: a stem from the x-height down past the baseline, its foot turned to the left
+    reh = {"polys": [[(0, X), (0, -0.3 * X), (-2 * w, -0.4 * X), (-2 * w, -0.4 * X + w), (-w, -0.3 * X + w), (-w, X)]]}
+    on = Style(**{**st.__dict__, "taken": {"ر.F": reh}, "seen": "ر.F", "stem_kin": True})
+    alef = stem_from_reh(on, "ا", "i")
+    ys = [y for ring in alef["polys"] for _, y in ring]
+    top = max(y for sh in flat(LETTERS["ا"][1](on, "i").shapes) for poly in sh for _, y in poly)
+    assert min(ys) == pytest.approx(0.0, abs=1e-6) and max(ys) == pytest.approx(top, abs=1e-6)
+    lam = stem_from_reh(on, "ل", "F")
+    assert min(y for ring in lam["polys"] for _, y in ring) < -0.2 * X               # ل alone keeps the ر's fall
+    off = Style(**{**on.__dict__, "stem_kin": False})
+    assert find_cut(off, "ا", "i")[0] is None                                      # the engine's ا, unless chosen
+    assert find_cut(Style(**{**off.__dict__, "variants": {"ا.i": ON_REH}}), "ا", "i")[0] is not None
+    assert any(c["letter"] == "ا" and any(o["name"] == ON_REH for o in c["options"]) for c in choices(off))
+    lean = {"polys": [[(0, 0.6 * X), (-3 * w, -0.3 * X), (-4 * w, -0.3 * X), (-w, 0.6 * X)]]}
+    assert stem_from_reh(Style(**{**on.__dict__, "taken": {"ر.F": lean}}), "ا", "i") is None   # a ر that leans is no stem
+
+
+def test_a_siblings_body_serves_the_letters_the_logo_lacks():
+    """موتنرو draws its ن as a cup hanging from the top line: ب and ي of new words take that body."""
     from khatt.typeset import find_cut
     cut = {"polys": [[[0, 0], [-4, 0], [-4, 30], [0, 30]]]}
-    st = Style(taken={"ن.M": cut}, seen="م.I و.F ن.M")
+    st = Style(taken={"ن.M": cut}, seen="م.I و.F ت.I ن.M")
     got, _, kin = find_cut(st, "ب", "M")
-    assert got is cut and kin                                # nothing says otherwise: the sibling's body serves
-    st2 = Style(taken={"ن.M": cut}, seen="م.I و.F ت.M ن.M")
-    assert find_cut(st2, "ب", "M")[0] is None                # ت is drawn, not cut: the bodies differ here
-    assert find_cut(st2, "ن", "M")[0] is cut                 # ن keeps its own
-
+    assert got is cut and kin
+    assert find_cut(st, "ن", "M")[0] is cut and not find_cut(st, "ن", "M")[2]   # ن keeps its own
+    assert find_cut(st, "ت", "I")[0] is None                 # ت is in the logo: its own drawing, not ن's
 
 def test_a_cut_outline_is_cleaned_of_pixel_notches_and_facets_but_keeps_its_corners():
     from shapely.geometry import Polygon, Point

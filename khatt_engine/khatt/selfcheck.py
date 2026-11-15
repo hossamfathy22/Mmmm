@@ -32,6 +32,7 @@ GOOD, FAIR = 0.75, 0.55          # share of common ink over all ink (IoU)
 # a letter that does not match fully may be taken from the logo: what the logo draws of a letter it
 # contains is the designer's own drawing. Whether the cut is kept is judged by check_and_take.
 CUT_BELOW = GOOD
+EXACT = 0.9        # a letter the engine draws this close to the logo stays the engine's (clean, and it stretches)
 FORM_AR = {"i": "منفصل", "I": "أول", "M": "وسط", "F": "آخر"}
 
 
@@ -90,8 +91,221 @@ def clean_outline(shape, px: float):
     return unary_union(polys) if polys else shape
 
 
+SHARE = 0.08       # a stroke as near (in pitches, on average) to two letters as this belongs to both (a shared arm)
+
+
+def _by_strokes(ink: np.ndarray, dist: np.ndarray, pitch: float) -> np.ndarray:
+    """Share the logo's ink among the letters stroke by stroke, not pixel by pixel. A pixel goes to the
+    letter the engine drew nearest it, and where the engine's guess at the letter is wrong (two stems
+    where the logo hangs a cup) its pixels cut the logo's strokes into wrong pieces: the cup lost an
+    arm, the ر's curl came away from its stem. The logo's ink is read as strokes (its centre line
+    between ends and junctions); a stroke goes whole to the letter nearest it on average, and to both
+    letters when it is as near to two (the arm two cups share). A long stroke that runs through two
+    letters (a join drawn as one line) is split where it passes from one to the other for good.
+    `dist`: for every letter, the distance of every pixel to the engine's drawing of it. Returns, for
+    every letter, the pixels that are its."""
+    from skimage.morphology import skeletonize
+    from .skeleton import _trace
+    nl = dist.shape[0]
+    nearest = dist.argmin(axis=0)
+    owned = np.stack([ink & (nearest == j) for j in range(nl)])        # pixel by pixel, where no stroke says
+    if not ink.any() or nl < 2:
+        return owned
+    sk = skeletonize(ink).astype(bool)
+    lab = np.full(ink.shape, -1, int)
+    sets: List[np.ndarray] = []
+    meets: List[Tuple[Tuple[int, int], int]] = []           # (end of a stroke, the letter its end is nearest)
+    run_min = max(3, int(round(0.4 * pitch)))
+    for path in _trace(sk):
+        if len(path) < 2:
+            continue
+        rr = np.array([q[0] for q in path]); cc = np.array([q[1] for q in path])
+        near = nearest[rr, cc]
+        # runs of the same nearest letter along the stroke; a run shorter than 0.4 pitch is a stroke
+        # passing near another letter, not entering it
+        bounds = [0] + [t for t in range(1, len(near)) if near[t] != near[t - 1]] + [len(near)]
+        segs = [[a, b, int(np.bincount(near[a:b]).argmax())] for a, b in zip(bounds, bounds[1:])]
+        # a stroke's first or last stretch is part of the stroke, unless it is long (where a stroke ends
+        # at a junction, the letter beyond the junction is near, and took a sliver of the stroke: a
+        # tick at the foot of every cup)
+        end_min = max(run_min, int(round(1.0 * pitch)))
+        merged = True
+        while merged and len(segs) > 1:
+            merged = False
+            q = min(range(len(segs)), key=lambda t: (segs[t][1] - segs[t][0]) / (end_min if t in (0, len(segs) - 1) else run_min))
+            if segs[q][1] - segs[q][0] < (end_min if q in (0, len(segs) - 1) else run_min):
+                o = q - 1 if q == len(segs) - 1 or (q > 0 and segs[q - 1][1] - segs[q - 1][0] >= segs[q + 1][1] - segs[q + 1][0]) else q + 1
+                a, b = min(segs[q][0], segs[o][0]), max(segs[q][1], segs[o][1])
+                segs[min(q, o)] = [a, b, segs[o][2]]
+                del segs[max(q, o)]
+                merged = True
+        for t, (a, b, _) in enumerate(segs):
+            d = dist[:, rr[a:b], cc[a:b]].mean(axis=1)
+            who = d <= d.min() + SHARE * pitch
+            lab[rr[a:b], cc[a:b]] = len(sets)
+            if t == 0:
+                meets.append((path[0], int(d.argmin())))
+            if t == len(segs) - 1:
+                meets.append((path[-1], int(d.argmin())))
+            sets.append(who)
+    if not sets:
+        return owned
+    # Where three strokes or more meet, the meeting belongs to the letter most of them are (ت's bottom
+    # and the arm it shares with ن meet ن's bottom: the foot of the arm is ت's, not ن's)
+    nb = ndi.convolve(sk.astype(int), np.ones((3, 3), int), mode="constant") - 1
+    radius = ndi.distance_transform_edt(ink)
+    done = np.zeros(ink.shape, bool)
+    for (r0, c0), _ in meets:
+        if done[r0, c0] or nb[r0, c0] < 3:
+            continue
+        here = [who for (r1, c1), who in meets if abs(r1 - r0) <= 2 and abs(c1 - c0) <= 2]
+        for (r1, c1), _ in meets:
+            if abs(r1 - r0) <= 2 and abs(c1 - c0) <= 2:
+                done[r1, c1] = True
+        if len(here) < 3:
+            continue
+        counts = np.bincount(here, minlength=nl)
+        if counts.max() * 2 <= len(here):
+            continue
+        R = 0.9 * max(1.0, float(radius[r0, c0]))
+        near = sk.copy()
+        rows, cols_ = np.nonzero(near)
+        sel = (rows - r0) ** 2 + (cols_ - c0) ** 2 <= R * R
+        who = np.zeros(nl, bool)
+        who[int(counts.argmax())] = True
+        lab[rows[sel], cols_[sel]] = len(sets)
+        sets.append(who)
+    # every inked pixel takes the stroke its nearest centre-line pixel is on
+    has = lab >= 0
+    _, (ir, ic) = ndi.distance_transform_edt(~has, return_indices=True)
+    stroke = lab[ir, ic]
+    table = np.stack(sets)                                              # strokes x letters
+    by = table[stroke]                                                  # H x W x letters
+    out = np.moveaxis(by, -1, 0) & ink[None]
+    return out
+
+
+def _align(logo: np.ndarray, glyphs, base_row: float, xh: float, pitch: float):
+    """Which letters each piece of the logo's ink holds, read as a designer reads it: a letter that does
+    not join the next (ا د ر و...) ends a piece, and a piece is as wide as the letters in it. The
+    engine's own drawing of a letter may be far off the logo's (two stems where the logo hangs a cup),
+    and placed by its pixels it slides onto the wrong ink, and every letter after it with it (موتنرو:
+    the ر onto the ن's cup, the last و onto the first). The pieces are the logo's own.
+    Returns (labels, [(piece, first letter, last letter + 1)], marks) or None when the pieces cannot be
+    read so (a piece holding two words' letters, a letter broken in many)."""
+    lab, n = ndi.label(logo, structure=np.ones((3, 3)))
+    if n == 0 or not glyphs:
+        return None
+    lo, hi = base_row - 0.6 * xh, base_row - 0.2 * xh
+    body, marks = [], []
+    for q, sl in enumerate(ndi.find_objects(lab), 1):
+        if sl is None:
+            continue
+        sel = lab[sl] == q
+        area = int(sel.sum())
+        if area < 4:
+            continue
+        rows = np.flatnonzero(sel.any(axis=1)) + sl[0].start
+        cols = np.flatnonzero(sel.any(axis=0)) + sl[1].start
+        in_band = bool(((rows >= lo) & (rows <= hi)).any())
+        if in_band and area >= 0.08 * xh * xh:
+            body.append((q, int(cols[0]), int(cols[-1])))
+        else:
+            marks.append((q, int(cols[0]), int(cols[-1])))
+    if not body:
+        return None
+    body.sort(key=lambda t: -(t[1] + t[2]))                    # right to left
+    wc = [b - a + 1.0 for _, a, b in body]
+    we = []
+    for p, m, dx in glyphs:
+        cs = np.flatnonzero(m.any(axis=0))
+        we.append(float(cs[-1] - cs[0] + 1) if len(cs) else 1.0)
+    ends = [p.form in ("i", "F") for p, _, _ in glyphs]        # joins no letter after it
+    nl, nc = len(glyphs), len(body)
+    INF = float("inf")
+    f = [[INF] * (nl + 1) for _ in range(nc + 1)]
+    back = [[None] * (nl + 1) for _ in range(nc + 1)]
+    f[0][0] = 0.0
+    for c in range(nc):
+        for i in range(nl + 1):
+            if f[c][i] == INF:
+                continue
+            # the piece holds letters i..j-1
+            for j in range(i + 1, min(nl, i + 6) + 1):
+                # the engine's widths are only a guide (its ر here is twice the logo's): no width counts
+                # for more than a letter out of place
+                cost = min(1.0, abs(math.log(wc[c] / max(1.0, sum(we[i:j])))))
+                cost += 1.5 * sum(ends[t] for t in range(i, j - 1))     # a piece across a letter that joins nothing
+                if j < nl and not ends[j - 1]:
+                    cost += 0.3                                        # a joined letter apart in ink
+                if f[c][i] + cost < f[c + 1][j]:
+                    f[c + 1][j], back[c + 1][j] = f[c][i] + cost, (i, j)
+            # or the piece is more of the letter before (a letter in two pieces)
+            if i > 0 and f[c][i] + 2.0 < f[c + 1][i]:                  # rare: most letters are one piece
+                f[c + 1][i], back[c + 1][i] = f[c][i] + 2.0, (i - 1, i - 1)
+    if f[nc][nl] == INF or f[nc][nl] > 0.8 * nc + 0.5:
+        return None
+    runs, i = [], nl
+    for c in range(nc, 0, -1):
+        a, b = back[c][i]
+        if a == b:                                             # continuation of letter a
+            runs.append((body[c - 1][0], a, a + 1))
+        else:
+            runs.append((body[c - 1][0], a, b))
+            i = a
+    runs.reverse()
+    return lab, runs, marks
+
+
+def _by_pieces(logo: np.ndarray, glyphs, base_row: float, xh: float, pitch: float) -> Optional[np.ndarray]:
+    """Every letter's share of the logo's ink, piece by piece (see _align): a piece of one letter is
+    that letter's whole; a piece of several is shared among them stroke by stroke (_by_strokes), with
+    the engine's letters laid across the piece in proportion to their widths; a dot or a dash goes to
+    the letter it stands over."""
+    got = _align(logo, glyphs, base_row, xh, pitch)
+    if got is None:
+        return None
+    lab, runs, marks = got
+    nl = len(glyphs)
+    owned = np.zeros((nl,) + logo.shape, bool)
+    span = [None] * nl                                          # where each letter stands, in columns
+    for q, a, b in runs:
+        piece = lab == q
+        cols = np.flatnonzero(piece.any(axis=0))
+        c0, c1 = float(cols[0]), float(cols[-1])
+        if b - a == 1:
+            owned[a] |= piece
+            lo_, hi_ = (c0, c1) if span[a] is None else (min(c0, span[a][0]), max(c1, span[a][1]))
+            span[a] = (lo_, hi_)
+            continue
+        ws = []
+        for t in range(a, b):
+            cs = np.flatnonzero(glyphs[t][1].any(axis=0))
+            ws.append((float(cs[0]), float(cs[-1])) if len(cs) else (0.0, 0.0))
+        total = sum(w1 - w0 + 1 for w0, w1 in ws) or 1.0
+        scale = (c1 - c0 + 1) / total
+        right = c1
+        dists = []
+        for t, (w0, w1) in zip(range(a, b), ws):
+            w = (w1 - w0 + 1) * scale
+            centre = right - w / 2
+            m = _shift(glyphs[t][1], int(round(centre - (w0 + w1) / 2)))
+            dists.append(ndi.distance_transform_edt(~m) if m.any() else np.full(logo.shape, 1e6))
+            span[t] = (right - w, right)
+            right -= w
+        share = _by_strokes(piece, np.stack(dists), pitch)
+        for t in range(a, b):
+            owned[t] |= share[t - a]
+    for q, a, b in marks:
+        x = 0.5 * (a + b)
+        near = [abs(x - 0.5 * (sp[0] + sp[1])) if sp else 1e9 for sp in span]
+        owned[int(np.argmin(near))] |= lab == q
+    return owned
+
+
 def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: float, pitch: float,
-          grey: Optional[np.ndarray] = None, level: float = 0.5, joins: Optional[np.ndarray] = None) -> Dict[str, Dict]:
+          grey: Optional[np.ndarray] = None, level: float = 0.5, joins: Optional[np.ndarray] = None,
+          below: float = CUT_BELOW, xh: float = 0.0, use_pieces: bool = False) -> Dict[str, Dict]:
     """Cut the letters the logo draws its own way out of the logo. The letters that matched say where
     they end: what is left of the logo's ink, near a letter that did not match, is that letter as the
     designer drew it. It is returned in the engine's units, relative to where the engine places that
@@ -101,10 +315,10 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
     from skimage.measure import find_contours
     good = np.zeros_like(logo) if joins is None else joins.copy()      # a join's ink is no letter's to take
     for (p, m, dx), x in zip(glyphs, letters):
-        if x["match"] >= CUT_BELOW:
+        if x["match"] >= below:
             good |= m
     rest = logo & ~ndi.binary_dilation(good, iterations=max(1, int(round(0.06 * pitch))))
-    bad = [(i, p, m, dx) for i, ((p, m, dx), x) in enumerate(zip(glyphs, letters)) if x["match"] < CUT_BELOW]
+    bad = [(i, p, m, dx) for i, ((p, m, dx), x) in enumerate(zip(glyphs, letters)) if x["match"] < below]
     if not rest.any() or not bad:
         return {}
     # every leftover piece goes to the nearest letter that did not match. A piece of a run of ink that
@@ -120,7 +334,7 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
     def edge(idx: int, side: str) -> Optional[float]:
         cols = np.flatnonzero(glyphs[idx][1].any(axis=0))
         return None if not len(cols) else float(cols[0] if side == "left" else cols[-1])
-    matched = [x["match"] >= CUT_BELOW for x in letters]
+    matched = [x["match"] >= below for x in letters]
     centre = np.array([0.0] + [float(np.argwhere(lab == q)[:, 1].mean()) for q in range(1, n + 1)])
     bounds = []
     for i, p, m, dx in bad:
@@ -135,7 +349,6 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
     # Joined letters are one piece of ink: the piece is shared pixel by pixel, each pixel to the nearest
     # letter that did not match (giving a whole piece to one letter took its joined neighbour with it:
     # the و of موتنرو came with its م, and drew مو in every new word).
-    nearest = dist.argmin(axis=0)
     columns = np.arange(logo.shape[1])
     kept = np.zeros_like(rest)
     for piece in range(1, n + 1):
@@ -146,6 +359,9 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
         if run_area[r] and run_good[r] / run_area[r] >= 0.5:
             continue
         kept |= sel
+    nearest = dist.argmin(axis=0)
+    # the logo's own pieces say which ink is which letter's, where they can be read (see _align)
+    pieces = _by_pieces(logo, glyphs, base_row, xh, pitch) if (use_pieces and xh > 0) else None
     for j, (i, p, m, dx) in enumerate(bad):
         left, right = bounds[j]
         span = np.ones(logo.shape[1], bool)
@@ -154,12 +370,24 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
         if left is not None:
             span &= columns >= left
         mine = kept & (nearest == j) & span[None, :]
+        if pieces is not None:
+            # the letter's share of its own piece of the logo, the ink of the letters that matched left
+            # to them
+            mine = pieces[i].copy()
         if mine.sum() < 0.05 * m.sum():
             continue
         # The letter that did not match was placed by a poor fit; its neighbour on the right matched,
         # so the cut is kept where the logo has it relative to that neighbour.
-        if i > 0 and letters[i - 1]["match"] >= CUT_BELOW:
+        if i > 0 and letters[i - 1]["match"] >= below:
             dx = glyphs[i - 1][2]
+        if pieces is not None:
+            # read from the logo's own pieces, the cut stands where the engine's letter stands: its right
+            # end where the engine's letter begins (where the letter before joins it)
+            from .typeset import flat as _flat
+            gx = [x for sh in _flat(p.glyph.shapes) for poly in sh for x, _ in poly]
+            cr = float(np.flatnonzero(mine.any(axis=0))[-1])
+            if gx:
+                dx = int(round(cr - x_of - (max(gx) + p.x) * s))
         # outlines of the cut, in engine units relative to the placed letter (x = 0 at its right edge);
         # traced on the grey picture where there is one, for edges finer than a pixel
         if grey is not None:
@@ -188,6 +416,8 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
             rings += [[[round(x, 2), round(y, 2)] for x, y in list(h.coords)[:-1]] for h in poly.interiors]
         if rings:
             out[f"{p.char}.{p.form}"] = {"polys": rings, "match_before": letters[i]["match"]}
+            if pieces is not None:
+                out[f"{p.char}.{p.form}"]["piece"] = True        # read from the logo's own pieces
     return out
 
 
@@ -269,9 +499,12 @@ def _slide(lay, upright: Style, logo: np.ndarray, s: float, x_of: float, base_ro
     return glyphs
 
 
-def self_check(L: Line, text: str, st: Style, k: float) -> Optional[Dict[str, Any]]:
+def self_check(L: Line, text: str, st: Style, k: float, cut_below: float = CUT_BELOW,
+               pieces: bool = False) -> Optional[Dict[str, Any]]:
     """Redraw `text` (the word in the logo) in the measured style and match it on the logo's line.
-    Returns None when the text cannot be drawn. Scores are IoU: common ink over all ink."""
+    Returns None when the text cannot be drawn. Scores are IoU: common ink over all ink. The letters
+    that match less than `cut_below` are cut out of the logo ("taken"); `pieces`: read from the logo's
+    own pieces of ink (_by_pieces), not shared out to the nearest of the engine's letters."""
     text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
     if not text or not L.stems:
         return None
@@ -312,7 +545,9 @@ def self_check(L: Line, text: str, st: Style, k: float) -> Optional[Dict[str, An
                         "verdict": "يطابق" if iou >= GOOD else ("قريب" if iou >= FAIR else "يختلف")})
     overall = float((union & logo).sum()) / max(1.0, float((union | logo).sum()))
     differ = [x for x in letters if x["verdict"] == "يختلف"]
-    taken = _take(logo, glyphs, letters, s, x_of, base_row, pitch, np.asarray(L.G, float), float(L.level), joins) if any(x["match"] < CUT_BELOW for x in letters) else {}
+    taken = (_take(logo, glyphs, letters, s, x_of, base_row, pitch, np.asarray(L.G, float), float(L.level), joins, cut_below,
+                   st.x_height * s, pieces)
+             if any(x["match"] < cut_below for x in letters) else {})
     notes = []
     if differ:
         notes.append("الشعار يرسم " + "، ".join(f"«{x['letter']}»" for x in differ)
@@ -562,12 +797,40 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
     """The self-check and everything read off the logo's own word (see _check_and_take), and then the
     parts of its letters, cut from it for the letters it lacks."""
     r = _check_and_take(L, text, st, k, take)
+    if r and take and st.take_all:
+        r = _take_the_rest(L, text, st, k, r)
     if r and take:
         st.parts = take_parts(L, text, st, k)
         if st.parts:
             r["parts"] = {q: v["from"] for q, v in st.parts.items()}
             r["notes"].append("قُصّت من حروف الشعار قطعها لتُبنى بها الحروف التي لا يحويها: "
                               + "، ".join(f"{q} (من «{v['from'].split('.')[0]}»)" for q, v in st.parts.items()) + ".")
+    return r
+
+
+def _take_the_rest(L: Line, text: str, st: Style, k: float, r: Dict[str, Any]) -> Dict[str, Any]:
+    """Last, once the logo's lengths are measured (a letter drawn longer is not a letter drawn
+    otherwise): every letter the engine still does not draw all but exactly, from the logo
+    (_take_rest)."""
+    now_r = self_check(L, text, st, k)
+    if not now_r:
+        return r
+    cur = [(x["letter"], x["form"], x["match"], x["shift"]) for x in now_r["letters"]]
+    kept, now, cur = _take_rest(L, text, st, k, dict(st.taken), now_r["overall"], cur)
+    if kept == st.taken:
+        return r
+    st.taken = dict(kept)
+    again = self_check(L, text, st, k)
+    if not again:
+        return r
+    r["taken"] = dict(kept)
+    r["overall_after"] = again["overall"]
+    r["letters_after"] = [{"letter": x["letter"], "form": x["form"], "match": x["match"], "shift": x["shift"]} for x in again["letters"]]
+    r["overlay_after_png"] = again["overlay_png"]
+    r["notes"] = [n for n in r["notes"] if not n.startswith("أُخذ من الشعار") and not n.startswith("لم يُؤخذ")
+                  and not n.startswith("حاول المحرك أخذ")]
+    r["notes"].append("أُخذ من الشعار نفسه: " + "، ".join(f"«{q.split('.')[0]}» ({FORM_AR[q.split('.')[1]]})" for q in kept)
+                      + ". يُستعمل في كل كلمة جديدة يقع فيها الحرف في الموضع نفسه.")
     return r
 
 
@@ -599,7 +862,7 @@ def _check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) 
     kept = {}
     for _ in range(2):
         grew = False
-        for key, cut in first["taken"].items():
+        for key, cut in (first.get("taken") or {}).items():
             if key in kept:
                 continue
             trial = Style(**{**st.__dict__, "taken": {**kept, key: cut}})
@@ -623,12 +886,12 @@ def _check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) 
         first["notes"] = [n for n in first["notes"] if not n.startswith("أُخذ من الشعار")]
         first["notes"].append("حاول المحرك أخذ ما يختلف من الشعار نفسه فلم يتحسن التطابق: الحروف هنا بعيدة عن صيغه، فبقيت كما يبنيها.")
         return _lengthen(L, text, st, k, first, None)
-    if len(kept) < len(first["taken"]):
-        dropped = [q.split(".")[0] for q in first["taken"] if q not in kept]
+    dropped = [q.split(".")[0] for q in (first.get("taken") or {}) if q not in kept]
+    if dropped:
         first["notes"].append("لم يُؤخذ من الشعار: " + "، ".join(f"«{q}»" for q in dropped) + " (القصّ لم يحسّن التطابق).")
-        first["notes"] = [n if not n.startswith("أُخذ من الشعار") else
-                          "أُخذ من الشعار نفسه: " + "، ".join(f"«{q.split('.')[0]}» ({FORM_AR[q.split('.')[1]]})" for q in kept)
-                          + ". يُستعمل في كل كلمة جديدة يقع فيها الحرف في الموضع نفسه." for n in first["notes"]]
+    first["notes"] = [n for n in first["notes"] if not n.startswith("أُخذ من الشعار")]
+    first["notes"].append("أُخذ من الشعار نفسه: " + "، ".join(f"«{q.split('.')[0]}» ({FORM_AR[q.split('.')[1]]})" for q in kept)
+                          + ". يُستعمل في كل كلمة جديدة يقع فيها الحرف في الموضع نفسه.")
     first["taken"] = kept
     st.taken = dict(kept)
     again = self_check(L, text, st, k)
@@ -637,6 +900,62 @@ def _check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) 
         first["letters_after"] = [{"letter": x["letter"], "form": x["form"], "match": x["match"]} for x in again["letters"]]
         first["overlay_after_png"] = again["overlay_png"]
     return _lengthen(L, text, st, k, first, again) if take else first
+
+
+def _take_rest(L: Line, text: str, st: Style, k: float, kept: Dict, now: float, cur: List) -> Tuple[Dict, float, List]:
+    """Every other letter the logo shows, from the logo too, unless the engine draws it all but exactly
+    (EXACT): the logo's letters are the truth, and a letter the engine draws "well enough" by the
+    pixels may be another letter by its shape. The pixel
+    score cannot tell a cup from two stems: Mootanroo's ت, a cup hanging from the top line, scored 0.77
+    drawn as two tall stems, so it was never cut, and its siblings were drawn as stems. A cut is kept
+    when its letter matches no worse than drawn (a cut that lost a piece is no truth) and no other
+    letter is harmed."""
+    # every letter cut in one reading of the logo, with the engine's letters only (a reading made with
+    # some letters already cut lays the others out differently, and the pieces come apart elsewhere)
+    base = Style(**{**st.__dict__, "taken": {}})
+    r = self_check(L, text, base, k, cut_below=EXACT, pieces=True)
+    kept = dict(kept)
+    if not r or not r.get("taken"):
+        r = {"taken": {}}
+    # read from the logo's own pieces, the letters fit one another as they do in the logo: a cup cut
+    # beside the engine's letter may sit badly where the two cuts together sit well. All at once, in
+    # place of the cuts kept so far, first.
+    whole = r["taken"]
+    if all(v.get("piece") for v in whole.values()) and len(whole) >= len(kept):
+        trial = Style(**{**st.__dict__, "taken": dict(whole)})
+        r2 = self_check(L, text, trial, k)
+        if (r2 and len(r2["letters"]) == len(cur) and r2["overall"] >= now - 0.005
+                and all(x["match"] >= m0 - 0.02 for (_, _, m0, _), x in zip(cur, r2["letters"]))):
+            cur = [(x["letter"], x["form"], x["match"], x["shift"]) for x in r2["letters"]]
+            return dict(whole), r2["overall"], cur
+    rest = {q: v for q, v in r["taken"].items() if q not in kept}
+    if rest and all(v.get("piece") for v in rest.values()):
+        trial = Style(**{**st.__dict__, "taken": {**kept, **rest}})
+        r2 = self_check(L, text, trial, k)
+        if (r2 and len(r2["letters"]) == len(cur) and r2["overall"] >= now - 0.005
+                and all(x["match"] >= m0 - 0.02 for (_, _, m0, _), x in zip(cur, r2["letters"]))):
+            kept.update(rest)
+            cur = [(x["letter"], x["form"], x["match"], x["shift"]) for x in r2["letters"]]
+            return kept, r2["overall"], cur
+    # where the pieces cannot be read so (ل cut badly out of ريبل's one piece يبل), each letter in turn,
+    # cut as the self-check cuts, beside the letters kept so far
+    near = self_check(L, text, Style(**{**st.__dict__, "taken": dict(kept)}), k, cut_below=EXACT)
+    r = {"taken": (near or {}).get("taken") or {}}
+    for key, cut in r["taken"].items():
+        if key in kept:
+            continue
+        trial = Style(**{**st.__dict__, "taken": {**kept, key: cut}})
+        r2 = self_check(L, text, trial, k)
+        if not r2 or len(r2["letters"]) != len(cur):
+            continue
+        hurt = any(m0 >= FAIR and x["match"] < m0 - 0.08 and abs(x["shift"] - s0) > 0.15 * st.pitch
+                   for (c0, f0, m0, s0), x in zip(cur, r2["letters"]) if f"{c0}.{f0}" != key)
+        own = [x["match"] - m0 for (c0, f0, m0, _), x in zip(cur, r2["letters"]) if f"{c0}.{f0}" == key]
+        gain = sum(own) / len(own) if own else 0.0
+        if not hurt and gain >= -0.01 and r2["overall"] >= now - 0.005:
+            kept[key], now = cut, r2["overall"]
+            cur = [(x["letter"], x["form"], x["match"], x["shift"]) for x in r2["letters"]]
+    return kept, now, cur
 
 
 # the parts that carry a logo's manner from letter to letter (named by the letter builders)

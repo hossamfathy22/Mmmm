@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 from . import geometry as g
 from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
-from .recipes import BUILDING, PARAMS, READS, REFERENCE, SKELETON, siblings, stretch_of, value
+from .recipes import BUILDING, ON_REH, PARAMS, READS, REFERENCE, SKELETON, siblings, stretch_of, value
 from .style import Style
 
 TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
@@ -176,7 +176,9 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
     reach = min(0.0, min(xs) - built.left)
     exit_x = built.exit_x + reach if built.exit_x is not None else None
     exit_edge = built.exit_edge + reach if built.exit_edge is not None else None
-    return Glyph([Tagged(polys, "logo", "من الشعار")] + list(marks or []), left=min(min(xs), built.left), entry_x=built.entry_x,
+    body = Tagged(polys, "logo", "من الشعار")
+    body.piece = bool(cut.get("piece"))                  # read from the logo's own pieces (selfcheck._by_pieces)
+    return Glyph([body] + list(marks or []), left=min(min(xs), built.left), entry_x=built.entry_x,
                  entry_edge=built.entry_edge, exit_x=exit_x, exit_edge=exit_edge, stems=built.stems,
                  tail=built.tail)
 
@@ -412,6 +414,108 @@ def with_parts(glyph: Glyph, st: Style, key: str = "") -> Glyph:
                  tail=glyph.tail)
 
 
+def _cut_span(glyph: Glyph) -> Optional[Tuple[float, float]]:
+    """Where the body cut from the logo's own pieces lies in a letter (its left and right ends), or None
+    when the letter is the engine's own, or cut where the engine's letter stood (its joins are the
+    engine's)."""
+    xs = [x for sh in glyph.shapes if getattr(sh, "source", "") == "logo" and getattr(sh, "piece", False)
+          for poly in sh for x, _ in poly]
+    return (min(xs), max(xs)) if xs else None
+
+
+# A logo that draws its ر as a stem (an upright stroke from the x-height down past the baseline, its
+# foot curled) shows how its designer draws every stem: ا is that ر set on the baseline, ل joined to
+# the next letter the same (its curl is the join), and ل alone or last the ر drawn up to ل's height.
+# What a designer does by hand with Mootanroo's ر. The designer's call (style.stem_kin, or the
+# variant ON_REH letter by letter): on the hidden ا of the other logos whose ر is a stem it fitted
+# worse than the engine's own ا three times in four (karashab's ا from 0.92 to 0.45).
+STEM_KIN = {"ا": "iF", "ل": "iIMF"}
+_STEMS: dict = {}
+
+
+def _sections(shape, y: float, w: float) -> List[Tuple[float, float]]:
+    from shapely.geometry import box
+    cut = shape.intersection(box(-1e5, y - 0.02 * w, 1e5, y + 0.02 * w))
+    spans = sorted((g.bounds[0], g.bounds[2]) for g in getattr(cut, "geoms", [cut]) if not g.is_empty and g.area > 0)
+    return _merged(spans)
+
+
+def stem_from_reh(st: Style, c: str, form: str) -> Optional[dict]:
+    """`c` (ا or ل) in `form` on the stroke of the logo's ر (see STEM_KIN), or None when the logo has no
+    ر cut, or draws it otherwise than as a stem."""
+    src = next((st.taken[q] for q in ("ر.F", "ر.i", "ز.F", "ز.i") if q in st.taken), None)
+    if src is None:
+        return None
+    polys = [[(float(x), float(y)) for x, y in ring] for ring in src["polys"]]
+    key = (c, form, round(st.x_height, 2), round(st.stem, 2), len(polys), tuple(polys[0][:3]))
+    if key in _STEMS:
+        return _STEMS[key]
+    from shapely.geometry import Polygon
+    X = st.x_height
+    acc = None
+    for ring in polys:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+    out = None
+    if acc is not None and not acc.is_empty:
+        y0, y1 = acc.bounds[1], acc.bounds[3]
+        mid, low = _sections(acc, 0.55 * X, X), _sections(acc, 0.25 * X, X)
+        upright = (y1 >= 0.85 * X and y0 < -0.1 * X and len(mid) == 1 and len(low) == 1
+                   and all(b - a <= 2.2 * st.stem for a, b in mid + low)
+                   and abs((mid[0][0] + mid[0][1]) - (low[0][0] + low[0][1])) / 2 <= 0.6 * st.stem)
+        if upright:
+            built = LETTERS[c][1](st, form)
+            top = max(y for sh in flat(built.shapes) for poly in sh for _, y in poly)
+            dy = -y0 if (c == "ا" or form in ("I", "M")) else 0.0     # set on the baseline, or left hanging
+            yc = 0.55 * X + dy
+            grow = max(0.0, top - (y1 + dy))
+            out = {"polys": [[(round(x, 2), round(y + dy + (grow if y + dy > yc else 0.0), 2)) for x, y in ring] for ring in polys],
+                   "from": "ر", "piece": bool(src.get("piece"))}
+    if len(_STEMS) > 512:
+        _STEMS.clear()
+    _STEMS[key] = out
+    return out
+
+
+def _upright(glyph: Glyph, st: Style, side: str) -> Optional[Tuple[float, float]]:
+    """The upright stroke a cut letter begins (right) or ends (left) with, standing on the baseline and
+    reaching the x-height: its left and right sides at half the x-height; None when the letter has none
+    there (a curl, a hook, a join that comes in low)."""
+    from shapely.geometry import Polygon
+    rings = [poly for sh in glyph.shapes if getattr(sh, "source", "") == "logo" for poly in sh if len(poly) >= 3]
+    if not rings:
+        return None
+    acc = None
+    for ring in rings:
+        q = Polygon(ring).buffer(0)
+        acc = q if acc is None else acc.symmetric_difference(q)
+    X = st.x_height
+    mid = _sections(acc, 0.5 * X, X)
+    if not mid:
+        return None
+    a, b = mid[-1] if side == "right" else mid[0]
+    if b - a > 2.2 * st.stem:
+        return None
+    # at the letter's edge (a hook inside a bowl is no arm the next letter can share)
+    x0, _, x1, _ = acc.bounds
+    if (side == "right" and x1 - b > 0.6 * st.stem) or (side == "left" and a - x0 > 0.6 * st.stem):
+        return None
+    c = 0.5 * (a + b)
+    # straight: the same stroke at the same place higher up (the side of a bowl leans as it rises and
+    # curls over: ن's is no arm)
+    for f in (0.65, 0.8):
+        row = _sections(acc, f * X, X)
+        near = [sp for sp in row if sp[0] - 0.5 * st.stem <= c <= sp[1] + 0.5 * st.stem]
+        if not near or abs(0.5 * (near[0][0] + near[0][1]) - c) > 0.4 * st.stem:
+            return None
+    ys = _merged([(lo, hi) for lo, hi in _section([list(r) for r in rings], c)])
+    span = next(((lo, hi) for lo, hi in ys if lo <= 0.5 * X <= hi), None)
+    if span is None or span[0] > 0.15 * X or span[1] < 0.85 * X:
+        return None
+    return a, b
+
+
 def find_cut(st: Style, c: str, form: str):
     """The letter as the logo draws it, for `c` in `form`: cut in this form, else in the other form
     that differs only by the join from the right (isolated/final, initial/medial), else the same of a
@@ -420,15 +524,13 @@ def find_cut(st: Style, c: str, form: str):
     other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
     # a letter form the logo has keeps its own drawing (the engine's, or its own cut); another letter's
     # body serves only letters the logo does not have
-    seen = st.seen.split()
-    kin_ok = f"{c}.{form}" not in seen
-    if kin_ok:
-        # A sibling the logo has and the engine draws (not cut) says the body is not shared in this logo:
-        # موتنرو cuts its tall ن but draws its ت as a plain tooth, so ن's body is no ب's or ي's.
-        for q in siblings(c, form) + siblings(c, other):
-            for fq in (form, other):
-                if f"{q}.{fq}" in seen and f"{q}.{fq}" not in st.taken and (q in siblings(c, fq) or c in siblings(q, fq)):
-                    kin_ok = False
+    kin_ok = f"{c}.{form}" not in st.seen.split()
+    want = st.variants.get(f"{c}.{form}")
+    if ((want == ON_REH or (st.stem_kin and want is None)) and kin_ok and c in STEM_KIN and form in STEM_KIN[c]
+            and not any(f"{c}.{f}" in st.taken for f in (form, other))):
+        got = stem_from_reh(st, c, form)
+        if got is not None:
+            return got, None, True
     for letter, kin in [(c, False)] + [(q, True) for q in (siblings(c, form) if kin_ok else [])]:
         if f"{letter}.{form}" in st.taken:
             return st.taken[f"{letter}.{form}"], None, kin
@@ -537,7 +639,20 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         glyph.below = _below_range(glyph)
         joined = prev is not None and form in ("M", "F")
         if prev is not None:
-            if i in top:
+            pc, gc = _cut_span(prev.glyph), _cut_span(glyph)
+            if joined and pc and gc:
+                # two letters as the logo draws them: the logo's join is in them (the hairline of م,
+                # the arm two cups share), so they meet as they meet in the logo, with no join of the
+                # engine's between them
+                x = prev.x + pc[0] - gc[1]
+                # and where the one before ends in an upright arm and this one begins with an upright,
+                # they are one stroke, as two cups share an arm in the logo (and the arm of a cup rises
+                # into the ا after it)
+                a, b = _upright(prev.glyph, st, "left"), _upright(glyph, st, "right")
+                if a and b:
+                    x = prev.x + 0.5 * (a[0] + a[1]) - 0.5 * (b[0] + b[1])
+                joined = False
+            elif i in top:
                 # joined at the top: the bar reaches the left edge of the previous tooth
                 x = prev.x + prev.glyph.left - st.white - glyph.entry_edge
                 joined = False

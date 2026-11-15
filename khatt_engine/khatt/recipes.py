@@ -252,6 +252,7 @@ SKELETON = {"غ": "ع", "ج": "ح", "خ": "ح", "چ": "ح", "ة": "ه", "ی": "�
 
 
 REFERENCE = "من المرجع"         # the variant: built on the structure of the logo's reference typeface
+ON_REH = "على الراء"           # the variant: ا or ل drawn on the stroke of the logo's ر (typeset.stem_from_reh)
 
 
 # Letters that share one body and differ only by their marks, in the forms where they do: what the
@@ -365,4 +366,27 @@ def choices(st: Style) -> List[Dict]:
                             "options": [{"name": "المحرك", "note": "الحرف كما يبنيه المحرك بقواعد الشعار"},
                                         {"name": REFERENCE, "note": note}],
                             "set_by_designer": key in st.variants})
+    # ا and ل on the stroke of the logo's ر, where the logo draws its ر as an upright stem: the
+    # designer's call (on the other logos it fits less often than the engine's own ا)
+    from .typeset import STEM_KIN, stem_from_reh
+    probe = Style(**{**st.__dict__, "stem_kin": True})
+    note = "الحرف على جذع راء الشعار: الراء على السطر، مطالة إلى ارتفاع الحرف، وعقفتها وصلة إلى ما بعدها"
+    have = {(c["letter"], c["form"]): c for c in out}
+    for c, forms in STEM_KIN.items():
+        for f in forms:
+            key = f"{c}.{f}"
+            if key in st.seen.split() or key in st.taken or stem_from_reh(probe, c, f) is None:
+                continue
+            on = st.variants.get(key) == ON_REH or (st.stem_kin and key not in st.variants)
+            entry = have.get((c, f))
+            if entry is not None:
+                if not any(o["name"] == ON_REH for o in entry["options"]):
+                    entry["options"].append({"name": ON_REH, "note": note})
+                if on:
+                    entry["chosen"] = ON_REH
+                continue
+            out.append({"letter": c, "form": f, "chosen": ON_REH if on else (st.variants.get(key) or "المحرك"),
+                        "options": [{"name": "المحرك", "note": "الحرف كما يبنيه المحرك بقواعد الشعار"},
+                                    {"name": ON_REH, "note": note}],
+                        "set_by_designer": key in st.variants})
     return out
