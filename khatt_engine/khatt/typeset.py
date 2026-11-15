@@ -336,7 +336,8 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             try:
                 glyph = LETTERS[c][1](st, form)
                 if cache is not None:
-                    cache[(c, form, flags)] = (glyph, {d: _dep_value(st, d) for d in READS.get()})
+                    # sorted: a set's order changes from run to run, and the fits try values in this order
+                    cache[(c, form, flags)] = (glyph, {d: _dep_value(st, d) for d in sorted(READS.get())})
             finally:
                 JOIN.reset(tok)
                 if rtok is not None:

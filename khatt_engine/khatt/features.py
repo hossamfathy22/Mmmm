@@ -270,10 +270,14 @@ def measure_features(lines: List[Line], readings: List[Reading], src: int, k: fl
         put("angular", sk.angular, turns, "نصيب الزوايا من كل انعطاف في الهيكل (0 منحنيات، 1 زوايا)")
     if corners >= 2 and sk.corner_r == sk.corner_r:
         put("corner_r", sk.corner_r * k, corners, "نصف قطر الزاوية على الحافة الخارجية", "px")
-    if "tail_reach" not in out:
-        drops, reach = _reh_tails(L, R)
-        if drops:
-            put("tail_drop", _median(drops), len(drops), "نزول ذيل الراء والزاي والواو تحت السطر ÷ النزول (0 على السطر)")
+    # how far the tails of ر ز و drop is measured whenever the reading knows them (it used to be read
+    # only when no tail had given its reach, and the tail was then drawn to the full descender)
+    drops, reach = _reh_tails(L, R)
+    if drops:
+        D = max(L.descender, 0.45 * L.x_height)
+        put("tail_drop", _median(drops), len(drops), "نزول ذيل الراء والزاي والواو تحت السطر ÷ النزول (0 على السطر)")
+        put("tail_depth", _median(drops) * D * k, len(drops), "عمق ذيل الراء والزاي والواو تحت السطر", "px")
+        if "tail_reach" not in out:
             put("tail_reach", _median(reach), len(reach), "امتداد الذيل إلى اليسار بوحدة الجذع")
     tj = _top_joins(L, R)
     if tj:

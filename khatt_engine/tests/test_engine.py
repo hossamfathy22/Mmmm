@@ -890,3 +890,47 @@ def test_a_reh_hung_from_the_tooth_is_seen_with_a_short_tail():
     an = analyse(png, texts=["بير"], read=False)
     got = an["style"]
     assert got.top_join >= 0.5 and got.reh_corner > 0
+
+
+def test_a_picture_cropped_through_the_letters_is_named():
+    """Ink running into the edge of the picture: part of the letters may be cut off (a tail, a dot);
+    the guard says so and trusts the measuring less."""
+    from PIL import Image
+    from khatt.pipeline import analyse
+    png = to_png(typeset("بير", Style(slant=0.0)), height=300)
+    im = Image.open(io.BytesIO(png)).convert("L")
+    w, h = im.size
+    tight = im.crop((0, 0, w, int(0.62 * h)))           # the bottom cut off through the letters
+    b = io.BytesIO(); tight.save(b, "PNG")
+    full = analyse(png, texts=["بير"], read=False)["health"]
+    cut = analyse(b.getvalue(), texts=["بير"], read=False)["health"]
+    assert not any("حافة الصورة" in w["text"] for w in full["warnings"])
+    assert any("حافة الصورة" in w["text"] for w in cut["warnings"]) and cut["confidence"] < full["confidence"]
+
+
+def test_the_tail_is_drawn_as_deep_as_the_logo_draws_it():
+    from khatt.pipeline import analyse
+    st = Style(slant=0.0, tail_drop=0.55)
+    png = to_png(typeset("بر", st), height=300)
+    got = analyse(png, texts=["بر"], read=False)["style"]
+    depth = got.descender * got.tail_drop
+    assert depth == pytest.approx(st.descender * st.tail_drop, rel=0.25)
+
+
+def test_measuring_the_letters_gives_the_same_rules_on_every_run():
+    """The fits try parameters in order; that order must not hang on Python's hashing of strings,
+    which changes from run to run (a logo once measured 53% or 80% depending on it)."""
+    import os
+    import subprocess
+    import sys
+    code = ("import warnings; warnings.filterwarnings('ignore');"
+            "from pathlib import Path; from khatt.pipeline import analyse; from khatt.selfcheck import fit_letters;"
+            f"an = analyse(Path({str(EXAMPLE)!r}).read_bytes(), texts=['بيدوناق'], read=False);"
+            "L, k, st = an['lines'][an['src']], an['k'], an['style'];"
+            "from khatt import recipes; recipes.LEARNED['dal.base'] = 1.6;"
+            "print(sorted(fit_letters(L, 'بيدوناق', st, k)[0].items()))")
+    root = str(Path(__file__).parent.parent)
+    out = [subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=root,
+                          env={**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": root}).stdout.strip().splitlines()[-1]
+           for seed in ("1", "2")]
+    assert out[0] == out[1] and "dal.base" in out[0]

@@ -262,6 +262,15 @@ def prepare(data: bytes) -> Tuple[Image.Image, np.ndarray, float, bool, List[Not
         th, inverted = _polarity(gray)
         notes.append(_note("ground", f"الخلفية غير مستوية (فرق {uneven:.0f} درجة رمادية): سُوّيت قبل القياس.", uneven=uneven))
     ink = (gray > th) if inverted else (gray <= th)
+    # ink touching the edge of the picture as it came (before leveling adds margins): the picture was
+    # cropped too tight, and what lies beyond
+    # (a tail, a dot, the top of an alef) is not there to be measured
+    sides = {"الأعلى": ink[0], "الأسفل": ink[-1], "اليمين": ink[:, -1], "اليسار": ink[:, 0]}
+    cut = [name for name, edge in sides.items() if edge.sum() >= max(3, 0.004 * len(edge))]
+    if cut:
+        notes.append(_note("cut", "الحبر يلمس حافة الصورة من " + " و".join(cut)
+                           + ": قد يكون جزء من الحروف مقصوصًا (ذيل، نقطة، طرف ألف)، فتخرج قياساته ناقصة. استعمل صورة بهامش حول الكتابة.",
+                           sides=cut))
     angle, gain = baseline_rotation(ink)
     if abs(angle) >= 0.4 and gain > 1.04:
         ground = int(np.median(np.concatenate([gray[0], gray[-1], gray[:, 0], gray[:, -1]])))
@@ -351,6 +360,8 @@ def assess(lines, readings, src: int, notes: List[Note]) -> Dict[str, Any]:
             penalty += 0.25                                  # filled outlines are read roughly
         elif n["kind"] in ("rotation", "ground", "symbol", "contrast"):
             penalty += 0.05                                  # corrected, but a corrected picture is less sure
-    return {"corrections": [n for n in notes if n["kind"] != "warning"],
-            "warnings": [n for n in notes if n["kind"] == "warning"] + warn,
+        elif n["kind"] == "cut":
+            penalty += 0.1                                   # not corrected: what was cut off is not measured
+    return {"corrections": [n for n in notes if n["kind"] not in ("warning", "cut")],
+            "warnings": [n for n in notes if n["kind"] in ("warning", "cut")] + warn,
             "confidence": round(float(np.clip(1.0 - penalty, 0.0, 1.0)), 2)}

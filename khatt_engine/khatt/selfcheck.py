@@ -501,6 +501,7 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
     if take:
         from .typeset import shape_forms
         st.seen = " ".join(dict.fromkeys(f"{c}.{f}" for c, f in shape_forms(text) if f in "iIMF"))
+        _judge_tails(L, text, st, k)
     first = self_check(L, text, st, k)
     if first and take:
         first = _measure_rules(L, text, st, k, first)
@@ -558,6 +559,18 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
         first["letters_after"] = [{"letter": x["letter"], "form": x["form"], "match": x["match"]} for x in again["letters"]]
         first["overlay_after_png"] = again["overlay_png"]
     return _lengthen(L, text, st, k, first, again) if take else first
+
+
+def _judge_tails(L: Line, text: str, st: Style, k: float) -> None:
+    """How deep the tails go is measured from the lowest ink under ر ز و; a tail drawn to that depth
+    changes how the engine builds them, and in some logos builds them worse (Mootanroo's و drops off
+    the logo). The logo's own word judges: the measured depth, or a tail to the full descender."""
+    if st.tail_drop >= 0.999 or not any(c in "رزژو" for c in text):
+        return
+    a = self_check(L, text, st, k)
+    b = self_check(L, text, Style(**{**st.__dict__, "tail_drop": 1.0}), k)
+    if a and b and b["overall"] > a["overall"] + 0.005:
+        st.tail_drop = 1.0
 
 
 def _measure_rules(L: Line, text: str, st: Style, k: float, first: Dict[str, Any]) -> Dict[str, Any]:
