@@ -208,9 +208,9 @@ def parts_exam(words=PART_WORDS) -> Dict:
     logos (many more letters than sixteen logos give): each word, set in each typeface, is measured
     as a logo; every letter with a named part is hidden in turn, the parts are cut from the other
     letters, and the hidden letter is drawn: in the engine's construction, with the logo's parts as
-    they are, and with the parts fitted by how real typefaces size that part in the two letters (its
-    centre line resized, its widths kept). The typeface playing the logo is left out of every
-    reference: of the part sizes and of the real letters the drawings are read against."""
+    they are, and with parts also made from others (mirrored or turned) where the engine's
+    construction, or real typefaces, draw the two alike. The typeface playing the logo is left out of
+    every reference: of the parts' likeness and of the real letters the drawings are read against."""
     import numpy as np
     from ..letters import LETTERS
     from ..pipeline import TAKE_MIN, analyse
@@ -265,11 +265,12 @@ def parts_exam(words=PART_WORDS) -> Dict:
                                  "reads_parts": ok(placed[0].glyph) if placed else None})
     out = {"rows": rows, "cases": len(rows)}
     if rows:
-        a = np.array([(r["engine"], r["as_is"], r["fitted"]) for r in rows])
+        a = np.array([(r["engine"], r["as_is"], r["engine_subs"], r["real_subs"]) for r in rows])
         out["reads_engine"] = sum(1 for r in rows if r["reads_engine"]) / len(rows)
         out["reads_parts"] = sum(1 for r in rows if r["reads_parts"]) / len(rows)
-        out.update({"engine": float(a[:, 0].mean()), "as_is": float(a[:, 1].mean()), "fitted": float(a[:, 2].mean()),
-                    "better": int((a[:, 2] > a[:, 0] + 0.02).sum()), "worse": int((a[:, 2] < a[:, 0] - 0.02).sum())})
+        out.update({"engine": float(a[:, 0].mean()), "as_is": float(a[:, 1].mean()), "engine_subs": float(a[:, 2].mean()),
+                    "real_subs": float(a[:, 3].mean()),
+                    "better": int((a[:, 3] > a[:, 0] + 0.02).sum()), "worse": int((a[:, 3] < a[:, 0] - 0.02).sum())})
     return out
 
 
@@ -333,6 +334,9 @@ def main() -> int:
         return 1
     if a.parts:
         r = parts_exam()
+        if a.out:
+            out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+            (out / "parts.json").write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"على {r['cases']} حرفًا مخفيًا تغيّر رسمه: {r['engine'] * 100:.1f}% بصيغة المحرك، و{r['as_is'] * 100:.1f}% بقطع "
               f"الشعار كما هي، و{r['engine_subs'] * 100:.1f}% مع قطع مبدّلة بحكم المحرك، "
               f"و{r['real_subs'] * 100:.1f}% مع قطع مبدّلة بحكم الخطوط الحقيقية "
