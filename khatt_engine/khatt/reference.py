@@ -36,15 +36,59 @@ def faces() -> List[str]:
     return [str(p) for p in font_files()]
 
 
+def _mask_strokes(m: np.ndarray) -> List[List[Tuple[float, float, float]]]:
+    """The centre line of an inked shape, stroke by stroke: [(row, col, half-width in pixels)], spurs
+    pruned, smoothed along each stroke and kept every 3 pixels."""
+    from skimage.morphology import skeletonize
+    from .skeleton import _trace
+    H, W = m.shape
+    sk = skeletonize(m).astype(bool)
+    rad = ndi.distance_transform_edt(m)
+    # a thick stroke's skeleton grows short branches towards its corners and flared ends: a branch
+    # from a free end to a junction shorter than the stroke is wide there is pruned, until none is left
+    for _ in range(6):
+        nb = ndi.convolve(sk.astype(int), np.ones((3, 3), int), mode="constant") - 1
+        ends = sk & (nb == 1)
+        cut = False
+        for path in _trace(sk):
+            a, b = path[0], path[-1]
+            free_a, free_b = ends[a], ends[b]
+            if free_a == free_b:
+                continue
+            junction = b if free_a else a
+            if len(path) < 1.6 * rad[junction] + 2:
+                for q in (path[:-1] if free_a else path[1:]):
+                    sk[q] = False
+                cut = True
+        if not cut:
+            break
+    out = []
+    for path in _trace(sk):
+        if len(path) < 3:
+            continue
+        # smoothed along the stroke (a pixel staircase is not the drawn curve), every 3 pixels
+        arr = np.array(path, float)
+        if len(arr) >= 5:
+            k = np.ones(5) / 5
+            sm = np.vstack([np.convolve(np.pad(arr[:, j], 2, mode="edge"), k, mode="valid") for j in range(2)]).T
+            sm[0], sm[-1] = arr[0], arr[-1]
+            arr = sm
+        keep = [0] + [i for i in range(1, len(arr) - 1) if i % 3 == 0] + [len(arr) - 1]
+        pts = []
+        for r, c in arr[keep]:
+            ri, ci = int(round(min(max(r, 0), H - 1))), int(round(min(max(c, 0), W - 1)))
+            pts.append((float(r), float(c), float(rad[ri, ci])))
+        out.append(pts)
+    return out
+
+
 @lru_cache(maxsize=4096)
 def _structure(path: str, char: str, form: str):
     """The centre line of the letter's body in the typeface, in units of its tooth (x-height = 1):
     a list of strokes, each a list of (x, y, r) with r the typeface's half-width there; x = 0 at the
     right end of the body. None when the typeface has no such letter."""
-    from skimage.morphology import skeletonize
     from .bench.fonts import load, shape
     from .bench.truth import drop_marks, raster, x_height
-    from .skeleton import _trace
     face = load(path)
     text = FORMS[form].format(char)
     idx = text.index(char)
@@ -66,47 +110,12 @@ def _structure(path: str, char: str, form: str):
     m = drop_marks(m, PX)
     if m.sum() < 20:
         return None
-    sk = skeletonize(m).astype(bool)
-    rad = ndi.distance_transform_edt(m)
-    # a thick stroke's skeleton grows short branches towards its corners and flared ends: a branch
-    # from a free end to a junction shorter than the stroke is wide there is pruned, until none is left
-    for _ in range(6):
-        nb = ndi.convolve(sk.astype(int), np.ones((3, 3), int), mode="constant") - 1
-        ends = sk & (nb == 1)
-        cut = False
-        for path in _trace(sk):
-            a, b = path[0], path[-1]
-            free_a, free_b = ends[a], ends[b]
-            if free_a == free_b:
-                continue
-            junction = b if free_a else a
-            if len(path) < 1.6 * rad[junction] + 2:
-                for q in (path[:-1] if free_a else path[1:]):
-                    sk[q] = False
-                cut = True
-        if not cut:
-            break
     holes = ndi.binary_fill_holes(m) & ~m
     lab, nh = ndi.label(holes)
     counters = [float(np.sum(lab == i)) / (PX * PX) for i in range(1, nh + 1) if np.sum(lab == i) >= 0.004 * PX * PX]
     strokes = []
-    for path in _trace(sk):
-        if len(path) < 3:
-            continue
-        # smoothed along the stroke (a pixel staircase is not the typeface's curve), every 3 pixels
-        arr = np.array(path, float)
-        if len(arr) >= 5:
-            k = np.ones(5) / 5
-            sm = np.vstack([np.convolve(np.pad(arr[:, j], 2, mode="edge"), k, mode="valid") for j in range(2)]).T
-            sm[0], sm[-1] = arr[0], arr[-1]
-            arr = sm
-        keep = [0] + [i for i in range(1, len(arr) - 1) if i % 3 == 0] + [len(arr) - 1]
-        pts = []
-        for r, c in arr[keep]:
-            ri, ci = int(round(min(max(r, 0), H - 1))), int(round(min(max(c, 0), W - 1)))
-            x = (c - pad) / s + min(xs)
-            y = top - r / s
-            pts.append((x / X, y / X, float(rad[ri, ci]) / PX))
+    for path in _mask_strokes(m):
+        pts = [(((c - pad) / s + min(xs)) / X, (top - r / s) / X, rad / PX) for r, c, rad in path]
         if len(pts) >= 2:
             strokes.append(pts)
     if not strokes:
@@ -259,3 +268,94 @@ def nearest(L, text: str, st: Style, k: float, widths=WIDTHS) -> Optional[Dict]:
     if best:
         best["engine"] = base["overall"]
     return best
+
+
+# ------------------------------------------------------------------ a part of the logo fitted to another letter
+PART_PX = 6.0               # pixels per unit when a part's centre line is read
+FIT_RANGE = (0.6, 1.6)      # how far a part may be shortened or lengthened, made lower or taller
+
+
+def part_strokes(polys) -> List[List[Tuple[float, float, float]]]:
+    """The centre line of a part cut from the logo, in its own units: [(x, y, half-width)]."""
+    from PIL import Image, ImageDraw
+    rings = [r for r in polys if len(r) >= 3]
+    if not rings:
+        return []
+    xs = [x for r in rings for x, _ in r]; ys = [y for r in rings for _, y in r]
+    s = PART_PX
+    pad = 3
+    W, H = int((max(xs) - min(xs)) * s) + 2 * pad, int((max(ys) - min(ys)) * s) + 2 * pad
+    if W < 4 or H < 4 or W * H > 4_000_000:
+        return []
+    acc = np.zeros((H, W), bool)
+    for r in rings:                                   # even-odd: a ring inside another is a counter
+        layer = Image.new("L", (W, H), 0)
+        ImageDraw.Draw(layer).polygon([((x - min(xs)) * s + pad, (max(ys) - y) * s + pad) for x, y in r], fill=255)
+        acc ^= np.array(layer) > 0
+    if acc.sum() < 10:
+        return []
+    return [[((c - pad) / s + min(xs), max(ys) - (r - pad) / s, rad / s) for r, c, rad in path] for path in _mask_strokes(acc)]
+
+
+def draw_strokes(strokes, transform) -> List[List[Tuple[float, float]]]:
+    """Strokes (x, y, half-width) moved by `transform` (a point -> point function) and drawn again with
+    their own widths: the part changes its length and height, not its pen."""
+    from shapely.geometry import Point, Polygon
+    from shapely.ops import unary_union
+    shapes = []
+    for stroke in strokes:
+        pts = [(*transform(x, y), r) for x, y, r in stroke]
+        # the centre line stops short of the stroke's end by its half-width: put the end back
+        for end, j in ((0, 1), (len(pts) - 1, len(pts) - 2)):
+            if len(pts) < 2:
+                break
+            x0, y0, r0 = pts[end]
+            ux, uy = x0 - pts[j][0], y0 - pts[j][1]
+            d = math.hypot(ux, uy) or 1.0
+            pts[end] = (x0 + ux / d * r0, y0 + uy / d * r0, r0)
+        pieces = []
+        for (x0, y0, r0), (x1, y1, r1) in zip(pts, pts[1:]):
+            dx, dy = x1 - x0, y1 - y0
+            d = math.hypot(dx, dy)
+            if d < 1e-6:
+                continue
+            nx, ny = -dy / d, dx / d
+            pieces.append(Polygon([(x0 + nx * r0, y0 + ny * r0), (x1 + nx * r1, y1 + ny * r1),
+                                   (x1 - nx * r1, y1 - ny * r1), (x0 - nx * r0, y0 - ny * r0)]).buffer(0))
+        pieces += [Point(x, y).buffer(r, 12) for x, y, r in pts[1:-1]]
+        if pieces:
+            shapes.append(unary_union(pieces))
+    if not shapes:
+        return []
+    body = unary_union(shapes)
+    rings = []
+    for poly in getattr(body, "geoms", [body]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            rings.append(list(poly.exterior.coords)[:-1])
+            rings += [list(h.coords)[:-1] for h in poly.interiors]
+    return rings
+
+
+def box(rings):
+    xs = [x for r in rings for x, _ in r]; ys = [y for r in rings for _, y in r]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def fit_part(part: Dict, target) -> Optional[List[List[Tuple[float, float]]]]:
+    """The logo's part fitted to the engine's part of another letter: the box of the engine's part in
+    the letter it was cut from is mapped onto the box of the engine's part in this letter (right ends
+    and bottoms kept together, lengths and heights scaled within FIT_RANGE), and the logo's part,
+    read as a centre line, is drawn again on that map with its own widths."""
+    if not part.get("engine"):
+        return None
+    if "strokes" not in part:
+        part["strokes"] = part_strokes(part["polys"])
+    if not part["strokes"]:
+        return None
+    sx0, sy0, sx1, sy1 = box(part["engine"])
+    tx0, ty0, tx1, ty1 = box(target)
+    if sx1 - sx0 < 1e-6 or sy1 - sy0 < 1e-6:
+        return None
+    kx = float(np.clip((tx1 - tx0) / (sx1 - sx0), *FIT_RANGE))
+    ky = float(np.clip((ty1 - ty0) / (sy1 - sy0), *FIT_RANGE))
+    return draw_strokes(part["strokes"], lambda x, y: (tx1 + (x - sx1) * kx, ty0 + (y - sy0) * ky))

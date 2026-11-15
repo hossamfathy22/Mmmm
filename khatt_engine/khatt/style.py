@@ -51,6 +51,11 @@ class Style:
     # a part the logo lacks made from another of its parts, mirrored or turned: tried, and off (on 551
     # hidden letters it drew worse than the parts as they are, above all the cups of ل ن ي)
     derive_parts: bool = False
+    # a part of the logo fitted to the letter it goes into: its centre line lengthened or shortened, made
+    # taller or lower to the size of the engine's part there, and drawn again with its own widths
+    part_fit: bool = True
+    # the logo's parts may change how a letter looks, not what it reads as (legible.py)
+    part_legible: bool = True
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
     # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them

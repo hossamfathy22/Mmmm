@@ -575,6 +575,8 @@ def _check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) 
 
 
 # the parts that carry a logo's manner from letter to letter (named by the letter builders)
+PART_LIKE = 0.5            # how like the engine's part (IoU) a part cut from the logo must be to be kept (0.25 let
+                           # through heads and tails that made letters read as others: Mootanroo's head 0.49)
 PART_KINDS = ("كأس سفلي", "رأس", "ذيل", "ذيل الميم", "عروة", "ذراع الكاف", "كأس أيمن", "أنف الحاء")
 
 
@@ -662,6 +664,10 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
                 # (the letter's shapes are in its own frame; xr is in the word's, where the letter stands at p.x)
                 eng = [[[round(x + p.x - xr, 2), round(y, 2)] for x, y in poly]
                        for sh in flat(p.glyph.shapes) if getattr(sh, "name", "") == name for poly in sh if len(poly) >= 3]
+                # a cut that is not much like the part it is meant to be is a misplaced letter's ink
+                from .typeset import _same_part
+                if _same_part(polys, eng) < PART_LIKE:
+                    continue
                 out[name] = {"polys": polys, "engine": eng, "from": f"{p.char}.{p.form}", "index": i, "match": round(match, 3)}
     return out
 

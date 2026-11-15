@@ -354,8 +354,16 @@ def with_parts(glyph: Glyph, st: Style) -> Glyph:
         if found is None:
             return sh
         _, kind, t, dx, dy = found
+        polys = None
+        if st.part_fit and t == "id":
+            # the logo's part on the size of this letter's part, with the logo's own widths
+            from .reference import fit_part
+            got = fit_part(st.parts[kind], target)
+            if got:
+                polys = [[(x + xr, y) for x, y in ring] for ring in got]
+        if polys is None:
+            polys = [[(x + dx + xr, y + dy) for x, y in ring] for ring in _turn(st.parts[kind]["polys"], t)]
         used[0] = True
-        polys = [[(x + dx + xr, y + dy) for x, y in ring] for ring in _turn(st.parts[kind]["polys"], t)]
         return Tagged(polys, "logo", name)
     shapes = [swap(s) for s in glyph.shapes]
     if not used[0]:
@@ -446,8 +454,13 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             if got is not None:
                 glyph = got
         if st.parts and f"{c}.{form}" not in st.seen.split():
-            # a letter the logo lacks: its parts as the logo draws them, where the logo has them
-            glyph = with_parts(glyph, st)
+            # a letter the logo lacks: its parts as the logo draws them, where the logo has them, as
+            # long as it still reads as the letter it is
+            built = with_parts(glyph, st)
+            if built is not glyph:
+                from .legible import keeps_reading
+                if not st.part_legible or keeps_reading(glyph, built, c, form, st):
+                    glyph = built
         cut, borrowed, kin = find_cut(st, c, form)
         ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":

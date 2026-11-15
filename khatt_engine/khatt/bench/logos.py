@@ -200,7 +200,7 @@ def reference_summary(rows: List[Dict]) -> str:
 
 
 PART_WORDS = ("مفقود", "قلم ونور", "فن ولين", "سفر وزن",
-              "صوم فطر", "يعمل قعد", "نبع وكد", "طمع وفم")      # the last four need parts made from others
+              "صوم فطر", "يعمل قعد", "نبع وكد", "طمع وفم")      # the last four have parts few logos give
 
 
 def parts_exam(words=PART_WORDS) -> Dict:
@@ -208,7 +208,8 @@ def parts_exam(words=PART_WORDS) -> Dict:
     logos (many more letters than sixteen logos give): each word, set in each typeface, is measured
     as a logo; every letter with a named part is hidden in turn, the parts are cut from the other
     letters, and the hidden letter is drawn: in the engine's construction, with the logo's parts as
-    they are, and with parts also made from others (mirrored or turned)."""
+    they are, and with the logo's parts fitted to the letter's own part (its centre line resized,
+    its widths kept)."""
     import numpy as np
     from ..letters import LETTERS
     from ..pipeline import TAKE_MIN, analyse
@@ -240,17 +241,29 @@ def parts_exam(words=PART_WORDS) -> Dict:
                     continue
                 seen = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i)
                 got = {}
-                for mode, derive in (("as_is", False), ("derived", True)):
-                    r = self_check(L, w, Style(**{**st.__dict__, "parts": parts, "seen": seen, "derive_parts": derive}), k)
+                for mode, fit in (("as_is", False), ("fitted", True)):
+                    r = self_check(L, w, Style(**{**st.__dict__, "parts": parts, "seen": seen, "part_fit": fit}), k)
                     if r and len(r["letters"]) == len(base["letters"]):
                         got[mode] = r["letters"][i]["match"]
-                if len(got) == 2 and (abs(got["as_is"] - x["match"]) > 1e-9 or abs(got["derived"] - x["match"]) > 1e-9):
-                    rows.append({"font": f.stem, "word": w, "letter": f"{x['letter']}.{x['form']}",
-                                 "engine": x["match"], **got})
+                if len(got) == 2 and (abs(got["as_is"] - x["match"]) > 1e-9 or abs(got["fitted"] - x["match"]) > 1e-9):
+                    # and does the letter still read as itself, drawn the engine's way and with the parts?
+                    from ..legible import legible
+                    c, fm = x["letter"], x["form"]
+                    up = Style(**{**st.__dict__, "slant": 0.0})
+                    eng_g = LETTERS[c][1](up, fm)
+                    with_p = Style(**{**up.__dict__, "parts": parts, "seen": seen})
+                    from ..typeset import typeset as _ts
+                    from .truth import FORMS as _F
+                    placed = [p for p in _ts(_F[fm].format(c), with_p).placed if p.char == c]
+                    rows.append({"font": f.stem, "word": w, "letter": f"{c}.{fm}", "engine": x["match"], **got,
+                                 "reads_engine": legible(eng_g, c, fm, up),
+                                 "reads_parts": legible(placed[0].glyph, c, fm, up) if placed else None})
     out = {"rows": rows, "cases": len(rows)}
     if rows:
-        a = np.array([(r["engine"], r["as_is"], r["derived"]) for r in rows])
-        out.update({"engine": float(a[:, 0].mean()), "as_is": float(a[:, 1].mean()), "derived": float(a[:, 2].mean()),
+        a = np.array([(r["engine"], r["as_is"], r["fitted"]) for r in rows])
+        out["reads_engine"] = sum(1 for r in rows if r["reads_engine"]) / len(rows)
+        out["reads_parts"] = sum(1 for r in rows if r["reads_parts"]) / len(rows)
+        out.update({"engine": float(a[:, 0].mean()), "as_is": float(a[:, 1].mean()), "fitted": float(a[:, 2].mean()),
                     "better": int((a[:, 2] > a[:, 0] + 0.02).sum()), "worse": int((a[:, 2] < a[:, 0] - 0.02).sum())})
     return out
 
@@ -316,15 +329,16 @@ def main() -> int:
     if a.parts:
         r = parts_exam()
         print(f"على {r['cases']} حرفًا مخفيًا تغيّر رسمه: {r['engine'] * 100:.1f}% بصيغة المحرك، و{r['as_is'] * 100:.1f}% بقطع "
-              f"الشعار كما هي، و{r['derived'] * 100:.1f}% مع القطع المصنوعة منها بالانعكاس والتدوير "
-              f"(تحسّن {r['better']} وساء {r['worse']} عن صيغة المحرك).")
+              f"الشعار كما هي، و{r['fitted'] * 100:.1f}% بقطع الشعار مكيّفة على مقاس الحرف بسمكها "
+              f"(تحسّن {r['better']} وساء {r['worse']} عن صيغة المحرك). يُقرأ الحرف نفسه: "
+              f"{r['reads_engine'] * 100:.0f}% بصيغة المحرك، و{r['reads_parts'] * 100:.0f}% بقطع الشعار.")
         from collections import defaultdict
         by = defaultdict(list)
         for x in r["rows"]:
             by[x["letter"].split(".")[0]].append(x)
         for c, xs in sorted(by.items(), key=lambda kv: -len(kv[1])):
             m = lambda q: sum(x[q] for x in xs) / len(xs) * 100
-            print(f"  {c}: {len(xs)} — المحرك {m('engine'):.0f}%، كما هي {m('as_is'):.0f}%، مع المصنوعة {m('derived'):.0f}%")
+            print(f"  {c}: {len(xs)} — المحرك {m('engine'):.0f}%، كما هي {m('as_is'):.0f}%، مكيّفة {m('fitted'):.0f}%")
         return 0
     if a.reference:
         text = reference_summary(reference_exam(folder))

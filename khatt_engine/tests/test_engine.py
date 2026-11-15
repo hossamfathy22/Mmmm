@@ -949,7 +949,8 @@ def test_a_part_cut_from_the_logo_builds_the_letters_the_logo_lacks():
     xr = max(x for p in head for x, _ in p)
     engine_head = [[(x - xr, y) for x, y in p] for p in head]
     square = [[(-0.9 * X, 0.0), (0.0, 0.0), (0.0, 0.8 * X), (-0.9 * X, 0.8 * X)]]
-    logo = Style(**{**st.__dict__, "parts": {"رأس": {"polys": square, "engine": engine_head, "from": "م.I"}}, "seen": "م.I"})
+    logo = Style(**{**st.__dict__, "parts": {"رأس": {"polys": square, "engine": engine_head, "from": "م.I"}}, "seen": "م.I",
+                    "part_legible": False, "part_fit": False})
     fa = typeset("فب", logo).placed[0]
     assert ("logo", "رأس") in fa.parts                                 # ف takes the logo's head
     assert ("logo", "رأس") not in typeset("مب", logo).placed[0].parts  # م is in the logo: its own drawing
@@ -977,8 +978,27 @@ def test_a_part_the_logo_lacks_is_made_from_another_mirrored():
     xr = max(x for p in head for x, _ in p)
     eng = [[(x - xr, y) for x, y in p] for p in head]
     logo = Style(**{**st.__dict__, "parts": {"رأس": {"polys": eng, "engine": eng, "from": "ف.i"}}, "seen": "ف.i",
-                    "derive_parts": True})
+                    "derive_parts": True, "part_legible": False})
     assert ("logo", "عروة") in typeset("صب", logo).placed[0].parts
     off = Style(**{**logo.__dict__, "derive_parts": False})
     assert ("engine", "عروة") in typeset("صب", off).placed[0].parts
     assert Style().derive_parts is False
+
+
+def test_a_part_that_makes_a_letter_read_as_another_is_refused():
+    """The logo's parts may change how a letter looks, not what it reads as: a part that turns a
+    letter into another (judged by its skeleton among the style's own letters) is not used."""
+    from khatt.legible import keeps_reading, reads_as
+    from khatt.typeset import with_parts
+    st = Style(slant=0.0)
+    X = st.x_height
+    for c, f in (("ف", "I"), ("و", "i"), ("م", "I")):
+        assert reads_as(LETTERS[c][1](st, f), c, f, st) == c          # the engine's own letters read as themselves
+    head = [sh for sh in flat(LETTERS["م"][1](st, "I").shapes) if getattr(sh, "name", "") == "رأس"][0]
+    xr = max(x for p in head for x, _ in p)
+    eng = [[(x - xr, y) for x, y in p] for p in head]
+    bar = [[(-2.4 * X, 0.0), (0.0, 0.0), (0.0, 0.25 * X), (-2.4 * X, 0.25 * X)]]   # a "head" that is a flat bar
+    logo = Style(**{**st.__dict__, "parts": {"رأس": {"polys": bar, "engine": eng, "from": "م.I"}}, "seen": "م.I", "part_fit": False})
+    built = with_parts(LETTERS["و"][1](logo, "i"), logo)
+    assert not keeps_reading(LETTERS["و"][1](logo, "i"), built, "و", "i", logo)
+    assert ("logo", "رأس") not in typeset("و", logo).placed[0].parts      # refused: و keeps the engine's head
