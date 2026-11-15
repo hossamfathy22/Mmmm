@@ -359,3 +359,83 @@ def fit_part(part: Dict, target) -> Optional[List[List[Tuple[float, float]]]]:
     kx = float(np.clip((tx1 - tx0) / (sx1 - sx0), *FIT_RANGE))
     ky = float(np.clip((ty1 - ty0) / (sy1 - sy0), *FIT_RANGE))
     return draw_strokes(part["strokes"], lambda x, y: (tx1 + (x - sx1) * kx, ty0 + (y - sy0) * ky))
+
+
+# ------------------------------------------------------------------ parts as real typefaces size them
+# Words set in each reference typeface and cut into parts the way a logo is: they tell, from real
+# designs, how the same part differs from letter to letter (how a ق's head stands to a م's).
+REF_WORDS = ("مفقود", "قلم ونور", "فن ولين", "سفر وزن", "صوم فطر", "يعمل قعد", "نبع وكد", "طمع وفم",
+             "همم قمر", "فول قمح", "ممر عين", "نقد وفن", "هوى وفم", "ضرب وطن")
+_LIBRARY: Optional[Dict[str, Dict[str, Tuple[float, float]]]] = None
+
+
+def family(path_or_stem: str) -> str:
+    from pathlib import Path
+    stem = Path(path_or_stem).stem
+    return stem.rsplit("-", 1)[0] if stem.rsplit("-", 1)[-1].isdigit() else stem
+
+
+def part_library(rebuild: bool = False, log=None) -> Dict[str, Dict[str, Tuple[float, float]]]:
+    """{typeface: {"letter.form|part": (width, height) in x-heights}}, read once and kept on disk."""
+    global _LIBRARY
+    import json
+    import os
+    from pathlib import Path
+    if _LIBRARY is not None and not rebuild:
+        return _LIBRARY
+    cache = Path(os.environ.get("KHATT_CACHE", Path.home() / ".cache" / "khatt")) / "ref_parts.json"
+    paths = [f for f in faces() if f.endswith("-400.woff2")]
+    if cache.exists() and not rebuild:
+        try:
+            data = json.loads(cache.read_text(encoding="utf-8"))
+            if data.get("fonts") == sorted(Path(p).stem for p in paths) and data.get("words") == list(REF_WORDS):
+                _LIBRARY = {f: {k: tuple(v) for k, v in d.items()} for f, d in data["parts"].items()}
+                return _LIBRARY
+        except (ValueError, KeyError):
+            pass
+    from .bench.fonts import load
+    from .bench.truth import png, word_image
+    from .pipeline import TAKE_MIN, analyse
+    from .selfcheck import take_parts
+    lib: Dict[str, Dict[str, Tuple[float, float]]] = {}
+    for p in paths:
+        face = load(p)
+        got: Dict[str, Tuple[float, float, float]] = {}
+        for w in REF_WORDS:
+            try:
+                an = analyse(png(word_image(face, w, x_px=90)[0]), texts=[w], read=False)
+            except Exception:
+                continue
+            if an["health"]["confidence"] < TAKE_MIN:
+                continue
+            L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+            for e in take_parts(L, w, st, k, every=True):
+                x0, y0, x1, y1 = box(e["polys"])
+                key = f"{e['from']}|{e['name']}"
+                if key not in got or e["match"] > got[key][2]:
+                    got[key] = ((x1 - x0) / st.x_height, (y1 - y0) / st.x_height, e["match"])
+        lib[Path(p).stem] = {k: (round(v[0], 4), round(v[1], 4)) for k, v in got.items()}
+        if log:
+            log(f"{Path(p).stem}: {len(got)}")
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps({"fonts": sorted(lib), "words": list(REF_WORDS), "parts": lib}, ensure_ascii=False),
+                     encoding="utf-8")
+    _LIBRARY = lib
+    return lib
+
+
+def part_ratio(source: str, target: str, name: str, skip: str = "", least: int = 3) -> Optional[Tuple[float, float]]:
+    """How the part `name` of letter form `target` stands to the same part of `source` in real typefaces:
+    the median ratio of their widths and of their heights over the typefaces that have both (`skip`:
+    a typeface family left out, the one standing in for the logo in the examination)."""
+    lib = part_library()
+    kx, ky = [], []
+    for font, parts in lib.items():
+        if skip and family(font) == skip:
+            continue
+        a, b = parts.get(f"{source}|{name}"), parts.get(f"{target}|{name}")
+        if a and b and a[0] > 0 and a[1] > 0:
+            kx.append(b[0] / a[0]); ky.append(b[1] / a[1])
+    if len(kx) < least:
+        return None
+    return float(np.median(kx)), float(np.median(ky))

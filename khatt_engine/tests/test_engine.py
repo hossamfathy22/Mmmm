@@ -1028,3 +1028,27 @@ def test_the_designer_can_lengthen_raise_and_thin_a_part_of_the_logo():
     out = draw(logo.to_dict(), "فب", params={"قطعة.رأس.سمك": 0.8})
     h = {x["name"]: x for x in out["handles"]}["قطعة.رأس.طول"]
     assert h["used"] and h["value"] == 1.0
+
+
+def test_real_typefaces_say_how_a_part_differs_from_letter_to_letter():
+    """The parts of words set in the open typefaces, cut the way a logo's are: the ratio between the
+    same part in two letters comes from real designs, and a typeface can be left out of it."""
+    from khatt.reference import faces, part_library, part_ratio
+    if not [f for f in faces() if f.endswith("-400.woff2")]:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    lib = part_library()
+    assert len(lib) >= 10 and sum(len(v) for v in lib.values()) >= 100
+    got = part_ratio("و.F", "م.I", "رأس")
+    assert got is not None and 0.6 < got[0] < 1.6 and 0.6 < got[1] < 1.6
+    fam = next(iter(lib)).rsplit("-", 1)[0]
+    assert part_ratio("و.F", "م.I", "رأس", skip=fam) is not None
+
+
+def test_letters_are_read_against_real_typefaces_too():
+    from khatt.legible import reads_as_real
+    from khatt.reference import faces
+    if not [f for f in faces() if "vazirmatn-400" in f]:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    st = Style(slant=0.0)
+    for c, f in (("و", "i"), ("ر", "i"), ("ح", "I"), ("ك", "i")):
+        assert reads_as_real(LETTERS[c][1](st, f), f, st) == c

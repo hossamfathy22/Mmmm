@@ -58,6 +58,10 @@ class Style:
     part_fit: bool = False
     # the logo's parts may change how a letter looks, not what it reads as (legible.py)
     part_legible: bool = True
+    # a part moved from one letter to another takes the difference real typefaces make between the two
+    # letters' parts (reference.part_ratio), its pen kept
+    part_ref_fit: bool = True
+    ref_skip: str = ""          # a typeface family left out of the references (the one playing the logo in the examination)
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
     # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them

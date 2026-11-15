@@ -313,7 +313,7 @@ def _placement(engine_src, target, t: str):
     return dx, dy, [[(x + dx, y + dy) for x, y in r] for r in src]
 
 
-def with_parts(glyph: Glyph, st: Style) -> Glyph:
+def with_parts(glyph: Glyph, st: Style, key: str = "") -> Glyph:
     """The letter with each of its parts the logo draws (st.parts) put in place of the engine's: the
     logo's part keeps where it stood against the engine's part in the letter it was cut from. A part
     the logo lacks may be made from another of its parts, mirrored or turned, when the engine's own
@@ -366,6 +366,18 @@ def with_parts(glyph: Glyph, st: Style) -> Glyph:
         # the designer's hand on the part: longer or shorter, taller or lower, thicker or thinner; the
         # part is drawn again from its centre line, so a longer part keeps its pen unless asked otherwise
         kl, kh, kw = (float(st.params.get(f"قطعة.{kind}.{w}", 1.0)) for w in ("طول", "ارتفاع", "سمك"))
+        # and, before the designer's hand, the difference real typefaces make between the letter the
+        # part was cut from and this one
+        if st.part_ref_fit and key and t == "id" and kind == name and st.parts[kind].get("from") and st.parts[kind]["from"] != key:
+            from .reference import part_ratio
+            got = part_ratio(st.parts[kind]["from"], key, kind, st.ref_skip)
+            if got:
+                kl *= min(1.6, max(0.6, got[0]))
+                kh *= min(1.6, max(0.6, got[1]))
+                if abs(kl - 1) < 0.04:
+                    kl = 1.0
+                if abs(kh - 1) < 0.04:
+                    kh = 1.0
         if (kl, kh, kw) != (1.0, 1.0, 1.0):
             from .reference import draw_strokes, part_strokes
             strokes = part_strokes(polys)
@@ -469,7 +481,7 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         if st.parts and f"{c}.{form}" not in st.seen.split():
             # a letter the logo lacks: its parts as the logo draws them, where the logo has them, as
             # long as it still reads as the letter it is
-            built = with_parts(glyph, st)
+            built = with_parts(glyph, st, f"{c}.{form}")
             if built is not glyph:
                 from .legible import keeps_reading
                 # a part the designer has set by hand is their judgement, not the reader's

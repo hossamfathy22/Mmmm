@@ -107,12 +107,61 @@ def keeps_reading(engine: Glyph, drawn: Glyph, char: str, form: str, st: Style) 
     # the parts by what they are, not by where they sit in memory (a dict freed and made again can
     # land at the same address with other parts in it)
     parts = tuple((q, v.get("from"), tuple(tuple(p) for p in v["polys"][0][:4])) for q, v in sorted(st.parts.items()) if v.get("polys"))
-    key = (_key(st, form), char, parts)
+    key = (_key(st, form), char, parts, st.ref_skip, st.part_ref_fit)
     if key in _KEPT:
         return _KEPT[key]
-    was, now = reads_as(engine, char, form, st), reads_as(drawn, char, form, st)
-    ok = now is None or now == was or _same(now, SKELETON.get(char, char), form) or _same(now, char, form)
+    def fine(now, was):
+        return now is None or now == was or _same(now, SKELETON.get(char, char), form) or _same(now, char, form)
+    # two judges: the engine's alphabet of this style, and real typefaces' letters
+    ok = fine(reads_as(drawn, char, form, st), reads_as(engine, char, form, st))
+    if ok:
+        ok = fine(reads_as_real(drawn, form, st), reads_as_real(engine, form, st))
     if len(_KEPT) > 4096:
         _KEPT.clear()
     _KEPT[key] = ok
     return ok
+
+
+# ------------------------------------------------------------------ read against real letters too
+# The engine's own alphabet is one judge; real typefaces are another, that does not share the
+# engine's weaknesses (its joined ف and ق, say). A few typefaces of different kinds.
+READERS = ("vazirmatn", "amiri", "noto-naskh-arabic", "cairo", "reem-kufi", "tajawal", "el-messiri", "changa")
+_REAL: Dict[Tuple[str, str], Dict[str, object]] = {}
+
+
+def _real_refs(form: str, skip: str = "") -> Dict[str, object]:
+    """Letters of the reading typefaces in `form` (their bodies, on the comparison canvas), labelled
+    "letter|typeface"; `skip` leaves a family out."""
+    key = (form, skip)
+    if key not in _REAL:
+        from .bench.__main__ import SKELETONS
+        from .bench.fonts import load
+        from .bench.score import BASE_ROW, CANVAS, PX, RIGHT_COL, Shape
+        from .bench.truth import letter_mask, x_height
+        from .reference import faces, family
+        refs = {}
+        for path in faces():
+            fam = family(path)
+            if not path.endswith("-400.woff2") or fam not in READERS or fam == skip:
+                continue
+            face = load(path)
+            cmap = face.tt.getBestCmap()
+            X = x_height(face)
+            for c in SKELETONS:
+                if ord(c) not in cmap or (form in ("I", "M") and LETTERS[c][0] != "D"):
+                    continue
+                m = letter_mask(face, c, form, PX, CANVAS, BASE_ROW, RIGHT_COL, X)
+                if m is not None and m.any():
+                    refs[f"{c}|{fam}"] = Shape(m)
+        _REAL[key] = refs
+    return _REAL[key]
+
+
+def reads_as_real(glyph: Glyph, form: str, st: Style) -> Optional[str]:
+    """The letter `glyph` reads as among real typefaces' letters."""
+    from .bench.score import read
+    x = _shape(glyph, st)
+    refs = _real_refs(form, st.ref_skip)
+    if x is None or x.empty or not refs:
+        return None
+    return read(x, refs)[0].split("|")[0]

@@ -580,13 +580,14 @@ PART_LIKE = 0.5            # how like the engine's part (IoU) a part cut from th
 PART_KINDS = ("كأس سفلي", "رأس", "ذيل", "ذيل الميم", "عروة", "ذراع الكاف", "كأس أيمن", "أنف الحاء")
 
 
-def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = None) -> Dict[str, Dict]:
+def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = None, every: bool = False):
     """Cut the parts of the logo's letters out of the logo: each letter of the word is drawn in the
     engine's construction and laid on the logo where it covers it best; the logo's ink that is that
     letter's is shared among the letter's parts, each pixel to the nearest; a part's share is that
     part as the logo draws it. Kept where the letter matches the logo at least roughly and the part
     is of a size with the engine's. The best-matching letter gives each kind of part.
-    `skip`: a letter whose ink gives nothing (the held-out examination)."""
+    `skip`: a letter whose ink gives nothing (the held-out examination). `every`: every part of every
+    letter, as a list (to learn from typefaces how the same part differs from letter to letter)."""
     from skimage.measure import find_contours
     text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
     if not text or not L.stems:
@@ -635,7 +636,7 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
         part_of = dists.argmin(axis=0)
         close = dists.min(axis=0) <= 0.35 * pitch       # ink far from every part of the letter is no part of it
         for q, (name, mm, xr) in enumerate(subs):
-            if name not in PART_KINDS or (name in out and out[name]["match"] >= match):
+            if name not in PART_KINDS or (not every and name in out and out[name]["match"] >= match):
                 continue
             ink = mine & (part_of == q) & close
             if not (0.4 * mm.sum() <= ink.sum() <= 2.5 * mm.sum()):
@@ -668,8 +669,12 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
                 from .typeset import _same_part
                 if _same_part(polys, eng) < PART_LIKE:
                     continue
-                out[name] = {"polys": polys, "engine": eng, "from": f"{p.char}.{p.form}", "index": i, "match": round(match, 3)}
-    return out
+                entry = {"polys": polys, "engine": eng, "from": f"{p.char}.{p.form}", "index": i, "match": round(match, 3)}
+                if every:
+                    out.setdefault("_all", []).append({**entry, "name": name})
+                else:
+                    out[name] = entry
+    return out.get("_all", []) if every else out
 
 
 def _judge_tails(L: Line, text: str, st: Style, k: float) -> None:
