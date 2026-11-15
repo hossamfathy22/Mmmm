@@ -607,7 +607,7 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
     owner = dist.argmin(axis=0)
     near = dist.min(axis=0) <= 0.6 * pitch
     out: Dict[str, Dict] = {}
-    for i, (p, m, dx, _) in enumerate(slid):
+    for i, (p, m, dx, join) in enumerate(slid):
         if i == skip:
             continue
         mine = logo & (owner == i) & near
@@ -625,11 +625,17 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
                 subs.append((getattr(sh, "name", ""), mm, max(x for poly in polys for x, _ in poly)))
         if not any(n in PART_KINDS for n, _, _ in subs):
             continue
-        part_of = np.stack([ndi.distance_transform_edt(~mm) for _, mm, _ in subs]).argmin(axis=0)
+        # the join to the next letter takes its own ink, or it would go to the nearest part (a stub on
+        # a head, carried wherever the head is used)
+        if join is not None and join.any():
+            subs.append(("وصلة", join, 0.0))
+        dists = np.stack([ndi.distance_transform_edt(~mm) for _, mm, _ in subs])
+        part_of = dists.argmin(axis=0)
+        close = dists.min(axis=0) <= 0.35 * pitch       # ink far from every part of the letter is no part of it
         for q, (name, mm, xr) in enumerate(subs):
             if name not in PART_KINDS or (name in out and out[name]["match"] >= match):
                 continue
-            ink = mine & (part_of == q)
+            ink = mine & (part_of == q) & close
             if not (0.4 * mm.sum() <= ink.sum() <= 2.5 * mm.sum()):
                 continue
             rings = []

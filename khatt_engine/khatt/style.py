@@ -48,6 +48,9 @@ class Style:
     # parts of letters as the logo draws them (selfcheck.take_parts): part name -> outlines, relative to
     # the right end of the engine's part; they stand in for that part in every letter the logo lacks
     parts: Dict[str, Dict] = field(default_factory=dict)
+    # a part the logo lacks made from another of its parts, mirrored or turned: tried, and off (on 551
+    # hidden letters it drew worse than the parts as they are, above all the cups of ل ن ي)
+    derive_parts: bool = False
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
     # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them

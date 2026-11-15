@@ -199,18 +199,20 @@ def reference_summary(rows: List[Dict]) -> str:
     return "\n".join(lines)
 
 
-PART_WORDS = ("مفقود", "قلم ونور", "فن ولين", "سفر وزن")
+PART_WORDS = ("مفقود", "قلم ونور", "فن ولين", "سفر وزن",
+              "صوم فطر", "يعمل قعد", "نبع وكد", "طمع وفم")      # the last four need parts made from others
 
 
 def parts_exam(words=PART_WORDS) -> Dict:
     """Do the parts of a logo's letters build the letters it lacks? The open typefaces stand in for
     logos (many more letters than sixteen logos give): each word, set in each typeface, is measured
-    as a logo; every letter with a head, a cup or a tail is hidden in turn, the parts are cut from
-    the other letters, and the hidden letter is drawn with them, against the engine's own."""
+    as a logo; every letter with a named part is hidden in turn, the parts are cut from the other
+    letters, and the hidden letter is drawn: in the engine's construction, with the logo's parts as
+    they are, and with parts also made from others (mirrored or turned)."""
     import numpy as np
     from ..letters import LETTERS
     from ..pipeline import TAKE_MIN, analyse
-    from ..selfcheck import PART_KINDS, self_check, take_parts
+    from ..selfcheck import self_check, take_parts
     from ..style import Style
     from ..typeset import flat
     from .fonts import font_files, load
@@ -230,20 +232,27 @@ def parts_exam(words=PART_WORDS) -> Dict:
             if not base:
                 continue
             for i, x in enumerate(base["letters"]):
-                mine = {getattr(sh, "name", "") for sh in flat(LETTERS[x["letter"]][1](st, x["form"]).shapes)} & set(PART_KINDS)
-                parts = take_parts(L, w, st, k, skip=i) if mine else {}
-                use = mine & set(parts)
-                if not use:
+                names = {getattr(sh, "name", "") for sh in flat(LETTERS[x["letter"]][1](st, x["form"]).shapes)} - {""}
+                if not names:
+                    continue
+                parts = take_parts(L, w, st, k, skip=i)
+                if not parts:
                     continue
                 seen = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i)
-                r = self_check(L, w, Style(**{**st.__dict__, "parts": parts, "seen": seen}), k)
-                if r and len(r["letters"]) == len(base["letters"]):
-                    rows.append({"font": f.stem, "word": w, "letter": f"{x['letter']}.{x['form']}", "parts": sorted(use),
-                                 "engine": x["match"], "with_parts": r["letters"][i]["match"]})
-    a = np.array([(r["engine"], r["with_parts"]) for r in rows]) if rows else np.zeros((0, 2))
-    return {"rows": rows, "cases": len(rows), "engine": float(a[:, 0].mean()) if rows else 0.0,
-            "with_parts": float(a[:, 1].mean()) if rows else 0.0,
-            "better": int((a[:, 1] > a[:, 0] + 0.02).sum()), "worse": int((a[:, 1] < a[:, 0] - 0.02).sum())}
+                got = {}
+                for mode, derive in (("as_is", False), ("derived", True)):
+                    r = self_check(L, w, Style(**{**st.__dict__, "parts": parts, "seen": seen, "derive_parts": derive}), k)
+                    if r and len(r["letters"]) == len(base["letters"]):
+                        got[mode] = r["letters"][i]["match"]
+                if len(got) == 2 and (abs(got["as_is"] - x["match"]) > 1e-9 or abs(got["derived"] - x["match"]) > 1e-9):
+                    rows.append({"font": f.stem, "word": w, "letter": f"{x['letter']}.{x['form']}",
+                                 "engine": x["match"], **got})
+    out = {"rows": rows, "cases": len(rows)}
+    if rows:
+        a = np.array([(r["engine"], r["as_is"], r["derived"]) for r in rows])
+        out.update({"engine": float(a[:, 0].mean()), "as_is": float(a[:, 1].mean()), "derived": float(a[:, 2].mean()),
+                    "better": int((a[:, 2] > a[:, 0] + 0.02).sum()), "worse": int((a[:, 2] < a[:, 0] - 0.02).sum())})
+    return out
 
 
 def held_out_summary(rows: List[Dict]) -> str:
@@ -306,8 +315,16 @@ def main() -> int:
         return 1
     if a.parts:
         r = parts_exam()
-        print(f"على {r['cases']} حرفًا مخفيًا: {r['engine'] * 100:.1f}% بصيغة المحرك، و{r['with_parts'] * 100:.1f}% بقطع "
-              f"الحروف الأخرى المقصوصة من الشعار (تحسّن {r['better']} وساء {r['worse']}).")
+        print(f"على {r['cases']} حرفًا مخفيًا تغيّر رسمه: {r['engine'] * 100:.1f}% بصيغة المحرك، و{r['as_is'] * 100:.1f}% بقطع "
+              f"الشعار كما هي، و{r['derived'] * 100:.1f}% مع القطع المصنوعة منها بالانعكاس والتدوير "
+              f"(تحسّن {r['better']} وساء {r['worse']} عن صيغة المحرك).")
+        from collections import defaultdict
+        by = defaultdict(list)
+        for x in r["rows"]:
+            by[x["letter"].split(".")[0]].append(x)
+        for c, xs in sorted(by.items(), key=lambda kv: -len(kv[1])):
+            m = lambda q: sum(x[q] for x in xs) / len(xs) * 100
+            print(f"  {c}: {len(xs)} — المحرك {m('engine'):.0f}%، كما هي {m('as_is'):.0f}%، مع المصنوعة {m('derived'):.0f}%")
         return 0
     if a.reference:
         text = reference_summary(reference_exam(folder))

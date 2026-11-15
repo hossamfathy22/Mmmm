@@ -291,23 +291,72 @@ def _same_part(a, b) -> float:
     return A.intersection(B).area / u if u else 0.0
 
 
+TRANSFORMS = {"id": (1, 1), "mx": (-1, 1), "my": (1, -1), "r180": (-1, -1)}
+PART_DERIVED = 0.55      # a part made from another (mirrored or turned) must match this well in the engine's own construction
+
+
+def _turn(rings, t: str):
+    """Mirror or turn outlines (a turn by 180 degrees is both mirrors): a pen thick on verticals and
+    thin on horizontals stays so under all of these; a quarter turn would swap them, and is not used."""
+    a, b = TRANSFORMS[t]
+    return [[(a * x, b * y) for x, y in ring] for ring in rings]
+
+
+def _placement(engine_src, target, t: str):
+    """How to move the source part, once turned, onto the target: right ends together, and (when
+    turned) bottoms together. Returns (dx, dy, the source engine part placed) or None."""
+    src = _turn(engine_src, t)
+    if not src or not target:
+        return None
+    dx = -max(x for r in src for x, _ in r)
+    dy = 0.0 if t == "id" else min(y for r in target for _, y in r) - min(y for r in src for _, y in r)
+    return dx, dy, [[(x + dx, y + dy) for x, y in r] for r in src]
+
+
 def with_parts(glyph: Glyph, st: Style) -> Glyph:
     """The letter with each of its parts the logo draws (st.parts) put in place of the engine's: the
-    logo's part keeps where it stood against the engine's part in the letter it was cut from."""
+    logo's part keeps where it stood against the engine's part in the letter it was cut from. A part
+    the logo lacks may be made from another of its parts, mirrored or turned, when the engine's own
+    two parts match so (the loop of ص from the head of و, the back cup of ع from the cup of ن)."""
     used = [False]
+
+    def best_source(name, target):
+        best = None
+        for kind, part in st.parts.items():
+            if not part.get("engine"):
+                continue
+            for t in TRANSFORMS:
+                if t == "id" and kind != name and not st.derive_parts:
+                    continue
+                if t != "id" and not st.derive_parts:
+                    continue
+                if kind == name and t != "id":
+                    continue                       # the part itself is used as it is
+                got = _placement(part["engine"], target, t)
+                if got is None:
+                    continue
+                v = _same_part(got[2], target)
+                need = PART_SAME if (kind == name and t == "id") else PART_DERIVED
+                if v >= need and (best is None or v > best[0]):
+                    best = (v, kind, t, got[0], got[1])
+        return best
 
     def swap(sh):
         if isinstance(sh, Compound):
             return Compound(swap(sub) for sub in sh)
         name = getattr(sh, "name", "")
-        part = st.parts.get(name)
-        if not part or not any(len(poly) >= 3 for poly in sh):
+        rings = [p for p in sh if len(p) >= 3]
+        if not name or not rings or (name not in st.parts and not st.derive_parts):
             return sh
-        xr = max(x for poly in sh for x, _ in poly)
-        if part.get("engine") and _same_part(part["engine"], [[(x - xr, y) for x, y in poly] for poly in sh]) < PART_SAME:
-            return sh                        # the same name, another part (the tail of و is not the tail of ر)
+        xr = max(x for poly in rings for x, _ in poly)
+        target = [[(x - xr, y) for x, y in poly] for poly in rings]
+        found = best_source(name, target)
+        if found is None:
+            return sh
+        _, kind, t, dx, dy = found
         used[0] = True
-        return Tagged([[(x + xr, y) for x, y in ring] for ring in part["polys"]], "logo", name)
+        polys = [[(x + dx + xr, y + dy) for x, y in ring] for ring in _turn(st.parts[kind]["polys"], t)]
+        return Tagged(polys, "logo", name)
     shapes = [swap(s) for s in glyph.shapes]
     if not used[0]:
         return glyph

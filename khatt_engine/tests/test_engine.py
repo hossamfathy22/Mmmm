@@ -967,3 +967,18 @@ def test_parts_are_cut_from_a_logo_drawn_with_them():
     parts = take_parts(an["lines"][an["src"]], "مور", an["style"], an["k"])
     assert "رأس" in parts and parts["رأس"]["from"] in ("م.I", "و.F")
     assert "ذيل" in parts and parts["ذيل"]["polys"]
+
+
+def test_a_part_the_logo_lacks_is_made_from_another_mirrored():
+    """The logo gives only a head; the loop of ص ط, which the engine draws as a head mirrored, is made
+    from it when making parts is asked for; it is off by default (the examination found it worse)."""
+    st = Style(slant=0.0)
+    head = [sh for sh in flat(LETTERS["ف"][1](st, "i").shapes) if getattr(sh, "name", "") == "رأس"][0]
+    xr = max(x for p in head for x, _ in p)
+    eng = [[(x - xr, y) for x, y in p] for p in head]
+    logo = Style(**{**st.__dict__, "parts": {"رأس": {"polys": eng, "engine": eng, "from": "ف.i"}}, "seen": "ف.i",
+                    "derive_parts": True})
+    assert ("logo", "عروة") in typeset("صب", logo).placed[0].parts
+    off = Style(**{**logo.__dict__, "derive_parts": False})
+    assert ("engine", "عروة") in typeset("صب", off).placed[0].parts
+    assert Style().derive_parts is False
