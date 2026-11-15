@@ -27,6 +27,9 @@ from .style import Style
 from .typeset import flat, typeset
 
 GOOD, FAIR = 0.75, 0.55          # share of common ink over all ink (IoU)
+# a letter that does not match fully may be taken from the logo: what the logo draws of a letter it
+# contains is the designer's own drawing. Whether the cut is kept is judged by check_and_take.
+CUT_BELOW = GOOD
 FORM_AR = {"i": "منفصل", "I": "أول", "M": "وسط", "F": "آخر"}
 
 
@@ -41,10 +44,10 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
     from skimage.measure import find_contours
     good = np.zeros_like(logo) if joins is None else joins.copy()      # a join's ink is no letter's to take
     for (p, m, dx), x in zip(glyphs, letters):
-        if x["verdict"] != "يختلف":
+        if x["match"] >= CUT_BELOW:
             good |= m
     rest = logo & ~ndi.binary_dilation(good, iterations=max(1, int(round(0.06 * pitch))))
-    bad = [(i, p, m, dx) for i, ((p, m, dx), x) in enumerate(zip(glyphs, letters)) if x["verdict"] == "يختلف"]
+    bad = [(i, p, m, dx) for i, ((p, m, dx), x) in enumerate(zip(glyphs, letters)) if x["match"] < CUT_BELOW]
     if not rest.any() or not bad:
         return {}
     # every leftover piece goes to the nearest letter that did not match. A piece of a run of ink that
@@ -60,7 +63,7 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
     def edge(idx: int, side: str) -> Optional[float]:
         cols = np.flatnonzero(glyphs[idx][1].any(axis=0))
         return None if not len(cols) else float(cols[0] if side == "left" else cols[-1])
-    matched = [x["verdict"] != "يختلف" for x in letters]
+    matched = [x["match"] >= CUT_BELOW for x in letters]
     centre = np.array([0.0] + [float(np.argwhere(lab == q)[:, 1].mean()) for q in range(1, n + 1)])
     bounds = []
     for i, p, m, dx in bad:
@@ -91,7 +94,7 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
             continue
         # The letter that did not match was placed by a poor fit; its neighbour on the right matched,
         # so the cut is kept where the logo has it relative to that neighbour.
-        if i > 0 and letters[i - 1]["verdict"] != "يختلف":
+        if i > 0 and letters[i - 1]["match"] >= CUT_BELOW:
             dx = glyphs[i - 1][2]
         # outlines of the cut, in engine units relative to the placed letter (x = 0 at its right edge);
         # traced on the grey picture where there is one, for edges finer than a pixel
@@ -244,7 +247,7 @@ def self_check(L: Line, text: str, st: Style, k: float) -> Optional[Dict[str, An
                         "verdict": "يطابق" if iou >= GOOD else ("قريب" if iou >= FAIR else "يختلف")})
     overall = float((union & logo).sum()) / max(1.0, float((union | logo).sum()))
     differ = [x for x in letters if x["verdict"] == "يختلف"]
-    taken = _take(logo, glyphs, letters, s, x_of, base_row, pitch, np.asarray(L.G, float), float(L.level), joins) if differ else {}
+    taken = _take(logo, glyphs, letters, s, x_of, base_row, pitch, np.asarray(L.G, float), float(L.level), joins) if any(x["match"] < CUT_BELOW for x in letters) else {}
     notes = []
     if differ:
         notes.append("الشعار يرسم " + "، ".join(f"«{x['letter']}»" for x in differ)
@@ -268,7 +271,91 @@ GAP_GRID = (-0.3, -0.2, -0.1)          # a letter that only leaves white after i
 SLIDE_COST = 0.02
 
 
-def fit_stretch(L: Line, text: str, st: Style, k: float) -> Dict[str, float]:
+class _Trial:
+    """The logo's own word, redrawn under trial rules and laid over the logo, scored as one number:
+    how well the whole word covers the logo, less how far its letters must slide to their places.
+    Shared by the fits below. `hide`: the index of a letter whose ink is left out of the score (the
+    held-out examination: rules measured on the other letters, judged on this one)."""
+
+    def __init__(self, L: Line, text: str, st: Style, k: float, hide: Optional[int] = None):
+        self.text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
+        self.ok = bool(self.text) and bool(L.stems)
+        if not self.ok:
+            return
+        self.up = Style(**{**st.__dict__, "slant": 0.0})
+        self.cache: Dict = {}
+        first = typeset(self.text, self.up, cache=self.cache)
+        self.ok = bool(first.placed)
+        if not self.ok:
+            return
+        self.placed = [(p.char, p.form) for p in first.placed]
+        logo = np.asarray(L.B, bool)
+        f = 2 if logo.shape[1] > 600 else 1                     # half the resolution is plenty to judge rules
+        if f > 1:
+            H2, W2 = logo.shape[0] // f, logo.shape[1] // f
+            logo = logo[:H2 * f, :W2 * f].reshape(H2, f, W2, f).mean(axis=(1, 3)) >= 0.5
+        self.logo, self.s = logo, 1.0 / (k * f)
+        self.base_row = L.row_of_y(0.0) / f
+        xs = [p[0] for sh in first.shapes for poly in sh for p in poly]
+        self.x_of = float(np.flatnonzero(logo.any(axis=0))[-1]) - max(xs) * self.s
+        self.pitch = st.pitch * self.s
+        self.X = st.x_height
+        self.hide = hide
+        self.count = np.ones_like(logo)                          # the pixels that count in the score
+        if hide is not None:
+            slid = _slide(first, self.up, logo, self.s, self.x_of, self.base_row, self.pitch)
+            dist = np.stack([ndi.distance_transform_edt(~m) for _, m, _, _ in slid])
+            idx = [i for i, p in enumerate(first.placed) if any(p is q for q, _, _, _ in slid)]
+            owner = np.array(idx)[dist.argmin(axis=0)]
+            self.count = owner != hide
+        self.logo_sum = float((logo & self.count).sum())
+
+    def layout(self, **changes):
+        return typeset(self.text, Style(**{**self.up.__dict__, **changes}), cache=self.cache)
+
+    def score(self, **changes) -> float:
+        return self.scores(**changes)[0]
+
+    def scores(self, **changes) -> Tuple[float, List[float]]:
+        """The word's score, and each letter's own match (its body against the logo's ink in its columns)."""
+        lay = self.layout(**changes)
+        union = np.zeros_like(self.logo)
+        slid = _slide(lay, self.up, self.logo, self.s, self.x_of, self.base_row, self.pitch)
+        moved, n = 0.0, 0
+        each = []
+        for i, (p, m, dx, j) in enumerate(slid):
+            union |= m if j is None else (m | j)
+            if i != self.hide:
+                moved, n = moved + abs(dx), n + 1
+            cols = np.flatnonzero(m.any(axis=0))
+            if len(cols) and i != self.hide:
+                band = self.logo[:, cols[0]:cols[-1] + 1] & self.count[:, cols[0]:cols[-1] + 1]
+                mm = m[:, cols[0]:cols[-1] + 1]
+                inter = float((mm & band).sum())
+                each.append(inter / max(1.0, float(mm.sum()) + float(band.sum()) - inter))
+            else:
+                each.append(float("nan"))
+        union &= self.count
+        inter = float((union & self.logo).sum())
+        iou = inter / max(1.0, float(union.sum()) + self.logo_sum - inter)
+        # the slides say how far each letter stands from where the rules put it: the right rules leave
+        # little to slide (a letter slid one x-height costs SLIDE_COST of match)
+        return iou - SLIDE_COST * moved / max(1, n) / (self.X * self.s), each
+
+    def reads(self, skip: Optional[int] = None) -> List[str]:
+        """What the letters of the word read while they were built (parameters, and "v:" variants);
+        with `skip`, only what some other letter than that one reads."""
+        out: List[str] = []
+        for i, (c, f) in enumerate(self.placed):
+            if i == skip:
+                continue
+            for (cc, ff, _), (_, deps) in self.cache.items():
+                if (cc, ff) == (c, f):
+                    out += [d for d in deps if d not in out]
+        return out
+
+
+def fit_stretch(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial] = None) -> Dict[str, float]:
     """How much longer the logo draws each letter than the engine builds it (its kashida).
 
     The logo's own word is redrawn with each letter form drawn longer by a trial length, keeping, one
@@ -278,46 +365,13 @@ def fit_stretch(L: Line, text: str, st: Style, k: float) -> Dict[str, float]:
     up to four. The letters still slide to where they cover the logo best, and how far they must slide
     counts against the lengths: the right lengths put every letter where the logo has it.
     Returns {} when no lengthening helps by at least a point."""
-    text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
-    if not text or not L.stems:
+    t = trial or _Trial(L, text, Style(**{**st.__dict__, "stretch": {}}), k)
+    if not t.ok:
         return {}
-    upright = Style(**{**st.__dict__, "slant": 0.0, "stretch": {}})
-    first = typeset(text, upright)
-    if not first.placed:
-        return {}
-    logo = np.asarray(L.B, bool)
-    f = 2 if logo.shape[1] > 600 else 1                     # half the resolution is plenty to judge lengths
-    if f > 1:
-        H2, W2 = logo.shape[0] // f, logo.shape[1] // f
-        logo = logo[:H2 * f, :W2 * f].reshape(H2, f, W2, f).mean(axis=(1, 3)) >= 0.5
-    H, W = logo.shape
-    s = 1.0 / (k * f)
-    base_row = L.row_of_y(0.0) / f
-    xs = [p[0] for sh in first.shapes for poly in sh for p in poly]
-    right = float(np.flatnonzero(logo.any(axis=0))[-1])
-    x_of = right - max(xs) * s
-    logo_sum = float(logo.sum())
-
-    pitch = st.pitch * s
-    X = st.x_height
-
-    built: Dict = {}                                       # the letters themselves do not change, only their lengths
-
-    def score(stretch: Dict[str, float]) -> float:
-        lay = typeset(text, Style(**{**upright.__dict__, "stretch": stretch}), cache=built)
-        union = np.zeros_like(logo)
-        slid = _slide(lay, upright, logo, s, x_of, base_row, pitch)
-        for _, m, _, j in slid:
-            union |= m if j is None else (m | j)
-        inter = float((union & logo).sum())
-        iou = inter / max(1.0, float(union.sum()) + logo_sum - inter)
-        # the slides say how far each letter stands from where the lengths put it: the right lengths
-        # leave little to slide (a letter slid one x-height costs SLIDE_COST of match)
-        moved = sum(abs(dx) for _, _, dx, _ in slid) / max(1, len(slid)) / (X * s)
-        return iou - SLIDE_COST * moved
-    keys = list(dict.fromkeys(f"{p.char}.{p.form}" for p in first.placed))
+    X = t.X
+    keys = list(dict.fromkeys(f"{c}.{f}" for i, (c, f) in enumerate(t.placed) if i != t.hide))
     cur: Dict[str, float] = {}
-    base = now = score(cur)
+    base = now = t.score(stretch=cur)
     # best first: every round tries every letter at every length and keeps the one change that helps
     # most, so a length goes to the letter that puts the most letters in place, not to the first tried
     for _ in range(2 * len(keys)):
@@ -327,7 +381,7 @@ def fit_stretch(L: Line, text: str, st: Style, k: float) -> Dict[str, float]:
             for v in grid:
                 if abs(v * X - cur.get(key, 0.0)) < 1e-9:
                     continue
-                sc = score({**cur, key: v * X})
+                sc = t.score(stretch={**cur, key: v * X})
                 if sc > now + 1e-4 and (best is None or sc > best[0]):
                     best = (sc, key, v * X)
         if best is None:
@@ -338,12 +392,109 @@ def fit_stretch(L: Line, text: str, st: Style, k: float) -> Dict[str, float]:
     return {q: round(v, 2) for q, v in cur.items() if abs(v) >= 0.04 * X}
 
 
+FIT_GRID = (0.5, 0.65, 0.8, 0.9, 1.1, 1.25, 1.5, 1.75, 2.0)
+FIT_MIN = 0.003           # a measured rule must earn this much of the score: smaller gains are noise
+
+
+def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial] = None, own: bool = True
+                ) -> Tuple[Dict[str, float], Dict[str, str], Dict[str, float]]:
+    """The rules of the letters, measured on the logo's own word: for every letter form in it, the
+    construction (variant) that draws it best, then every parameter its letters read, each tried over
+    its handle's range and kept where the word covers the logo best. What the designer has set is left
+    alone. A parameter shared by several letters is measured on all of them at once, and serves every
+    other letter that shares it (the cup measured on ن draws ل and ق).
+
+    Each letter's construction, then (with `own`) each letter's own parameters: these serve the
+    letters of the logo. Then, apart, the designer's general manner (recipes.TRAITS: how wide, how
+    high, how open, how round) measured on all the letters at once: it serves letters the logo does
+    not contain.
+
+    Returns (parameters, constructions, manner) for `style.fitted`, `style.chosen`, `style.traits`."""
+    from .recipes import DECLARED, PARAMS, SKELETON, TRAIT_GRID, TRAITS, VARIANTS, general_rule
+    t = trial or _Trial(L, text, Style(**{**st.__dict__, "fitted": {}, "chosen": {}, "traits": {}}), k)
+    if not t.ok:
+        return {}, {}, {}
+    reads = t.reads(skip=t.hide)
+    hidden = t.placed[t.hide] if t.hide is not None else None
+    # constructions: a variant key a letter reads, with more than one option, the designer has not set
+    options: Dict[str, List[str]] = {}
+    for c, f in dict.fromkeys(t.placed):
+        if (c, f) == hidden:
+            continue
+        for letter in dict.fromkeys((c, SKELETON.get(c, c))):
+            key = f"{letter}.{f}"
+            names = [v.name for v in VARIANTS.get(key, [])] or [n for n, _ in DECLARED.get(key, ([], None))[0]]
+            if len(names) > 1 and key not in st.variants and letter not in st.variants and ("v:" + key) in reads:
+                options[key] = names
+    params = [d for d in reads if d in PARAMS and d not in st.params]
+    fitted: Dict[str, float] = {}
+    chosen: Dict[str, str] = {}
+    now = t.score()
+    for key, names in options.items():
+        best = None
+        for name in names:
+            sc = t.score(chosen={**chosen, key: name})
+            if best is None or sc > best[0]:
+                best = (sc, name)
+        if best[0] > now + FIT_MIN:
+            now, chosen = best[0], {**chosen, key: best[1]}
+    # then each letter's own rules
+    for _ in range(2 if own else 0):
+        grew = False
+        for name in params:
+            p = PARAMS[name]
+            rule = general_rule(t.up, name)
+            span = (p.lo * rule, p.hi * rule) if rule > 0 else (0.0, 0.5 * t.X)
+            grid = [rule * m for m in FIT_GRID if span[0] - 1e-9 <= rule * m <= span[1] + 1e-9] if rule > 0 \
+                else [span[1] * m for m in (0.1, 0.25, 0.5, 0.75, 1.0)]
+            best = None
+            for v in grid:
+                if abs(v - fitted.get(name, rule)) < 1e-9:
+                    continue
+                sc = t.score(fitted={**fitted, name: v}, chosen=chosen)
+                if best is None or sc > best[0]:
+                    best = (sc, v)
+            if best is not None and best[0] > now + FIT_MIN:
+                now, fitted, grew = best[0], {**fitted, name: round(best[1], 3)}, True
+        if not grew:
+            break
+    # then, apart, the general manner on all the letters at once (with their constructions, not their
+    # own measures): it is what reaches letters the logo does not contain
+    t.up = Style(**{**t.up.__dict__, "chosen": chosen, "fitted": {}})
+    now, _ = t.scores()
+    # A manner is what the designer repeats: a trait is kept only where it draws at least two letters
+    # better, and more letters better than worse (one letter drawn long is a kashida, not a manner).
+    traits: Dict[str, float] = {}
+    kinds = [q for q, (_, names) in TRAITS.items() if any(n in params for n in names)]
+    _, each_now = t.scores()
+    for _ in range(2):
+        grew = False
+        for q in kinds:
+            best = None
+            for f in TRAIT_GRID + (1.0,):
+                if abs(f - traits.get(q, 1.0)) < 1e-9:
+                    continue
+                sc, each = t.scores(traits={**traits, q: f})
+                up = sum(1 for a, b in zip(each_now, each) if b > a + 0.02)
+                down = sum(1 for a, b in zip(each_now, each) if b < a - 0.02)
+                if up >= 2 and up > down and (best is None or sc > best[0]):
+                    best = (sc, f, each)
+            if best is not None and best[0] > now + FIT_MIN:
+                now, traits, grew, each_now = best[0], {**traits, q: best[1]}, True, best[2]
+        if not grew:
+            break
+    traits = {q: f for q, f in traits.items() if abs(f - 1.0) > 1e-9}
+    return fitted, chosen, traits
+
+
 def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -> Optional[Dict[str, Any]]:
     """The self-check, and when the logo draws some letters its own way, the same check again with
     those letters cut out of the logo: `st.taken` is filled, and the result says how far it helped.
     With take=False (the logo's word is only a guess) nothing is cut: a wrong reading would cut a
     wrong letter."""
     first = self_check(L, text, st, k)
+    if first and take:
+        first = _measure_rules(L, text, st, k, first)
     if first and not take and first.get("taken"):
         first["taken"] = {}
         first["notes"] = [n for n in first["notes"] if not n.startswith("أُخذ من الشعار")]
@@ -398,6 +549,35 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
         first["letters_after"] = [{"letter": x["letter"], "form": x["form"], "match": x["match"]} for x in again["letters"]]
         first["overlay_after_png"] = again["overlay_png"]
     return _lengthen(L, text, st, k, first, again) if take else first
+
+
+def _measure_rules(L: Line, text: str, st: Style, k: float, first: Dict[str, Any]) -> Dict[str, Any]:
+    """The rules of the letters read off the logo's own word (fit_letters), kept when the word then
+    matches the logo better. Letters are cut from the logo only where no rule draws them."""
+    if st.fitted or st.chosen or st.traits:
+        return first
+    fitted, chosen, traits = fit_letters(L, text, st, k)
+    if not fitted and not chosen and not traits:
+        return first
+    from .recipes import SKELETON
+    on = "".join(sorted({SKELETON.get(c, c) for c in text if c in LETTERS}))
+    trial = Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on})
+    r = self_check(L, text, trial, k)
+    if not r or r["overall"] < first["overall"] + 0.01:
+        return first
+    st.fitted, st.chosen, st.traits, st.measured_on = fitted, chosen, traits, on
+    r["overall_rules"] = first["overall"]           # before the rules were measured on the logo
+    r["fitted"], r["chosen"], r["traits"] = dict(fitted), dict(chosen), dict(traits)
+    from .recipes import general_rule
+    changed = sorted(fitted, key=lambda n: -abs(fitted[n] / max(1e-9, general_rule(trial, n)) - 1))[:6]
+    if traits:
+        r["notes"].insert(0, "أسلوب المصمم العام كما قيس من حروف الشعار كلها، ويُطبَّق على كل حرف ولو لم يكن في الشعار: "
+                          + "، ".join(f"{q} × {f:.2f}" for q, f in traits.items()) + ".")
+    r["notes"].insert(0, f"قيس من حروف الشعار {len(fitted)} معاملًا" + (f" و{len(chosen)} صيغة" if chosen else "")
+                      + f" بدل قواعد المحرك العامة، فارتفع التطابق من {first['overall'] * 100:.0f}% إلى {r['overall'] * 100:.0f}%. أبرزها: "
+                      + "، ".join(f"{n} × {fitted[n] / max(1e-9, general_rule(trial, n)):.2f}" for n in changed)
+                      + (" — " + "، ".join(f"«{q}» {v}" for q, v in chosen.items()) if chosen else "") + ".")
+    return r
 
 
 def _lengthen(L: Line, text: str, st: Style, k: float, first: Dict[str, Any], last: Optional[Dict[str, Any]]) -> Dict[str, Any]:

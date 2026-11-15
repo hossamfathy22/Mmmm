@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 from . import geometry as g
 from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
-from .recipes import stretch_of
+from .recipes import BUILDING, PARAMS, READS, stretch_of, value
 from .style import Style
 
 TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
@@ -244,9 +244,19 @@ def extension(st: Style, key: str) -> float:
     return stretch_of(st, key)
 
 
+def _dep_value(st: Style, dep: str):
+    """The current value of something a letter read while it was built (see recipes.READS)."""
+    if dep.startswith("v:"):
+        k = dep[2:]
+        return st.variants.get(k) or st.chosen.get(k)
+    return value(st, dep) if dep in PARAMS else None
+
+
 def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
     """Lay out `word` right to left. `cache` (a dict kept by the caller) reuses the letters built for
-    an earlier layout with the same style: for trying many lengths of the same word."""
+    an earlier layout of the same logo whose parameters and variants they read are unchanged: for
+    trying many values on the same word. (Only the designer's and the measured values are compared:
+    the style's other measures must not change between calls that share a cache.)"""
     lay = Layout(text=word, style=st)
     x = 0.0
     prev: Optional[Placed] = None
@@ -268,15 +278,23 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             lay.skipped.append(c)
             continue
         flags = frozenset((["no_exit"] if i + 1 in top else []) + (["top_entry"] if i in top else []))
-        glyph = cache.get((c, form, flags)) if cache is not None else None
+        glyph = None
+        ltok = BUILDING.set(c)
+        if cache is not None and (c, form, flags) in cache:
+            kept, deps = cache[(c, form, flags)]
+            if all(_dep_value(st, d) == v for d, v in deps.items()):
+                glyph = kept
         if glyph is None:
-            tok = JOIN.set(flags)
+            tok, rtok = JOIN.set(flags), READS.set(set()) if cache is not None else None
             try:
                 glyph = LETTERS[c][1](st, form)
+                if cache is not None:
+                    cache[(c, form, flags)] = (glyph, {d: _dep_value(st, d) for d in READS.get()})
             finally:
                 JOIN.reset(tok)
-            if cache is not None:
-                cache[(c, form, flags)] = glyph
+                if rtok is not None:
+                    READS.reset(rtok)
+        BUILDING.reset(ltok)
         cut, borrowed = st.taken.get(f"{c}.{form}"), None
         if cut is None:
             # the same body in the other form that differs only by the join from the right

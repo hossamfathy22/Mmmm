@@ -13,7 +13,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from . import geometry as g
 from .library import ACTIVE, Compound, Tagged
-from .recipes import BY_EYE, DERIVED, FITTED, MEASURED, angular, choose, curved, declare, param, variant
+from .recipes import BY_EYE, DERIVED, FITTED, MEASURED, angular, choose, curved, declare, param, pick, variant
 from .recipes import P as val
 from .style import Style
 
@@ -312,7 +312,7 @@ def _yeh_isolated(st: Style, final_mark: Optional[str]) -> Glyph:
 def yeh(st: Style, form: str, mark: Optional[str], final_mark: Optional[str]) -> Glyph:
     if form in ("I", "M"):
         return beh(st, form, mark)
-    if form == "i" and st.angular < 0.5 and st.variants.get("ي.i") != "كأس":
+    if form == "i" and st.angular < 0.5 and pick(st, "ي.i") != "كأس":
         return _yeh_isolated(st, final_mark)
     U, u, X, D = st.stem, st.stem / 2, st.x_height, st.descender
     r, w = -u, val(st, "cup.width") * 4.0 / 3.4
@@ -475,7 +475,7 @@ def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
     yt = X - h / 2
     if st.angular >= 0.5:
         return _jeem_square(st, form, mark)
-    if (st.variants.get(f"ح.{form}") or st.variants.get("ح") or _hah_default(st)) == "ذراع مائل":
+    if (pick(st, f"ح.{form}", "ح") or _hah_default(st)) == "ذراع مائل":
         return _hah_slanted(st, form, mark)
     top = [g.nose_top(st, d0, xa)]
     if form in ("I", "M"):
@@ -641,7 +641,8 @@ param("loop.ring_below", lambda st: 0.5, "تُرسم العروة حلقةً ح�
 
 
 def _loop_kind(st: Style) -> str:
-    want = st.variants.get("ص") or st.variants.get("ط") or st.variants.get("عروة")
+    # the loop is one construction for ص ض ط ظ in every form: a choice made for any of them holds
+    want = pick(st, "ص", "ط", "عروة", *[f"{c}.{f}" for c in "صط" for f in "iIMF"])
     if want in ("قطرة", "حلقة"):
         return want
     return "قطرة" if st.hair < val(st, "loop.ring_below") * st.stem else "حلقة"
@@ -941,7 +942,7 @@ param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى 
 def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, A, h = st.stem, st.stem / 2, st.x_height, st.ascender, st.hair
     xl, w = head_box(st)
-    if form == "I" and st.variants.get("ه.I") != "حلقة وجذع" and st.angular < 0.5:
+    if form == "I" and pick(st, "ه.I") != "حلقة وجذع" and st.angular < 0.5:
         # هـ in the typefaces: a wide head with a stroke across it that makes two eyes
         wide = 2 * U + val(st, "heh.counter")
         xl = -wide

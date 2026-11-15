@@ -47,6 +47,15 @@ class Style:
     # A joining letter lengthens its join to the next; a final or isolated letter stretches its body
     # along the baseline; a letter with neither leaves more white after it. Fitted by the self-check.
     stretch: Dict[str, float] = field(default_factory=dict)
+    # the rules of the letters as measured on this logo (selfcheck.fit_letters): a parameter's value and
+    # a letter form's construction read off the logo's own word. They stand in for the rule (the
+    # designer's `params` and `variants` still win), and serve every letter that shares them.
+    fitted: Dict[str, float] = field(default_factory=dict)
+    measured_on: str = ""       # the letters (by skeleton) `fitted` was measured on: it serves only them
+    # the designer's general manner, measured on all the logo's letters at once, applied to every
+    # letter (also those the logo does not contain): trait -> factor on the rules of that kind
+    traits: Dict[str, float] = field(default_factory=dict)
+    chosen: Dict[str, str] = field(default_factory=dict)
 
     @property
     def pitch(self) -> float:

@@ -9,6 +9,10 @@ are taken from the logo, which letters were taken, which the logo draws longer t
 the engine now lengthens), and how the word is read when it is not typed.
 Run it before and after a change: a change that helps the typefaces and hurts real logos is not
 an improvement.
+
+With --held-out it asks whether the engine understands a logo or only copies it: each letter of the
+word is hidden in turn, the rules are measured on the other letters, and the hidden one is drawn
+with them (see held_out).
 """
 from __future__ import annotations
 
@@ -54,6 +58,64 @@ def examine(folder: Path, read: bool = True) -> List[Dict]:
     return rows
 
 
+def held_out(folder: Path) -> List[Dict]:
+    """Does the engine understand a logo or copy it? Each letter of the logo's word is hidden in turn:
+    its ink is left out, the rules of the letters are measured on the others (fit_letters), and the
+    hidden letter is drawn with them and matched on the logo. Compared with the same letter drawn with
+    the engine's general rules. Nothing is cut: a cut is the logo's own drawing, not understanding."""
+    from ..pipeline import TAKE_MIN, analyse
+    from ..recipes import SKELETON
+    from ..selfcheck import _Trial, fit_letters, self_check
+    from ..style import Style
+    texts = json.loads((folder / "texts.json").read_text(encoding="utf-8"))
+    rows = []
+    for name, text in texts.items():
+        pics = [p for p in folder.glob(name + ".*") if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")]
+        if not pics:
+            continue
+        try:
+            an = analyse(pics[0].read_bytes(), texts=[text], read=False)
+        except Exception:
+            continue
+        if an["health"]["confidence"] < TAKE_MIN:
+            continue
+        L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+        base = self_check(L, text, st, k)
+        if not base:
+            continue
+        general, measured = [], []
+        for i, x in enumerate(base["letters"]):
+            t = _Trial(L, text, st, k, hide=i)
+            if not t.ok:
+                continue
+            fitted, chosen, traits = fit_letters(L, text, st, k, trial=t)
+            # the hidden letter is not a letter of the logo: it takes the manner, not its own measure
+            on = "".join(sorted({SKELETON.get(y["letter"], y["letter"]) for j, y in enumerate(base["letters"]) if j != i}))
+            r = self_check(L, text, Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on}), k)
+            if not r or len(r["letters"]) != len(base["letters"]):
+                continue
+            general.append(x["match"])
+            measured.append(r["letters"][i]["match"])
+        if general:
+            rows.append({"name": name, "text": text, "general": sum(general) / len(general),
+                         "measured": sum(measured) / len(measured), "letters": len(general),
+                         "better": sum(m > g + 0.02 for g, m in zip(general, measured)),
+                         "worse": sum(m < g - 0.02 for g, m in zip(general, measured))})
+    return rows
+
+
+def held_out_summary(rows: List[Dict]) -> str:
+    lines = ["| الشعار | الحرف المخفي بالقواعد العامة | بالقواعد المقيسة من بقية الحروف | تحسّن | ساء |", "|---|---|---|---|---|"]
+    for r in rows:
+        lines.append(f"| {r['text']} | {r['general'] * 100:.0f}% | {r['measured'] * 100:.0f}% | {r['better']} | {r['worse']} |")
+    n = sum(r["letters"] for r in rows)
+    g = sum(r["general"] * r["letters"] for r in rows) / max(1, n)
+    m = sum(r["measured"] * r["letters"] for r in rows) / max(1, n)
+    lines += ["", f"على {n} حرفًا مخفيًا في {len(rows)} شعارًا: {g * 100:.1f}% بالقواعد العامة، و{m * 100:.1f}% بقواعد مقيسة "
+              f"من بقية حروف الشعار. تحسّن {sum(r['better'] for r in rows)} وساء {sum(r['worse'] for r in rows)}."]
+    return "\n".join(lines)
+
+
 def summary(rows: List[Dict]) -> str:
     ok = [r for r in rows if "error" not in r]
     best = [r.get("after") or r.get("check") or 0.0 for r in ok]
@@ -78,12 +140,20 @@ def main() -> int:
     p.add_argument("folder")
     p.add_argument("-o", "--out", default="")
     p.add_argument("--no-read", action="store_true", help="لا تجرّب القراءة دون نص (أسرع)")
+    p.add_argument("--held-out", action="store_true", help="امتحان الحرف المخفي: هل يفهم المحرك الشعار أم ينسخه")
     a = p.parse_args()
     warnings.filterwarnings("ignore")
     folder = Path(a.folder)
     if not (folder / "texts.json").exists():
         print("يلزم ملف texts.json في المجلد: {\"اسم الصورة\": \"النص العربي\"}", file=sys.stderr)
         return 1
+    if a.held_out:
+        text = held_out_summary(held_out(folder))
+        print(text)
+        if a.out:
+            out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+            (out / "held_out.md").write_text("# امتحان الحرف المخفي\n\n" + text + "\n", encoding="utf-8")
+        return 0
     rows = examine(folder, read=not a.no_read)
     text = summary(rows)
     print(text)

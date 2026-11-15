@@ -745,3 +745,54 @@ def test_the_editor_offers_the_length_and_saves_its_change(tmp_path):
     assert not {x["name"]: x for x in draw(d, "باب")["handles"]}["مد.ك.I"]["used"]
     rec = save_edit(d, "كتاب", {"مد.ك.I": 10.0}, {}, path=tmp_path / "e.jsonl")
     assert rec["params"] == 1
+
+
+# ---------------------------------------------------------------- the rules of the letters, measured on the logo
+def test_a_wrong_letter_rule_is_measured_back_from_the_logo():
+    """The general rule for the base of د made twice too long: measured on the logo's own word, the
+    base comes back to its length, and the word matches the logo again."""
+    from khatt import recipes
+    from khatt.pipeline import analyse
+    from khatt.selfcheck import fit_letters, self_check
+    an = analyse(EXAMPLE.read_bytes(), texts=["بيدوناق"], read=False)
+    L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+    right = recipes.general_rule(st, "dal.base")
+    recipes.LEARNED["dal.base"] = 2.0
+    try:
+        bad = self_check(L, "بيدوناق", st, k)
+        fitted, chosen, traits = fit_letters(L, "بيدوناق", st, k)
+        assert "dal.base" in fitted and abs(fitted["dal.base"] / right - 1) <= 0.2
+        good = self_check(L, "بيدوناق", Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen}), k)
+        d = lambda r: {x["letter"]: x["match"] for x in r["letters"]}["د"]
+        assert d(good) > d(bad) + 0.03 and good["overall"] > bad["overall"]
+    finally:
+        recipes.LEARNED.clear()
+
+
+def test_measured_rules_serve_the_logos_letters_and_the_manner_serves_the_others():
+    st = Style()
+    plain_d, plain_b = typeset("د", st), typeset("ب", st)
+    width = lambda lay: lay.bbox()[2] - lay.bbox()[0]
+    from khatt.recipes import general_rule
+    m = Style(**{**st.__dict__, "fitted": {"dal.base": 2 * general_rule(st, "dal.base"), "beh.width": 0.5 * general_rule(st, "beh.width")},
+                 "measured_on": "د", "traits": {"عرض": 1.5}})
+    assert width(typeset("د", m)) > width(plain_d) + 0.5 * general_rule(st, "dal.base")   # د is in the logo: its own measure
+    assert width(typeset("ذ", m)) > width(typeset("ذ", st)) + 0.5 * general_rule(st, "dal.base")   # ذ shares its skeleton
+    assert width(typeset("ب", m)) > width(plain_b)              # ب is not: the logo's manner (wider), not ب's own value
+    on_b = Style(**{**m.__dict__, "measured_on": "بد"})
+    assert width(typeset("ب", on_b)) < width(plain_b)           # once ب is a letter of the logo, its measure
+
+
+def test_the_layout_cache_rebuilds_only_what_a_change_touches():
+    from khatt.recipes import general_rule
+    st = Style()
+    cache = {}
+    typeset("بيد", st, cache=cache)
+    before = {key: g for key, (g, _) in cache.items()}
+    st2 = Style(**{**st.__dict__, "fitted": {"dal.base": 1.5 * general_rule(st, "dal.base")}})
+    lay = typeset("بيد", st2, cache=cache)
+    after = {key: g for key, (g, _) in cache.items()}
+    changed = {key[0] for key in before if before[key] is not after[key]}
+    assert changed == {"د"}
+    fresh = typeset("بيد", st2)
+    assert lay.bbox() == pytest.approx(fresh.bbox())
