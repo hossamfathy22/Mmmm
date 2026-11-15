@@ -187,7 +187,8 @@ function showFacts(){
   const notes = h.corrections.map(n => 'صُحّح: ' + n.text).concat(h.warnings.map(n => 'تنبيه: ' + n.text));
   html += notes.length ? '<ul class="notes">' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>'
                        : '<p class="muted" style="margin:6px 0 0">الصورة نظيفة: لا تصحيح ولا تنبيه.</p>';
-  if(logo.read) html += `<p style="margin:8px 0 0">قرأ المحرك: <b>${esc(logo.read)}</b>${logo.read_sure ? '' : ' <span class="muted">(غير مكتملة: اكتب نص الشعار)</span>'}</p>`;
+  const how = {given: 'كما كتبتها', stems: 'من الجذوع', drawn: `بالرسم، تغطية ${Math.round((logo.read_match || 0) * 100)}%`}[logo.read_how] || '';
+  if(logo.read) html += `<p style="margin:8px 0 0">قرأ المحرك: <b>${esc(logo.read)}</b> <span class="muted">(${how})</span>${logo.read_sure ? '' : ' <span class="muted">— غير مكتملة: اكتب نص الشعار</span>'}</p>`;
   $('health').innerHTML = html;
   $('measures').innerHTML = Object.entries(logo.measures).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${fmt(v)}</td></tr>`).join('');
   const s = logo.self_check;

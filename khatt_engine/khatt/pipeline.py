@@ -179,8 +179,25 @@ def _learned() -> None:
         _learned.done = True
 
 
+# A reading by drawing is used only if its letters cover the logo this well. Measured: the right
+# reading of the hand-made example covers it 83%; a wrong reading of the second example ("سسشی نصع"
+# for "سفينة نجم") 68%, of the square kufi logo 51%.
+DRAWN_MIN = 0.75
+
+
+def own_text(R) -> str:
+    """The logo's own word, as far as it is known: typed by the designer, or read with no letter
+    left unknown. A dotless tooth read by drawing is drawn as ب (the same body)."""
+    if R.text_given:
+        return R.text_given
+    t = R.text_guess or ""
+    if R.text_drawn:
+        t = t.replace("ٮ", "ب")
+    return t if t and not any(c in "ٮ?" for c in t) else ""
+
+
 def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
-            overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            overrides: Optional[Dict[str, Any]] = None, read: bool = True) -> Dict[str, Any]:
     """Stages 1-4 alone: guard the picture, measure and read every line, and turn the chosen line
     into drawing rules. Nothing is drawn. This is all a caller needs to typeset words in the logo's
     style, and all the benchmark needs to test the measuring."""
@@ -211,6 +228,17 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
     for key, v in (overrides or {}).items():
         if hasattr(style, key) and v is not None:
             setattr(style, key, type(getattr(style, key))(v))
+    # The stem reader knows teeth, tails and tall strokes. When it leaves letters unread and the
+    # designer typed nothing, the logo is read by drawing: letters drawn in the measured style are
+    # matched to it. That reading is kept only if its letters cover the logo well.
+    if read and R.script == "arabic" and not R.text_given and any(c in "ٮ?" for c in (R.text_guess or "?")):
+        from .reading import read_by_drawing
+        got = read_by_drawing(L, style, k)
+        if got and got["match"] >= DRAWN_MIN:
+            R.text_guess, R.text_drawn, R.drawn_match = got["text"], True, got["match"]
+        elif got:
+            R.drawn_match = got["match"]
+        health = assess(lines, readings, src, notes)
     return {"work": work, "ink": ink, "scale": scale, "k": k, "inverted": inverted, "lines": lines, "readings": readings,
             "src": src, "health": health, "lib": lib, "feats": feats, "style": style}
 
@@ -226,8 +254,9 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     obs = observations(lines, readings, k)
     # the self-check: the logo's own word, redrawn with the rules read from it; letters the logo draws
     # its own way are cut out of it and used for the new word
-    own_text = R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else "")
-    check = check_and_take(L, own_text, style, k) if own_text else None
+    own = own_text(R)
+    # letters are taken from the logo only on a sure reading: typed, or read whole from the stems
+    check = check_and_take(L, own, style, k, take=not R.text_drawn) if own else None
 
     # 5-6. build and verify
     def build(st: Style):

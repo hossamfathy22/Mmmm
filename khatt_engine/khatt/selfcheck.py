@@ -235,10 +235,16 @@ def self_check(L: Line, text: str, st: Style, k: float) -> Optional[Dict[str, An
             "verdict": "يطابق" if overall >= GOOD else ("قريب" if overall >= FAIR else "يختلف"), "overlay_png": buf.getvalue()}
 
 
-def check_and_take(L: Line, text: str, st: Style, k: float) -> Optional[Dict[str, Any]]:
+def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -> Optional[Dict[str, Any]]:
     """The self-check, and when the logo draws some letters its own way, the same check again with
-    those letters cut out of the logo: `st.taken` is filled, and the result says how far it helped."""
+    those letters cut out of the logo: `st.taken` is filled, and the result says how far it helped.
+    With take=False (the logo's word is only a guess) nothing is cut: a wrong reading would cut a
+    wrong letter."""
     first = self_check(L, text, st, k)
+    if first and not take and first.get("taken"):
+        first["taken"] = {}
+        first["notes"] = [n for n in first["notes"] if not n.startswith("أُخذ من الشعار")]
+        first["notes"].append("الكلمة مقروءة بالرسم لا مكتوبة: لم يُؤخذ شيء من الشعار. اكتب نص الشعار ليُؤخذ منه ما يرسمه بطريقته.")
     if not first or not first.get("taken"):
         return first
     # A cut is kept only if it earns its place: the logo's word matches better with it, and no letter

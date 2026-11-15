@@ -56,6 +56,8 @@ class Reading:
     units: List[Unit] = field(default_factory=list)
     text_guess: str = ""
     text_given: str = ""
+    text_drawn: bool = False                     # the guess came from reading by drawing (reading.py)
+    drawn_match: float = 0.0
     mark_side: Dict[int, str] = field(default_factory=dict)      # piece index -> above/below
 
 

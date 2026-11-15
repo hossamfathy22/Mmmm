@@ -338,6 +338,8 @@ def assess(lines, readings, src: int, notes: List[Note]) -> Dict[str, Any]:
             add("ارتفاع الحروف مأخوذ من جذعين فقط.", 0.1)
     if R.script != "arabic":
         add("لم يُتعرَّف على السطر ككتابة عربية.", 0.3, script=R.script)
+    elif not R.text_given and getattr(R, "text_drawn", False):
+        add(f"قُرئت الكلمة بالرسم («{R.text_guess}»، تغطية {R.drawn_match * 100:.0f}%): اكتب نص الشعار إن كانت خطأ.", 0.05)
     elif not R.text_given:
         unsure = sum(1 for u in R.units if u.letter in "ٮ?" or not u.letter)
         if R.units and unsure / len(R.units) > 0.34:

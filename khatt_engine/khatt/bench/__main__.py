@@ -77,7 +77,7 @@ DISTORTIONS = [
 
 def _numbers(im: Image.Image) -> Optional[Dict[str, float]]:
     try:
-        an = analyse(png(im))
+        an = analyse(png(im), read=False)
     except Exception:
         return None
     L, k = an["lines"][an["src"]], an["k"]

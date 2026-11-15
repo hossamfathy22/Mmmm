@@ -330,7 +330,7 @@ def _png(im) -> bytes:
 
 def _measured(im):
     from khatt.pipeline import analyse
-    an = analyse(_png(im))
+    an = analyse(_png(im), read=False)                 # the guard alone: reading by drawing is tested apart
     L, k = an["lines"][an["src"]], an["k"]
     return L.x_height * k, L.stem * k, L.slant, an["health"]
 
@@ -634,3 +634,33 @@ def test_a_letter_the_logo_draws_its_own_way_is_taken_from_it(monkeypatch):
     assert "من الشعار" not in [getattr(s, "name", "") for s in q2.glyph.shapes]
     c = {(x["letter"], x["form"]): x for x in choices(st)}[("ق", "i")]
     assert c["chosen"] == "من الشعار" and {o["name"] for o in c["options"]} == {"من الشعار", "المحرك"}
+
+
+# ---------------------------------------------------------------- reading by drawing
+def test_the_example_is_read_by_drawing_when_the_stems_are_not_enough():
+    from khatt.pipeline import analyse, own_text
+    an = analyse(EXAMPLE.read_bytes())
+    R = an["readings"][an["src"]]
+    assert R.text_drawn and R.text_guess == "بيدوناق" and R.drawn_match >= 0.75
+    assert own_text(R) == "بيدوناق"
+    assert any("بالرسم" in w["text"] for w in an["health"]["warnings"])
+
+
+def test_a_poor_reading_by_drawing_is_not_trusted():
+    from khatt.pipeline import analyse, own_text
+    an = analyse((EXAMPLE.parent / "round_square.png").read_bytes())       # "سفينة نجم"
+    R = an["readings"][an["src"]]
+    assert not R.text_drawn and own_text(R) == "" and R.drawn_match < 0.75
+    an2 = analyse((EXAMPLE.parent / "round_square.png").read_bytes(), read=False)
+    assert an2["readings"][an2["src"]].drawn_match == 0.0                    # and reading can be skipped
+
+
+def test_nothing_is_taken_from_the_logo_on_a_guessed_reading(monkeypatch):
+    from khatt import letters
+    from khatt.pipeline import analyse
+    from khatt.selfcheck import check_and_take
+    monkeypatch.setitem(letters.LETTERS, "ق", ("D", lambda s, f: letters.alef(s, f, None)))
+    an = analyse(EXAMPLE.read_bytes(), texts=["بيدوناق"])
+    L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+    r = check_and_take(L, "بيدوناق", st, k, take=False)
+    assert r["taken"] == {} and st.taken == {} and any("بالرسم" in n for n in r["notes"])

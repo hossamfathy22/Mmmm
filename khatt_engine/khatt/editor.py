@@ -21,7 +21,7 @@ import numpy as np
 
 from .critic import critique
 from .letters import LETTERS
-from .pipeline import analyse
+from .pipeline import analyse, own_text
 from .recipes import PARAMS, SHAPE_LETTERS, SKELETON, choices, handles, rule_value
 from .render import to_svg
 from .selfcheck import check_and_take
@@ -56,8 +56,8 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     gives it (the reading and the self-check are surer with it)."""
     an = analyse(image, texts=[text] if text.strip() else None)
     L, R, st, k = an["lines"][an["src"]], an["readings"][an["src"]], an["style"], an["k"]
-    own = R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else "")
-    check = check_and_take(L, own, st, k) if own else None
+    own = own_text(R)
+    check = check_and_take(L, own, st, k, take=not R.text_drawn) if own else None
     overlay = None
     if check:
         overlay = base64.b64encode(check.pop("overlay_png")).decode("ascii")
@@ -66,6 +66,7 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
             check["overlay_after_png"] = base64.b64encode(after).decode("ascii")
     return _plain({
         "style": st.to_dict(), "health": an["health"], "read": R.text_given or R.text_guess, "read_sure": bool(own),
+        "read_how": "given" if R.text_given else ("drawn" if R.text_drawn else "stems"), "read_match": R.drawn_match,
         "self_check": check, "self_check_png": overlay,
         "measures": {"الجذع": st.stem, "الخط الشعري": st.hair, "ارتفاع الحروف": st.x_height, "الطالع": st.ascender,
                      "النازل": st.descender, "البياض بين الأسنان": st.white, "الميل °": st.slant, "قطر النقطة": st.dot},
