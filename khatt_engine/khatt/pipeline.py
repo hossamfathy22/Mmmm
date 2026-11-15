@@ -171,11 +171,20 @@ def report(name: str, lines_js, obs, lib, style: Style, recipes, checks, word: s
     return "\n".join(md) + "\n"
 
 
+def _learned() -> None:
+    """Load what has been learned from the designer's edits (once per process)."""
+    from . import recipes
+    if not getattr(_learned, "done", False):
+        recipes.load_learned()
+        _learned.done = True
+
+
 def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
             overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Stages 1-4 alone: guard the picture, measure and read every line, and turn the chosen line
     into drawing rules. Nothing is drawn. This is all a caller needs to typeset words in the logo's
     style, and all the benchmark needs to test the measuring."""
+    _learned()
     # 1. load
     work, ink, scale, inverted, notes = prepare(image)
     k = 1.0 / scale

@@ -42,10 +42,34 @@ def param(name: str, rule: Callable[[Style], float], text: str, source: str, sha
     return name
 
 
+# Rules learned from the designer's edits (learning.py): a factor on a rule, applied to every logo.
+# Kept outside the code, beside the log of edits, so that learning never rewrites a rule silently.
+LEARNED: Dict[str, float] = {}
+
+
+def load_learned(path=None) -> Dict[str, float]:
+    import json
+    import os
+    from pathlib import Path
+    p = Path(path) if path else Path(os.environ.get("KHATT_DATA", Path.home() / ".khatt")) / "learned.json"
+    LEARNED.clear()
+    if p.exists():
+        try:
+            LEARNED.update({k: float(v["factor"]) for k, v in json.loads(p.read_text(encoding="utf-8")).items() if k in PARAMS})
+        except (ValueError, KeyError, TypeError):
+            pass
+    return LEARNED
+
+
+def rule_value(st: Style, name: str) -> float:
+    """The rule's value for this logo, with what has been learned from the designer's edits."""
+    return float(PARAMS[name].rule(st)) * LEARNED.get(name, 1.0)
+
+
 def P(st: Style, name: str) -> float:
     """The value of a named parameter for this logo: the designer's, if set, else the rule's."""
     v = st.params.get(name)
-    return float(v) if v is not None else float(PARAMS[name].rule(st))
+    return float(v) if v is not None else rule_value(st, name)
 
 
 # ------------------------------------------------------------------ variants of a letter form
@@ -118,10 +142,11 @@ def handles(st: Style) -> List[Dict]:
     and every letter form that has more than one construction."""
     out = []
     for p in PARAMS.values():
-        rule = float(p.rule(st))
+        rule = rule_value(st, p.name)
         span = [p.lo * rule, p.hi * rule] if rule > 0 else [0.0, 0.5 * st.x_height]     # a rule of 0 still has somewhere to go
         out.append({"name": p.name, "shape": p.shape, "value": round(P(st, p.name), 3), "rule_value": round(rule, 3),
-                    "rule": p.text, "source": p.source, "range": [round(span[0], 3), round(span[1], 3)],
+                    "rule": p.text + (f" (× {LEARNED[p.name]:.3g} مما تعلّمه من تعديلاتك)" if p.name in LEARNED else ""),
+                    "source": p.source, "range": [round(span[0], 3), round(span[1], 3)],
                     "set_by_designer": p.name in st.params})
     return out
 

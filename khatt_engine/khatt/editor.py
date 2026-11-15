@@ -22,7 +22,7 @@ import numpy as np
 from .critic import critique
 from .letters import LETTERS
 from .pipeline import analyse
-from .recipes import PARAMS, SHAPE_LETTERS, SKELETON, choices, handles
+from .recipes import PARAMS, SHAPE_LETTERS, SKELETON, choices, handles, rule_value
 from .render import to_svg
 from .selfcheck import self_check
 from .style import Style
@@ -106,7 +106,7 @@ def save_edit(style: Dict[str, Any], word: str, params: Dict[str, float], varian
     for name, v in (params or {}).items():
         if name not in PARAMS or v is None:
             continue
-        rule = float(PARAMS[name].rule(base))
+        rule = rule_value(base, name)
         # values reach the page rounded to three places: a handle left where the rule put it is not an edit
         if abs(float(v) - rule) <= max(2e-3, 1e-4 * abs(rule)):
             continue

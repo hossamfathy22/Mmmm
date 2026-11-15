@@ -575,3 +575,37 @@ def test_editor_logs_what_was_changed(read_example, tmp_path):
     s = summarise(edits)[0]
     assert s["name"] == "meem.height" and s["times"] == 2 and s["logos"] == 2 and s["same_way"] and s["always"] == 1
     assert abs(s["median_ratio"] - 0.75) < 1e-3
+
+
+# ---------------------------------------------------------------- learning from the edits
+def test_a_correction_repeated_on_several_logos_becomes_a_proposal(tmp_path):
+    from khatt.learning import propose
+    def edit(logo, ratio, name="meem.height"):
+        return {"logo": logo, "params": [{"name": name, "rule": 50.0, "chosen": 50.0 * ratio, "ratio": ratio, "scope": "logo"}]}
+    once = [edit("a", 0.8)]
+    twice_opposite = [edit("a", 0.8), edit("b", 1.2), edit("c", 0.9)]
+    three = [edit("a", 0.8), edit("b", 0.9), edit("c", 0.85), edit("c", 0.7)]
+    assert propose(once) == [] and propose(twice_opposite) == []           # one logo, or two ways: not a rule
+    (p,) = propose(three)
+    assert p["name"] == "meem.height" and p["logos"] == 3 and abs(p["factor"] - 0.825) < 1e-6
+
+
+def test_a_learned_factor_sits_on_top_of_the_rule_and_can_be_removed(tmp_path):
+    import json
+    from khatt import recipes
+    from khatt.learning import apply
+    st = Style()
+    plain = recipes.P(st, "meem.height")
+    path = tmp_path / "learned.json"
+    try:
+        apply([{"name": "meem.height", "factor": 0.8, "logos": 3, "times": 4}], path)
+        assert abs(recipes.P(st, "meem.height") - 0.8 * plain) < 1e-6
+        assert abs(recipes.P(Style(params={"meem.height": 33.0}), "meem.height") - 33.0) < 1e-9   # the designer still wins
+        h = {x["name"]: x for x in recipes.handles(st)}["meem.height"]
+        assert "تعلّمه" in h["rule"] and abs(h["rule_value"] - round(0.8 * plain, 3)) < 1e-6
+        data = json.loads(path.read_text(encoding="utf-8")); data.pop("meem.height")
+        path.write_text(json.dumps(data), encoding="utf-8")
+        recipes.load_learned(path)
+        assert abs(recipes.P(st, "meem.height") - plain) < 1e-9
+    finally:
+        recipes.LEARNED.clear()
