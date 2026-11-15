@@ -379,6 +379,8 @@ def _jeem_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 
 param("hah.span", lambda st: 1.78 * st.pitch, "عرض رأس الحاء = 1.78 خطوة", BY_EYE, "الحاء")
+param("hah.reach", lambda st: 2.2 * st.pitch, "امتداد كأس الحاء الأخيرة والمنفصلة إلى اليمين = 2.2 خطوة", BY_EYE, "الحاء")
+param("hah.bowl_left", lambda st: 0.5 * st.pitch, "كم يتجاوز كأس الحاء طرفها الأيسر = نصف خطوة", BY_EYE, "الحاء")
 param("hah.turn", lambda st: 0.62, "نصف قطر انعطاف أنف الحاء = 0.62 من سمك الذراع (أكثر من النصف، فلا ينسدّ داخله)", DERIVED, "الحاء")
 param("hah.nose_y", lambda st: 0.65 * st.x_height, "ارتفاع طرف أنف الحاء في صيغة الذراع المائل = 0.65 × ارتفاع الحروف", FITTED, "الحاء")
 
@@ -427,7 +429,7 @@ def _hah_slanted(st: Style, form: str, mark: Optional[str]) -> Glyph:
         # ح ـح: after landing on the baseline the same stroke turns down into the bowl and swings back
         # to the right under the letter; a join from the right meets it where it lands, lying flat
         D = st.descender
-        xl, reach, yb = xj - 0.5 * P, 2.2 * P, -D + h / 2
+        xl, reach, yb = xj - val(st, "hah.bowl_left"), val(st, "hah.reach"), -D + h / 2
         bowl = g.path(g.cubic(b, (xj - 0.28 * P, h / 2), (xl, 0.1 * D), (xl, -0.3 * D)),
                       g.cubic((xl, -0.3 * D), (xl, -0.8 * D), (xl + 0.2 * reach, yb), (xl + 0.5 * reach, yb)),
                       g.cubic((xl + 0.5 * reach, yb), (xl + 0.8 * reach, yb), (xl + 0.95 * reach, -0.85 * D), (xl + reach, -0.6 * D)))
@@ -497,7 +499,7 @@ def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
         # the next letter keeps its white from the bar's left end; the baseline join passes under it
         return Glyph(shapes, left=xa, entry_x=entry, entry_edge=0, exit_x=ex + 1, exit_edge=xa)
     # ح ـح: from the nose the stroke runs down to the left, through the baseline, into the bowl
-    xl, reach = xa - 0.05 * P, 2.2 * P
+    xl, reach = xa + 0.45 * P - val(st, "hah.bowl_left"), val(st, "hah.reach")
     yb = -D + h / 2
     run = d0 - xl
     beta = 32.0
@@ -631,13 +633,34 @@ def _tah_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
 param("loop.length", lambda st: 0.8 * st.x_height + 1.35 * st.stem,
       "طول عروة الصاد والطاء = 0.8 × ارتفاع الحروف (منحدر بميل 45°) + 1.35 جذع (الطرف المستدير)", FITTED, "العروة")
 param("sad.tooth", lambda st: st.x_height, "ارتفاع سنّ الصاد = ارتفاع الحروف", BY_EYE, "الصاد")
+# On the typefaces (nearly all with heavy hairlines) the ring reads right 61% of the time against 57%
+# for the teardrop. They hardly hold a contrast pen, so for those the teardrop, approved by eye on the
+# reference logo, stays.
+param("loop.ring_length", lambda st: 1.25 * (2 * st.stem + 1.9 * st.white), "طول عروة الصاد الحلقية = 1.25 × (جذعان + 1.9 بياض)", FITTED, "العروة")
+param("loop.ring_below", lambda st: 0.5, "تُرسم العروة حلقةً حين يبلغ الخط الشعري نصف الجذع فأكثر", BY_EYE, "العروة")
+
+
+def _loop_kind(st: Style) -> str:
+    want = st.variants.get("ص") or st.variants.get("ط") or st.variants.get("عروة")
+    if want in ("قطرة", "حلقة"):
+        return want
+    return "قطرة" if st.hair < val(st, "loop.ring_below") * st.stem else "حلقة"
 
 
 def _loop(st: Style) -> Tuple[List[g.Shape], float, float]:
-    """The loop of ص ط with its right end at x = 0: the teardrop, the centre of the stem that stands at
-    its left point, and its length."""
+    """The loop of ص ط with its right end at x = 0, the centre of the stem that stands at its left
+    point, and its length. Two constructions:
+      قطرة  a teardrop: flat on the baseline, a round thick end, a slope down to the stem's foot
+            (a contrast pen, as in the reference logo);
+      حلقة  a rounded ring whose left side is the stem itself, flat on top at the x-height
+            (a pen with heavy hairlines, as most sans typefaces draw it)."""
+    U = st.stem
     L = g.loop_length(st)
-    return [_named(g.teardrop(st, -L, 0.0), "عروة")], -L - st.stem / 2, L
+    if _loop_kind(st) == "حلقة":
+        Lr = val(st, "loop.ring_length")
+        xs = -Lr + U / 2                       # the stem is the ring's left side
+        return [_named(g.ring(st, -Lr, 0.0, 0.0, st.x_height), "عروة")], xs, Lr - U
+    return [_named(g.teardrop(st, -L, 0.0), "عروة")], -L - U / 2, L
 
 
 def sad(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -972,6 +995,11 @@ def tatweel(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 
 # variants chosen inside the builders above, declared so that they can be listed and picked
+declare("ص", "iIMF", [("قطرة", "عروة كالقطرة بمنحدر إلى قدم السنّ: لقلم التباين"),
+                      ("حلقة", "حلقة مستديرة جانبها الأيسر هو السنّ: للأقلام ثقيلة الخطوط الأفقية")],
+        lambda st: "مربّع" if st.angular >= 0.5 else _loop_kind(st))
+declare("ط", "iIMF", [("قطرة", "عروة كالقطرة"), ("حلقة", "حلقة مستديرة")],
+        lambda st: "مربّع" if st.angular >= 0.5 else _loop_kind(st))
 declare("ح", "iIMF", [("أنف", "شرطة شعرية وأنف قائم بسمك الجذع: لقلم التباين"),
                       ("ذراع مائل", "ذراع ينحدر إلى أنف مستدير: لقلم السمك الواحد")],
         lambda st: "مربّع" if st.angular >= 0.5 else _hah_default(st))
