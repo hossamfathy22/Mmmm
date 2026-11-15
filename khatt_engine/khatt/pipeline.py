@@ -20,7 +20,7 @@ import numpy as np
 from .analyze import find_lines
 from .guard import assess, prepare
 from .recipes import choices, handles
-from .selfcheck import check_and_take
+from .selfcheck import check_and_take, prune_parts
 from .bezier import to_path
 from .features import measure_features
 from .library import ACTIVE, build_library
@@ -258,6 +258,13 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     own = own_text(R)
     # letters are taken from the logo only on a sure reading: typed, or read whole from the stems
     check = check_and_take(L, own, style, k, take=not R.text_drawn and health["confidence"] >= TAKE_MIN) if own else None
+    if use_parts and own and check:
+        # a piece of the logo that draws the logo's own word worse is not used
+        dropped = prune_parts(lib, L, own, style, k)
+        if dropped:
+            from .library import PART_NAMES
+            check["notes"].append("لم تُستعمل من قطع الشعار: " + "، ".join(PART_NAMES.get(q, q) for q in dropped)
+                                  + " (رسمت كلمة الشعار نفسها أسوأ من صيغة المحرك).")
 
     # 5-6. build and verify
     def build(st: Style):

@@ -43,6 +43,7 @@ class Style:
     variants: Dict[str, str] = field(default_factory=dict)
     # letters the logo draws its own way, cut out of it by the self-check: "letter.form" -> outlines
     taken: Dict[str, Dict] = field(default_factory=dict)
+    seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # how far the logo draws a letter longer than the engine builds it (kashida): "letter.form" -> length.
     # A joining letter lengthens its join to the next; a final or isolated letter stretches its body
     # along the baseline; a letter with neither leaves more white after it. Fitted by the self-check.

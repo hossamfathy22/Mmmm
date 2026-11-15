@@ -796,3 +796,34 @@ def test_the_layout_cache_rebuilds_only_what_a_change_touches():
     assert changed == {"د"}
     fresh = typeset("بيد", st2)
     assert lay.bbox() == pytest.approx(fresh.bbox())
+
+
+def test_a_letter_cut_from_the_logo_draws_its_siblings_with_their_own_marks():
+    """ب cut from the logo draws ن (same body when joined) with ن's dot above, not ب's below; a letter
+    form the logo has keeps its own drawing."""
+    st = Style()
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    beh = LETTERS["ب"][1](st, "M")
+    ink = unary_union([Polygon(poly).buffer(0) for sh in flat(beh.shapes) for poly in sh])   # as a logo's outline
+    rings = [list(q.exterior.coords)[:-1] for q in getattr(ink, "geoms", [ink])]
+    cut = Style(**{**st.__dict__, "taken": {"ب.M": {"polys": rings}}, "seen": "ب.M"})
+    noon = [p for p in typeset("بنب", cut).placed if p.char == "ن"][0]
+    names = [n for _, n in noon.parts]
+    assert "من الشعار" in names
+    ys = [y for sh in flat(noon.glyph.shapes) if getattr(sh, "name", "") == "من الشعار" for poly in sh for _, y in poly]
+    assert min(ys) > -0.05 * st.x_height                 # ب's dot under the baseline was taken off the body
+    marks = [sh for sh in flat(noon.glyph.shapes) if getattr(sh, "name", "") == "نقطة"]
+    assert marks and min(y for sh in marks for poly in sh for _, y in poly) > 0.9 * st.x_height     # ن's own dot, above
+    own = Style(**{**cut.__dict__, "seen": "ب.M ن.M"})
+    noon2 = [p for p in typeset("بنب", own).placed if p.char == "ن"][0]
+    assert "من الشعار" not in [n for _, n in noon2.parts]
+    assert [p for p in typeset("بنب", own).placed if p.char == "ب"][0].parts[0][1] == "من الشعار"
+
+
+def test_compound_parts_inside_compound_parts_are_laid_out():
+    from khatt.library import Compound, Tagged
+    from khatt.typeset import flat
+    sq = [[(0, 0), (1, 0), (1, 1), (0, 1)]]
+    nested = [Compound([Tagged(sq, "logo", "a"), Compound([Tagged(sq, "engine", "b")])])]
+    assert [s.name for s in flat(nested)] == ["a", "b"]

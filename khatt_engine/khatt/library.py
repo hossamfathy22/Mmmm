@@ -203,7 +203,10 @@ class Library:
         out = Compound([sh])
         foot = self.bottom(xc, entry, exit, self.white)
         if foot is None:
-            out.append(Tagged(fallback(self.y_cut + 0.3 * self.stem), "engine", "أسفل جذع مستنتج"))
+            got = fallback(self.y_cut + 0.3 * self.stem)
+            # the engine's stem is one shape, or several (a compound): each is a list of polygons
+            shapes = got if isinstance(got, Compound) or (got and got[0] and isinstance(got[0][0][0], (list, tuple))) else [got]
+            out.extend(Tagged(sh, "engine", "أسفل جذع مستنتج") for sh in shapes)
         elif isinstance(foot, Compound):
             out += foot
         else:

@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 from . import geometry as g
 from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
-from .recipes import BUILDING, PARAMS, READS, stretch_of, value
+from .recipes import BUILDING, PARAMS, READS, siblings, stretch_of, value
 from .style import Style
 
 TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
@@ -67,10 +67,10 @@ def shape_forms(word: str) -> List[Tuple[str, str]]:
 
 
 def flat(shapes):
-    """Compound parts (several unioned shapes) become separate shapes."""
+    """Compound parts (several unioned shapes, possibly compound themselves) become separate shapes."""
     for s in shapes:
         if isinstance(s, Compound):
-            yield from s
+            yield from flat(s)
         else:
             yield s
 
@@ -94,13 +94,41 @@ def _shift(shape: g.Shape, dx: float) -> g.Shape:
     return [[(x + dx, y) for x, y in poly] for poly in shape]
 
 
-def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] = None, stem: float = 0.0) -> Glyph:
+def _strip_marks(polys, x_height: float):
+    """The body of a letter cut from the logo, without its dots and dashes: the small pieces wholly
+    above the teeth or under the baseline."""
+    from shapely.geometry import Polygon
+    acc = None
+    for ring in polys:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+    if acc is None:
+        return polys
+    pieces = [q for q in getattr(acc, "geoms", [acc]) if q.geom_type == "Polygon" and not q.is_empty]
+    if not pieces:
+        return polys
+    big = max(q.area for q in pieces)
+    keep = [q for q in pieces if not (q.area < 0.35 * big and (q.bounds[1] >= 0.8 * x_height or q.bounds[3] <= 0.05 * x_height))]
+    out = []
+    for q in keep:
+        out.append(list(q.exterior.coords)[:-1])
+        out += [list(h.coords)[:-1] for h in q.interiors]
+    return out
+
+
+def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] = None, stem: float = 0.0,
+              marks: Optional[list] = None, x_height: float = 0.0) -> Glyph:
     """The letter as the logo draws it, standing in for the engine's: the engine's letter is kept
     only for where joins arrive and leave. A letter nothing joins from the right (isolated, initial)
     keeps its right edge where the engine's is, so it does not reach into the white before it.
     `borrowed`: the cut was taken in another form of the letter (final for isolated, medial for
-    initial, and back); a join that arrived from the right is cut off when this form has none."""
+    initial, and back); a join that arrived from the right is cut off when this form has none.
+    `marks`: the cut is another letter with the same body (ب for ن): its own dots are taken off and
+    these (the engine's marks for this letter) put on."""
     polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
+    if marks is not None:
+        polys = _strip_marks(polys, x_height)
     from shapely.geometry import Polygon as _P
 
     def area(rings):
@@ -148,7 +176,7 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
     reach = min(0.0, min(xs) - built.left)
     exit_x = built.exit_x + reach if built.exit_x is not None else None
     exit_edge = built.exit_edge + reach if built.exit_edge is not None else None
-    return Glyph([Tagged(polys, "logo", "من الشعار")], left=min(min(xs), built.left), entry_x=built.entry_x,
+    return Glyph([Tagged(polys, "logo", "من الشعار")] + list(marks or []), left=min(min(xs), built.left), entry_x=built.entry_x,
                  entry_edge=built.entry_edge, exit_x=exit_x, exit_edge=exit_edge, stems=built.stems,
                  tail=built.tail)
 
@@ -232,7 +260,9 @@ def stretch_glyph(glyph: Glyph, e: float, st: Style) -> Optional[Glyph]:
         else:
             new = [[(x - e if x < xc else x, y) for x, y in poly] for poly in sh]
         return Tagged(new, getattr(sh, "source", "engine"), getattr(sh, "name", "")) if isinstance(sh, Tagged) else new
-    shapes = [Compound(move(sub) for sub in s) if isinstance(s, Compound) else move(s) for s in glyph.shapes]
+    def deep(sh):
+        return Compound(deep(sub) for sub in sh) if isinstance(sh, Compound) else move(sh)
+    shapes = [deep(s) for s in glyph.shapes]
     at = lambda v: (v - e if v < xc else v) if v is not None else None
     return Glyph(shapes, left=at(glyph.left), entry_x=glyph.entry_x, entry_edge=glyph.entry_edge,
                  exit_x=at(glyph.exit_x), exit_edge=at(glyph.exit_edge),
@@ -242,6 +272,23 @@ def stretch_glyph(glyph: Glyph, e: float, st: Style) -> Optional[Glyph]:
 def extension(st: Style, key: str) -> float:
     """How much longer the logo draws this letter form: the designer's value, else the fitted one."""
     return stretch_of(st, key)
+
+
+def find_cut(st: Style, c: str, form: str):
+    """The letter as the logo draws it, for `c` in `form`: cut in this form, else in the other form
+    that differs only by the join from the right (isolated/final, initial/medial), else the same of a
+    letter with the same body (ب for ن). Returns (cut, the form it was cut in if another, whether it
+    is another letter's)."""
+    other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
+    # a letter form the logo has keeps its own drawing (the engine's, or its own cut); another letter's
+    # body serves only letters the logo does not have
+    kin_ok = f"{c}.{form}" not in st.seen.split()
+    for letter, kin in [(c, False)] + [(q, True) for q in (siblings(c, form) if kin_ok else [])]:
+        if f"{letter}.{form}" in st.taken:
+            return st.taken[f"{letter}.{form}"], None, kin
+        if f"{letter}.{other}" in st.taken and (not kin or letter in siblings(c, other) or c in siblings(letter, other)):
+            return st.taken[f"{letter}.{other}"], other, kin
+    return None, None, False
 
 
 def _dep_value(st: Style, dep: str):
@@ -295,15 +342,11 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 if rtok is not None:
                     READS.reset(rtok)
         BUILDING.reset(ltok)
-        cut, borrowed = st.taken.get(f"{c}.{form}"), None
-        if cut is None:
-            # the same body in the other form that differs only by the join from the right
-            other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
-            if f"{c}.{other}" in st.taken:
-                cut, borrowed = st.taken[f"{c}.{other}"], other
+        cut, borrowed, kin = find_cut(st, c, form)
         ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":
-            glyph = from_logo(glyph, cut, form, borrowed, st.stem)
+            marks = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)] if kin else None
+            glyph = from_logo(glyph, cut, form, borrowed, st.stem, marks, st.x_height)
             ext = 0.0                    # the letter as the logo draws it already has the logo's length
         if ext > 0 and form in ("i", "F"):
             longer = stretch_glyph(glyph, ext, st)
@@ -336,7 +379,7 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
             lay.joins.append((a, b))
             prev.join_out = (min(a, b), max(a, b))
         for s in glyph.shapes:
-            for sub in (s if isinstance(s, Compound) else [s]):
+            for sub in flat([s]):
                 src, name = getattr(sub, "source", "engine"), getattr(sub, "name", "") or "قطعة"
                 here.parts.append((src, name))
                 lay.shapes.append(Tagged(_shift(sub, x), src, name))

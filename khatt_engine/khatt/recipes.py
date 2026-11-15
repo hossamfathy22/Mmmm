@@ -237,6 +237,24 @@ SKELETON = {"غ": "ع", "ج": "ح", "خ": "ح", "چ": "ح", "ة": "ه", "ی": "�
             "ض": "ص", "ظ": "ط", "ش": "س", "ذ": "د", "ز": "ر", "ژ": "ر", "ت": "ب", "ث": "ب", "پ": "ب"}
 
 
+# Letters that share one body and differ only by their marks, in the forms where they do: what the
+# logo draws of one of them (a letter cut from it) draws the others, with their own marks.
+BODIES: List[Tuple[str, str]] = [
+    ("بتثپنيیئ", "IM"), ("بتثپ", "iF"), ("يیى", "iF"), ("جحخچ", "iIMF"), ("دذ", "iF"), ("رزژ", "iF"),
+    ("سش", "iIMF"), ("صض", "iIMF"), ("طظ", "iIMF"), ("عغ", "iIMF"), ("فقڤ", "IM"), ("فڤ", "iF"),
+    ("كک", "iIMF"), ("هة", "iF"),
+]
+
+
+def siblings(letter: str, form: str) -> List[str]:
+    """The other letters drawn with the same body as `letter` in `form`."""
+    out: List[str] = []
+    for letters, forms in BODIES:
+        if letter in letters and form in forms:
+            out += [c for c in letters if c != letter and c not in out]
+    return out
+
+
 # ------------------------------------------------------------------ what a designer can move
 def handles(st: Style) -> List[Dict]:
     """Every named parameter with its value for this logo, its rule and where the rule came from,
@@ -280,6 +298,10 @@ def choices(st: Style) -> List[Dict]:
     partner = {"i": "F", "F": "i", "I": "M", "M": "I"}
     keys = list(st.taken) + [f"{k.split('.')[0]}.{partner[k.split('.')[1]]}" for k in st.taken
                              if f"{k.split('.')[0]}.{partner[k.split('.')[1]]}" not in st.taken]
+    # and every letter that shares the body of a letter taken from the logo
+    keys += [f"{c}.{f}" for key in list(keys) for f in [key.split(".")[1]] for c in siblings(key.split(".")[0], f)
+             if f"{c}.{f}" not in keys]
+    keys = list(dict.fromkeys(keys))
     for key in keys:
         letter, form = key.split(".")
         out.append({"letter": letter, "form": form, "chosen": "المحرك" if st.variants.get(key) == "المحرك" else "من الشعار",

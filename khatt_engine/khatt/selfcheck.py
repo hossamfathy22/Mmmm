@@ -310,8 +310,13 @@ class _Trial:
             self.count = owner != hide
         self.logo_sum = float((logo & self.count).sum())
 
+    CACHED = {"fitted", "chosen", "traits", "stretch", "params", "variants", "measured_on"}
+
     def layout(self, **changes):
-        return typeset(self.text, Style(**{**self.up.__dict__, **changes}), cache=self.cache)
+        # the cache knows what letters read of the parameters and variants; any other change of the
+        # style (the construction family) builds the letters afresh
+        cache = self.cache if set(changes) <= self.CACHED else None
+        return typeset(self.text, Style(**{**self.up.__dict__, **changes}), cache=cache)
 
     def score(self, **changes) -> float:
         return self.scores(**changes)[0]
@@ -492,6 +497,9 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
     those letters cut out of the logo: `st.taken` is filled, and the result says how far it helped.
     With take=False (the logo's word is only a guess) nothing is cut: a wrong reading would cut a
     wrong letter."""
+    if take:
+        from .typeset import shape_forms
+        st.seen = " ".join(dict.fromkeys(f"{c}.{f}" for c, f in shape_forms(text) if f in "iIMF"))
     first = self_check(L, text, st, k)
     if first and take:
         first = _measure_rules(L, text, st, k, first)
@@ -608,3 +616,30 @@ def _lengthen(L: Line, text: str, st: Style, k: float, first: Dict[str, Any], la
         first["notes"].append("الشعار يمدّ " + "، ".join(longer) + " من ارتفاع الحروف أطول مما يبنيه المحرك: مدّها مثله فارتفع التطابق من "
                               f"{before * 100:.0f}% إلى {r['overall'] * 100:.0f}%. يُستعمل المدّ نفسه في كل كلمة جديدة.")
     return first
+
+
+def prune_parts(lib, L: Line, text: str, st: Style, k: float) -> List[str]:
+    """The pieces cut from the logo (the parts box) must earn their place like everything else: each
+    is left out in turn, and dropped if the logo's own word then matches better. Returns what was
+    dropped (and removes it from `lib`)."""
+    from .library import ACTIVE
+
+    def score() -> float:
+        tok = ACTIVE.set(lib)
+        try:
+            r = self_check(L, text, st, k)
+        finally:
+            ACTIVE.reset(tok)
+        return r["overall"] if r else 0.0
+    if not text:
+        return []
+    now, dropped = score(), []
+    for key in list(lib.parts):
+        part = lib.parts.pop(key)
+        sc = score()
+        if sc > now + 0.01:
+            now = sc
+            dropped.append(key)
+        else:
+            lib.parts[key] = part
+    return dropped

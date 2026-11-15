@@ -83,7 +83,7 @@ def held_out(folder: Path) -> List[Dict]:
         base = self_check(L, text, st, k)
         if not base:
             continue
-        general, measured = [], []
+        general, measured, with_cuts = [], [], []
         for i, x in enumerate(base["letters"]):
             t = _Trial(L, text, st, k, hide=i)
             if not t.ok:
@@ -96,23 +96,43 @@ def held_out(folder: Path) -> List[Dict]:
                 continue
             general.append(x["match"])
             measured.append(r["letters"][i]["match"])
+            # and with the bodies of the other letters cut from the logo: a sibling's body (ي for ن)
+            # may draw the hidden letter, its own ink may not
+            own = {f"{x['letter']}.{f}" for f in (x["form"], {"i": "F", "F": "i", "I": "M", "M": "I"}[x["form"]])}
+            cuts = {q: v for q, v in (r.get("taken") or {}).items() if q not in own}
+            got = r["letters"][i]["match"]
+            if cuts:
+                r2 = self_check(L, text, Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits,
+                                                   "measured_on": on, "taken": cuts,
+                                                   "seen": " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i)}), k)
+                if r2 and len(r2["letters"]) == len(base["letters"]):
+                    got = r2["letters"][i]["match"]
+            with_cuts.append(got)
         if general:
             rows.append({"name": name, "text": text, "general": sum(general) / len(general),
                          "measured": sum(measured) / len(measured), "letters": len(general),
+                         "with_cuts": sum(with_cuts) / len(with_cuts),
+                         "better_cuts": sum(m > g + 0.02 for g, m in zip(general, with_cuts)),
+                         "worse_cuts": sum(m < g - 0.02 for g, m in zip(general, with_cuts)),
                          "better": sum(m > g + 0.02 for g, m in zip(general, measured)),
                          "worse": sum(m < g - 0.02 for g, m in zip(general, measured))})
     return rows
 
 
 def held_out_summary(rows: List[Dict]) -> str:
-    lines = ["| الشعار | الحرف المخفي بالقواعد العامة | بالقواعد المقيسة من بقية الحروف | تحسّن | ساء |", "|---|---|---|---|---|"]
+    lines = ["| الشعار | الحرف المخفي بالقواعد العامة | بالقواعد المقيسة من بقية الحروف | تحسّن / ساء | ومع أجسام الحروف الشقيقة من الشعار | تحسّن / ساء |",
+             "|---|---|---|---|---|---|"]
     for r in rows:
-        lines.append(f"| {r['text']} | {r['general'] * 100:.0f}% | {r['measured'] * 100:.0f}% | {r['better']} | {r['worse']} |")
+        lines.append(f"| {r['text']} | {r['general'] * 100:.0f}% | {r['measured'] * 100:.0f}% | {r['better']} / {r['worse']} | "
+                     f"{r['with_cuts'] * 100:.0f}% | {r['better_cuts']} / {r['worse_cuts']} |")
     n = sum(r["letters"] for r in rows)
     g = sum(r["general"] * r["letters"] for r in rows) / max(1, n)
     m = sum(r["measured"] * r["letters"] for r in rows) / max(1, n)
+    c = sum(r["with_cuts"] * r["letters"] for r in rows) / max(1, n)
     lines += ["", f"على {n} حرفًا مخفيًا في {len(rows)} شعارًا: {g * 100:.1f}% بالقواعد العامة، و{m * 100:.1f}% بقواعد مقيسة "
-              f"من بقية حروف الشعار. تحسّن {sum(r['better'] for r in rows)} وساء {sum(r['worse'] for r in rows)}."]
+              f"من بقية حروف الشعار (تحسّن {sum(r['better'] for r in rows)} وساء {sum(r['worse'] for r in rows)})، "
+              f"و{c * 100:.1f}% حين تُرسم من أجسام الحروف الشقيقة المقصوصة من الشعار أيضًا "
+              f"(تحسّن {sum(r['better_cuts'] for r in rows)} وساء {sum(r['worse_cuts'] for r in rows)})."]
     return "\n".join(lines)
 
 
