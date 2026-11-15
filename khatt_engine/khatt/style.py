@@ -30,6 +30,8 @@ class Style:
     overshoot: float = 0.0      # round bottoms and tops pass the lines by this much
     seen_drop: float = 0.0      # inner teeth of س ش are this much lower
     group_gap: float = 0.0      # white between letters that do not join (0 = 1.15 x white)
+    reh_corner: float = 0.0     # outer radius of the top corner of a letter hung from the tooth before it (0 = not seen)
+    join_white: float = 0.0     # white between two joined letters (0 = white, as between the teeth of one letter)
     round_gap: float = 1.18     # extra white before a round head (optical spacing)
     # ---- vocabulary read from the skeleton (skeleton.py)
     angular: float = 0.0        # share of the turning done at corners: >= 0.5 draws tails and cups with corners

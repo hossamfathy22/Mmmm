@@ -98,7 +98,9 @@ TRAITS: Dict[str, Tuple[str, List[str]]] = {
     "استدارة": ("استدارة الأركان والانعطافات", ["ain.round", "reh.corner", "hah.turn"]),
 }
 TRAIT_OF = {n: t for t, (_, names) in TRAITS.items() for n in names}
-TRAIT_GRID = (0.6, 0.7, 0.8, 0.9, 1.1, 1.2, 1.35, 1.5, 1.75)
+# A manner turns rules by a little: a factor beyond these drew letters the logo lacks out of shape
+# (Sirang measured "height x 1.75" on five letters, and its م and ع came out a third too tall).
+TRAIT_GRID = (0.8, 0.9, 1.1, 1.25)
 
 
 def trait_rule(st: Style, name: str) -> float:

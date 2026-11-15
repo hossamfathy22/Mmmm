@@ -104,10 +104,15 @@ def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) 
     if "overshoot" in f: st.overshoot = float(np.clip(f["overshoot"], 0, 0.06 * st.x_height))
     if "seen_drop" in f: st.seen_drop = float(np.clip(f["seen_drop"], 0, 0.3 * st.x_height))
     if "group_gap" in f: st.group_gap = float(np.clip(f["group_gap"], 0.5 * st.white, 2.5 * st.white))
+    # the designer may set joined letters further apart than the teeth of one letter: used only when it
+    # clearly differs (a sixth of the white), so a measure's noise does not move every join
+    if "join_white" in f and abs(f["join_white"] - st.white) > st.white / 6:
+        st.join_white = float(np.clip(f["join_white"], 0.6 * st.white, 2.5 * st.white))
     if "angular" in f: st.angular = float(np.clip(f["angular"], 0, 1))
     if "corner_r" in f: st.corner_r = float(np.clip(f["corner_r"], 0, 1.5 * st.stem))
     if "tail_drop" in f: st.tail_drop = float(np.clip(f["tail_drop"], 0, 1))
     if "top_join" in f: st.top_join = float(f["top_join"])
+    if "reh_corner" in f: st.reh_corner = float(np.clip(f["reh_corner"], 0, 1.2 * st.stem))
     # the logo's own dash mark: a short hairline that is not a long bar over a letter
     own = [p.size * k for p in L.dashes if p.size <= 2.6 * L.stem and not (p.cy > 0.9 * L.x_height and p.size > 2.2 * L.stem)]
     if own:

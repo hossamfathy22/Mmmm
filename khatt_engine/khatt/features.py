@@ -9,6 +9,7 @@ For every logo the engine measures *how* its parts are shaped, not only how big 
   overshoot              how far round bottoms dip below the flat ones
   seen_drop              how much lower the inner teeth of a run are
   group_gap              white between letters that do not join
+  join_white             white between two joined letters (the teeth of one letter keep `white`)
   angular, corner_r      from the skeleton: share of the turning done at corners, and their outer radius
   tail_drop, tail_reach  for letters of the ر family in the logo's own text: how far the tail goes
                          below the baseline (0 = it rests on the baseline) and how far it reaches
@@ -214,6 +215,14 @@ def _group_gap(L: Line, R: Reading) -> Optional[float]:
     return _median(gaps)
 
 
+def _letter_gap(L: Line, R: Reading) -> Tuple[Optional[float], int]:
+    """White between two joined letters, apart from the white between the teeth of one letter (the
+    three teeth of س). Only where the reading knows which stems belong to which letter."""
+    of = {i: n for n, u in enumerate(R.units) if u.letter not in ("?", "ٮ") for i in u.stems}
+    between = [j.white for j in R.joins if j.kind == "join" and j.right in of and j.left in of and of[j.right] != of[j.left]]
+    return _median(between), len(between)
+
+
 # ------------------------------------------------------------------ all together
 def measure_features(lines: List[Line], readings: List[Reading], src: int, k: float) -> Dict[str, Dict]:
     """Returns {name: {"value": v, "samples": n, "unit": ..., "note": Arabic text}} (lengths in original px)."""
@@ -249,6 +258,10 @@ def measure_features(lines: List[Line], readings: List[Reading], src: int, k: fl
         "انخفاض الأسنان الداخلية عن ارتفاع الحروف", "px")
     gg = _group_gap(L, R)
     put("group_gap", gg * k if gg is not None else None, 1, "الأبيض بين حرفين غير متصلين", "px")
+    rc, rn = _top_join_corner(L, R)
+    put("reh_corner", rc * k if rc is not None else None, rn, "استدارة الركن الخارجي للحرف الموصول من أعلى السن", "px")
+    lg, ln = _letter_gap(L, R)
+    put("join_white", lg * k if lg is not None else None, ln, "الأبيض بين حرفين متصلين (غير البياض بين أسنان الحرف الواحد)", "px")
     from .skeleton import read_skeleton
     sk = read_skeleton(L)
     turns = sum(1 for g in sk.segments if g.kind in ("corner", "curve"))
@@ -268,14 +281,15 @@ def measure_features(lines: List[Line], readings: List[Reading], src: int, k: fl
     return out
 
 
-def _top_joins(L: Line, R: Reading) -> int:
-    """How many descending stems (ر ز و) hang from the top of the tooth on their right: same body,
-    no join on the baseline between the two, ink across the top and white under it."""
+def _hung(L: Line, R: Reading) -> List[int]:
+    """The stems (ر ز و) that hang from the top of the tooth on their right: same body, no join on
+    the baseline between the two, ink across the top and white under it, and a tail below the
+    baseline (a short tail is still a tail: the stem may have been taken for a tooth)."""
     X, U = L.x_height, L.stem
     joined = {(j.right, j.left) for j in R.joins}
-    n = 0
+    out = []
     for i, s in enumerate(L.stems):
-        if s.role != "descending" or i == 0:
+        if s.role not in ("descending", "tooth") or i == 0:
             continue
         r = L.stems[i - 1]
         if r.comp != s.comp or (i - 1, i) in joined or not (0 < r.x - s.x < 3.2 * U) or r.top < 0.85 * X:
@@ -286,9 +300,47 @@ def _top_joins(L: Line, R: Reading) -> int:
         gap = L.lab[:, c0:c1 + 1] == s.comp
         top = gap[int(L.row_of_y(min(s.top, r.top))):int(L.row_of_y(0.75 * X)) + 1]
         low = gap[int(L.row_of_y(0.6 * X)):int(L.row_of_y(0.12 * X)) + 1]
-        if top.size and low.size and top.any(axis=0).mean() > 0.85 and low.mean() < 0.1:
-            n += 1
-    return n
+        if not (top.size and low.size and top.any(axis=0).mean() > 0.85 and low.mean() < 0.1):
+            continue
+        if s.role != "descending":
+            # a tooth-like stem counts only with ink well under the baseline below it
+            sc0, sc1 = int(round(L.col_of_x(s.x - s.w))), int(round(L.col_of_x(s.x + s.w / 2)))
+            # (the line's picture may end a little under the baseline: what shows of the tail is enough)
+            under = L.lab[int(L.row_of_y(-0.04 * X)):, max(0, sc0):sc1 + 1] == s.comp
+            if not under.any():
+                continue
+        out.append(i)
+    return out
+
+
+def _top_joins(L: Line, R: Reading) -> int:
+    """How many descending stems hang from the top of the tooth on their right (see _hung)."""
+    return len(_hung(L, R))
+
+
+def _top_join_corner(L: Line, R: Reading) -> Tuple[Optional[float], int]:
+    """The rounding of the outer top corner of a letter hung from the top of the tooth before it
+    (ر in سیرنگ): going down from the top, how far the stem's outer edge stays inside its line."""
+    X, U = L.x_height, L.stem
+    radii = []
+    for i in _hung(L, R):
+        s = L.stems[i]
+        edge = s.x - s.w / 2                                # the outer (left) edge of the stem
+        c0, c1 = int(round(L.col_of_x(edge - 0.3 * U))), int(round(L.col_of_x(edge + U)))
+        top_row = int(round(L.row_of_y(min(s.top, X) + 0.05 * U)))
+        depth = 0.0
+        for row in range(max(0, top_row), int(round(L.row_of_y(min(s.top, X) - 1.2 * U))) + 1):
+            ink = np.flatnonzero(L.lab[row, max(0, c0):c1 + 1] == s.comp)
+            if not len(ink):
+                continue
+            x = L.x_of_col(max(0, c0) + ink[0])
+            if x - edge > 0.04 * U:                        # the edge is still turning in
+                depth = min(s.top, X) - L.y_of_row(row)
+            else:
+                break
+        if depth > 0:
+            radii.append(depth)
+    return _median(radii), len(radii)
 
 
 def _reh_tails(L: Line, R: Reading) -> Tuple[List[float], List[float]]:

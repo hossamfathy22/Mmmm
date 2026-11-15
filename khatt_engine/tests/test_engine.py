@@ -865,3 +865,28 @@ def test_a_reference_letter_is_the_designers_choice_for_letters_the_logo_lacks()
     assert "بنية الخط المرجعي" in [n for _, n in asked.placed[0].parts]
     keys = {(c["letter"], c["form"]) for c in choices(st) if any(o["name"] == REFERENCE for o in c["options"])}
     assert ("ح", "I") in keys and ("ب", "I") not in keys          # a letter the logo has keeps its own drawing
+
+
+# ---------------------------------------------------------------- what the logo measures and the drawing now uses
+def test_the_white_between_joined_letters_is_measured_apart_from_the_teeth():
+    """A word drawn with joined letters set wider apart than the teeth of one letter: the engine
+    measures that white apart, and lays new words out with it."""
+    from khatt.pipeline import analyse
+    st = Style(slant=0.0, join_white=1.6 * Style().white)
+    png = to_png(typeset("سبس", st), height=300)
+    an = analyse(png, texts=["سبس"], read=False)
+    got = an["style"]
+    assert got.join_white == pytest.approx(1.6 * got.white, rel=0.2)
+    a, b = typeset("سب", Style(**{**got.__dict__, "join_white": 0.0})), typeset("سب", got)
+    assert (b.bbox()[2] - b.bbox()[0]) - (a.bbox()[2] - a.bbox()[0]) == pytest.approx(got.join_white - got.white, abs=1.0)
+
+
+def test_a_reh_hung_from_the_tooth_is_seen_with_a_short_tail():
+    """ر hung from the top of the tooth before it, with a tail barely under the baseline (as in
+    سیرنگ): the logo is read as joining from the top, and the corner of the ر is measured."""
+    from khatt.pipeline import analyse
+    base = Style(slant=0.0, top_join=1.0, tail_drop=0.3)
+    png = to_png(typeset("بير", base), height=300)
+    an = analyse(png, texts=["بير"], read=False)
+    got = an["style"]
+    assert got.top_join >= 0.5 and got.reh_corner > 0

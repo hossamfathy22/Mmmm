@@ -467,8 +467,8 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     # own measures): it is what reaches letters the logo does not contain
     t.up = Style(**{**t.up.__dict__, "chosen": chosen, "fitted": {}})
     now, _ = t.scores()
-    # A manner is what the designer repeats: a trait is kept only where it draws at least two letters
-    # better, and more letters better than worse (one letter drawn long is a kashida, not a manner).
+    # A manner is what the designer repeats: a trait is kept only where it draws most of the letters
+    # better and none worse (one letter drawn long is a kashida, not a manner).
     traits: Dict[str, float] = {}
     kinds = [q for q, (_, names) in TRAITS.items() if any(n in params for n in names)]
     _, each_now = t.scores()
@@ -482,7 +482,8 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
                 sc, each = t.scores(traits={**traits, q: f})
                 up = sum(1 for a, b in zip(each_now, each) if b > a + 0.02)
                 down = sum(1 for a, b in zip(each_now, each) if b < a - 0.02)
-                if up >= 2 and up > down and (best is None or sc > best[0]):
+                # a manner shows in most of the letters, not in two of them
+                if up >= max(2, (len(each) + 1) // 2) and down == 0 and (best is None or sc > best[0]):
                     best = (sc, f, each)
             if best is not None and best[0] > now + FIT_MIN:
                 now, traits, grew, each_now = best[0], {**traits, q: best[1]}, True, best[2]

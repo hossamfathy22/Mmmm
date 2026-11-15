@@ -374,7 +374,7 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 x = prev.x + prev.glyph.left - st.white - glyph.entry_edge
                 joined = False
             elif joined and prev.glyph.exit_edge is not None:
-                x = prev.x + prev.glyph.exit_edge - st.white - glyph.entry_edge
+                x = prev.x + prev.glyph.exit_edge - (st.join_white or st.white) - glyph.entry_edge
             else:
                 gap = group_gap * (st.round_gap if glyph.entry_x < glyph.entry_edge - 1e-6 else 1.0)   # optical: rounds need more
                 x = prev.x + prev.glyph.left - gap - glyph.entry_edge

@@ -541,7 +541,8 @@ def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 
 param("reh.top", lambda st: 0.62 * st.x_height, "ارتفاع جذع الراء = 0.62 × ارتفاع الحروف", BY_EYE, "الراء")
-param("reh.corner", lambda st: 0.48 * st.stem, "استدارة ركن الراء الموصولة من أعلى = 0.48 جذع (قيست 11 على جذع 23)", MEASURED, "الراء")
+param("reh.corner", lambda st: st.reh_corner if st.reh_corner > 0 else 0.48 * st.stem,
+      "استدارة ركن الراء الموصولة من أعلى = كما يقيسها الشعار، وإلا 0.48 جذع (قيست 11 على جذع 23 في «سیرنگ»)", MEASURED, "الراء")
 
 
 def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
