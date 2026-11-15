@@ -58,6 +58,13 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     L, R, st, k = an["lines"][an["src"]], an["readings"][an["src"]], an["style"], an["k"]
     own = own_text(R)
     check = check_and_take(L, own, st, k, take=not R.text_drawn and an["health"]["confidence"] >= TAKE_MIN) if own else None
+    ref = None
+    if own and an["health"]["confidence"] >= TAKE_MIN:
+        # the reference typeface nearest the logo: the letters the logo lacks may be built on it
+        from .reference import nearest
+        ref = nearest(L, own, st, k, widths=(1.0,))
+        if ref:
+            st.reference, st.ref_wide = str(ref["path"]), ref["wide"]
     overlay = None
     if check:
         overlay = base64.b64encode(check.pop("overlay_png")).decode("ascii")
@@ -68,6 +75,8 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
         "style": st.to_dict(), "health": an["health"], "read": R.text_given or R.text_guess, "read_sure": bool(own),
         "read_how": "given" if R.text_given else ("drawn" if R.text_drawn else "stems"), "read_match": R.drawn_match,
         "self_check": check, "self_check_png": overlay,
+        "reference": ({"font": Path(ref["path"]).stem, "match": round(ref["match"], 3), "engine": round(ref["engine"], 3)}
+                      if ref else None),
         "measures": {"الجذع": st.stem, "الخط الشعري": st.hair, "ارتفاع الحروف": st.x_height, "الطالع": st.ascender,
                      "النازل": st.descender, "البياض بين الأسنان": st.white, "الميل °": st.slant, "قطر النقطة": st.dot},
     })
@@ -86,7 +95,7 @@ def draw(style: Dict[str, Any], word: str, params: Optional[Dict[str, float]] = 
     for h in hs:
         h["used"] = (any(c == h["letters"] and f == h["form"] or (c == h["letters"] and {f, h["form"]} in ({"i", "F"}, {"I", "M"}))
                          for c, f in forms) if "letters" in h else bool(in_word & set(SHAPE_LETTERS.get(h["shape"], ""))))
-    present = {(SKELETON.get(c, c), f) for c, f in forms}
+    present = {(SKELETON.get(c, c), f) for c, f in forms} | set(forms)
     cs = [dict(c, form_ar=FORM_AR[c["form"]]) for c in choices(st) if (c["letter"], c["form"]) in present]
     out = {"svg": to_svg(lay, background=None), "handles": hs, "choices": cs, "skipped": lay.skipped,
            "letters": [{"letter": c, "form": FORM_AR[f]} for c, f in forms]}

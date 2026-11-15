@@ -237,6 +237,9 @@ SKELETON = {"غ": "ع", "ج": "ح", "خ": "ح", "چ": "ح", "ة": "ه", "ی": "�
             "ض": "ص", "ظ": "ط", "ش": "س", "ذ": "د", "ز": "ر", "ژ": "ر", "ت": "ب", "ث": "ب", "پ": "ب"}
 
 
+REFERENCE = "من المرجع"         # the variant: built on the structure of the logo's reference typeface
+
+
 # Letters that share one body and differ only by their marks, in the forms where they do: what the
 # logo draws of one of them (a letter cut from it) draws the others, with their own marks.
 BODIES: List[Tuple[str, str]] = [
@@ -315,4 +318,29 @@ def choices(st: Style) -> List[Dict]:
         out.append({"letter": letter, "form": form, "chosen": want if want in names else default(st),
                     "options": [{"name": n, "note": note} for n, note in options],
                     "set_by_designer": key in st.variants or letter in st.variants})
+    if st.reference:
+        # every letter form the logo lacks may be built on the structure of the logo's reference
+        # typeface: one more option of its own entry, or an entry of its own
+        from pathlib import Path
+        from .letters import LETTERS
+        font = Path(st.reference).stem
+        note = f"بنية الحرف من الخط المرجعي الأقرب إلى الشعار ({font})، مرسومة بقلم الشعار"
+        have = {(c["letter"], c["form"]): c for c in out}
+        for c, (joining, _) in LETTERS.items():
+            for f in ("iIMF" if joining == "D" else "iF"):
+                key = f"{c}.{f}"
+                if key in st.seen.split() or key in st.taken:
+                    continue
+                entry = have.get((c, f)) or have.get((SKELETON.get(c, c), f))
+                if entry is not None and not any(o["name"] in ("من الشعار", "المحرك") for o in entry["options"]):
+                    entry["options"].append({"name": REFERENCE, "note": note})
+                    if st.variants.get(key) == REFERENCE:
+                        entry["chosen"] = REFERENCE
+                    continue
+                if entry is not None:
+                    continue
+                out.append({"letter": c, "form": f, "chosen": st.variants.get(key) or "المحرك",
+                            "options": [{"name": "المحرك", "note": "الحرف كما يبنيه المحرك بقواعد الشعار"},
+                                        {"name": REFERENCE, "note": note}],
+                            "set_by_designer": key in st.variants})
     return out

@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 from . import geometry as g
 from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
-from .recipes import BUILDING, PARAMS, READS, siblings, stretch_of, value
+from .recipes import BUILDING, PARAMS, READS, REFERENCE, SKELETON, siblings, stretch_of, value
 from .style import Style
 
 TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
@@ -342,6 +342,16 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 if rtok is not None:
                     READS.reset(rtok)
         BUILDING.reset(ltok)
+        if st.reference and (st.ref_all or (f"{c}.{form}" not in st.seen.split()
+                                             and REFERENCE in (st.variants.get(f"{c}.{form}"),
+                                                               st.variants.get(f"{SKELETON.get(c, c)}.{form}")))):
+            # a letter the logo lacks, asked of the logo's reference typeface: built on its structure
+            # with the logo's pen (the examination found this no better than the engine on average,
+            # so it is the designer's choice, not the default)
+            from .reference import ref_glyph
+            got = ref_glyph(st.reference, c, form, st, st.ref_wide, engine=glyph)
+            if got is not None:
+                glyph = got
         cut, borrowed, kin = find_cut(st, c, form)
         ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":

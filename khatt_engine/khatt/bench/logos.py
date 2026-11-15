@@ -119,6 +119,70 @@ def held_out(folder: Path) -> List[Dict]:
     return rows
 
 
+def reference_exam(folder: Path, widths=(0.85, 1.0, 1.2)) -> List[Dict]:
+    """Would the letters a logo lacks be better built on the structure of a reference typeface?
+    Every letter of the word is hidden in turn; the typeface (and width) that redraws the other
+    letters best is chosen, and the hidden letter, built on it with the logo's pen, is matched on the
+    logo, against the engine's own letter."""
+    import numpy as np
+    from ..pipeline import TAKE_MIN, analyse
+    from ..reference import faces
+    from ..selfcheck import self_check
+    from ..style import Style
+    paths = [f for f in faces() if f.endswith("-400.woff2")]
+    texts = json.loads((folder / "texts.json").read_text(encoding="utf-8"))
+    rows = []
+    for name, text in texts.items():
+        pics = [p for p in folder.glob(name + ".*") if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")]
+        if not pics or not paths:
+            continue
+        try:
+            an = analyse(pics[0].read_bytes(), texts=[text], read=False)
+        except Exception:
+            continue
+        if an["health"]["confidence"] < TAKE_MIN:
+            continue
+        L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+        base = self_check(L, text, st, k)
+        if not base:
+            continue
+        n = len(base["letters"])
+        eng = np.array([x["match"] for x in base["letters"]])
+        found = []
+        for path in paths:
+            for w in widths:
+                try:
+                    r = self_check(L, text, Style(**{**st.__dict__, "reference": path, "ref_wide": w, "ref_all": True}), k)
+                except Exception:
+                    continue
+                if r and len(r["letters"]) == n:
+                    found.append((path, w, np.array([x["match"] for x in r["letters"]])))
+        if not found:
+            continue
+        A = np.array([m for _, _, m in found])
+        ref = []
+        for i in range(n):
+            others = [j for j in range(n) if j != i]
+            ref.append(float(A[A[:, others].mean(axis=1).argmax(), i]))
+        best = found[int(A.mean(axis=1).argmax())]
+        rows.append({"name": name, "text": text, "engine": float(eng.mean()), "reference": float(np.mean(ref)), "letters": n,
+                     "font": Path(best[0]).stem, "better": int(sum(r > e + 0.02 for r, e in zip(ref, eng))),
+                     "worse": int(sum(r < e - 0.02 for r, e in zip(ref, eng)))})
+    return rows
+
+
+def reference_summary(rows: List[Dict]) -> str:
+    lines = ["| الشعار | الحرف المخفي بصيغة المحرك | ببنية الخط المرجعي | تحسّن / ساء | أقرب خط |", "|---|---|---|---|---|"]
+    for r in rows:
+        lines.append(f"| {r['text']} | {r['engine'] * 100:.0f}% | {r['reference'] * 100:.0f}% | {r['better']} / {r['worse']} | {r['font']} |")
+    n = sum(r["letters"] for r in rows)
+    e = sum(r["engine"] * r["letters"] for r in rows) / max(1, n)
+    f = sum(r["reference"] * r["letters"] for r in rows) / max(1, n)
+    lines += ["", f"على {n} حرفًا مخفيًا: {e * 100:.1f}% بصيغة المحرك، و{f * 100:.1f}% ببنية الخط المرجعي المختار من بقية الحروف "
+              f"(تحسّن {sum(r['better'] for r in rows)} وساء {sum(r['worse'] for r in rows)})."]
+    return "\n".join(lines)
+
+
 def held_out_summary(rows: List[Dict]) -> str:
     lines = ["| الشعار | الحرف المخفي بالقواعد العامة | بالقواعد المقيسة من بقية الحروف | تحسّن / ساء | ومع أجسام الحروف الشقيقة من الشعار | تحسّن / ساء |",
              "|---|---|---|---|---|---|"]
@@ -161,12 +225,17 @@ def main() -> int:
     p.add_argument("-o", "--out", default="")
     p.add_argument("--no-read", action="store_true", help="لا تجرّب القراءة دون نص (أسرع)")
     p.add_argument("--held-out", action="store_true", help="امتحان الحرف المخفي: هل يفهم المحرك الشعار أم ينسخه")
+    p.add_argument("--reference", action="store_true", help="امتحان الحرف المخفي ببنية أقرب خط مرجعي")
     a = p.parse_args()
     warnings.filterwarnings("ignore")
     folder = Path(a.folder)
     if not (folder / "texts.json").exists():
         print("يلزم ملف texts.json في المجلد: {\"اسم الصورة\": \"النص العربي\"}", file=sys.stderr)
         return 1
+    if a.reference:
+        text = reference_summary(reference_exam(folder))
+        print(text)
+        return 0
     if a.held_out:
         text = held_out_summary(held_out(folder))
         print(text)

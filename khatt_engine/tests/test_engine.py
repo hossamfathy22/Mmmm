@@ -543,7 +543,8 @@ def test_editor_draws_with_the_designers_changes(read_example):
     assert plain["svg"].startswith("<svg") and plain["critic"] == []
     used = {h["name"] for h in plain["handles"] if h["used"]}
     assert {"meem.height", "ain.eye_w", "dal.base"} <= used and "kaf.arm" not in used      # the word's own letters
-    assert [(c["letter"], c["form"], c["chosen"]) for c in plain["choices"]] == [("ع", "M", "قمع")]
+    own = [c for c in plain["choices"] if any(o["name"] not in ("المحرك", "من المرجع") for o in c["options"])]
+    assert [(c["letter"], c["form"], c["chosen"]) for c in own] == [("ع", "M", "قمع")]
     rule = {h["name"]: h for h in plain["handles"]}["meem.height"]
     assert rule["range"][0] < rule["value"] < rule["range"][1] and not rule["set_by_designer"]
     moved = draw(read_example["style"], "معهد", {"meem.height": rule["range"][0]}, {"ع.M": "حلقة بشقّ"})
@@ -827,3 +828,40 @@ def test_compound_parts_inside_compound_parts_are_laid_out():
     sq = [[(0, 0), (1, 0), (1, 1), (0, 1)]]
     nested = [Compound([Tagged(sq, "logo", "a"), Compound([Tagged(sq, "engine", "b")])])]
     assert [s.name for s in flat(nested)] == ["a", "b"]
+
+
+# ---------------------------------------------------------------- the structure of a reference typeface
+def _a_reference():
+    from khatt.reference import faces
+    fs = [f for f in faces() if "vazirmatn-400" in f]
+    if not fs:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    return fs[0]
+
+
+def test_a_letter_is_built_on_a_reference_structure_with_the_logos_pen():
+    from khatt.reference import ref_glyph
+    path = _a_reference()
+    st = Style(slant=0.0)
+    sad = ref_glyph(path, "ص", "M", st)
+    body = sad.shapes[0]
+    assert len(body) >= 2                                   # its loop keeps an open counter under the logo's pen
+    ys = [y for poly in body for _, y in poly]
+    assert max(ys) == pytest.approx(st.x_height, abs=0.25 * st.x_height) and min(ys) > -0.15 * st.x_height
+    hah = ref_glyph(path, "ح", "I", st)
+    assert hah.exit_x is not None and hah.left < -st.stem
+    beh = ref_glyph(path, "ت", "M", st)                     # the marks are the engine's (the logo's): two dots above
+    dots = [sh for sh in beh.shapes[1:] if getattr(sh, "name", "") in ("نقطة", "شرطة")]
+    assert dots and all(min(y for p in sh for _, y in p) > 0.9 * st.x_height for sh in dots)
+
+
+def test_a_reference_letter_is_the_designers_choice_for_letters_the_logo_lacks():
+    from khatt.recipes import REFERENCE, choices
+    path = _a_reference()
+    st = Style(reference=path, seen="ب.I")
+    plain = typeset("حب", st)
+    asked = typeset("حب", Style(**{**st.__dict__, "variants": {"ح.I": REFERENCE}}))
+    assert "بنية الخط المرجعي" not in [n for p in plain.placed for _, n in p.parts]
+    assert "بنية الخط المرجعي" in [n for _, n in asked.placed[0].parts]
+    keys = {(c["letter"], c["form"]) for c in choices(st) if any(o["name"] == REFERENCE for o in c["options"])}
+    assert ("ح", "I") in keys and ("ب", "I") not in keys          # a letter the logo has keeps its own drawing

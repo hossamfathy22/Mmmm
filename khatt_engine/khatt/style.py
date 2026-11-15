@@ -44,6 +44,11 @@ class Style:
     # letters the logo draws its own way, cut out of it by the self-check: "letter.form" -> outlines
     taken: Dict[str, Dict] = field(default_factory=dict)
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
+    # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
+    # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them
+    reference: str = ""
+    ref_wide: float = 1.0
+    ref_all: bool = False       # every letter on the reference's structure (to judge a reference on the logo's word)
     # how far the logo draws a letter longer than the engine builds it (kashida): "letter.form" -> length.
     # A joining letter lengthens its join to the next; a final or isolated letter stretches its body
     # along the baseline; a letter with neither leaves more white after it. Fitted by the self-check.
