@@ -253,6 +253,7 @@ SKELETON = {"غ": "ع", "ج": "ح", "خ": "ح", "چ": "ح", "ة": "ه", "ی": "�
 
 REFERENCE = "من المرجع"         # the variant: built on the structure of the logo's reference typeface
 ON_REH = "على الراء"           # the variant: ا or ل drawn on the stroke of the logo's ر (typeset.stem_from_reh)
+TEETH_CHOICE = "أسنان الشعار"   # the variant: س ش built of the logo's own tooth (typeset.teeth_from_logo)
 
 
 # Letters that share one body and differ only by their marks, in the forms where they do: what the
@@ -366,11 +367,34 @@ def choices(st: Style) -> List[Dict]:
                             "options": [{"name": "المحرك", "note": "الحرف كما يبنيه المحرك بقواعد الشعار"},
                                         {"name": REFERENCE, "note": note}],
                             "set_by_designer": key in st.variants})
+    # س and ش of the logo's own tooth, where the logo shows one: the designer's choice where its tooth
+    # is not a cup that shares its arms (there it is the rule)
+    from .typeset import TEETH, teeth_from_logo
+    note_t = "أسنان الحرف من سنّ الشعار نفسه (حرف من ب ت ث ي)، موصولة كما يصل الشعار أسنانه"
+    have = {(c["letter"], c["form"]): c for c in out}
+    for c in TEETH:
+        for f in "iIMF":
+            key = f"{c}.{f}"
+            if key in st.seen.split() or key in st.taken or teeth_from_logo(st, c, f) is None:
+                continue
+            auto = st.teeth_kin and teeth_from_logo(st, c, f, cups_only=True) is not None
+            on = st.variants.get(key) == TEETH_CHOICE or (auto and key not in st.variants)
+            entry = have.get((c, f))
+            if entry is not None:
+                if not any(o["name"] == TEETH_CHOICE for o in entry["options"]):
+                    entry["options"].append({"name": TEETH_CHOICE, "note": note_t})
+                if on:
+                    entry["chosen"] = TEETH_CHOICE
+                continue
+            out.append({"letter": c, "form": f, "chosen": TEETH_CHOICE if on else (st.variants.get(key) or "المحرك"),
+                        "options": [{"name": "المحرك", "note": "الحرف كما يبنيه المحرك بقواعد الشعار"},
+                                    {"name": TEETH_CHOICE, "note": note_t}],
+                        "set_by_designer": key in st.variants})
     # ا and ل on the stroke of the logo's ر, where the logo draws its ر as an upright stem: the
     # designer's call (on the other logos it fits less often than the engine's own ا)
     from .typeset import STEM_KIN, stem_from_reh
     probe = Style(**{**st.__dict__, "stem_kin": True})
-    note = "الحرف على جذع راء الشعار: الراء على السطر، مطالة إلى ارتفاع الحرف، وعقفتها وصلة إلى ما بعدها"
+    note = "الحرف على جذع راء الشعار: الراء على السطر، مطالة إلى ارتفاع الحرف، وعقفتها وصلة إلى ما بعدها (والكاف بذراعها أو علامتها)"
     have = {(c["letter"], c["form"]): c for c in out}
     for c, forms in STEM_KIN.items():
         for f in forms:

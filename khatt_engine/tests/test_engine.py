@@ -853,6 +853,45 @@ def test_alef_and_lam_on_the_logos_reh_are_the_designers_choice():
     assert stem_from_reh(Style(**{**on.__dict__, "taken": {"ر.F": lean}}), "ا", "i") is None   # a ر that leans is no stem
 
 
+def test_seen_is_built_of_the_logos_tooth_where_its_teeth_are_cups():
+    """A logo that hangs its teeth as cups sharing an arm (Mootanroo) builds س of three such cups;
+    a tooth cut with its joins on either side builds it only when the designer asks."""
+    from khatt.recipes import TEETH_CHOICE
+    from khatt.typeset import find_cut, teeth_from_logo
+    st = Style()
+    X, w = st.x_height, st.stem
+    cup = [[(0, X), (0, 0), (-3 * w, 0), (-3 * w, X), (-2 * w, X), (-2 * w, w), (-w, w), (-w, X)]]
+    st_cup = Style(**{**st.__dict__, "taken": {"ت.I": {"polys": cup, "piece": True}}, "seen": "ت.I"})
+    seen, _, kin = find_cut(st_cup, "س", "M")
+    assert seen is not None and kin
+    xs = [x for ring in seen["polys"] for x, _ in ring]
+    assert max(xs) - min(xs) == pytest.approx(7 * w, abs=0.1 * w)          # three cups, two arms shared
+    lay = typeset("شمس", st_cup)
+    assert lay.placed[0].glyph.shapes[0].source == "logo" and lay.placed[2].glyph.shapes[0].source == "logo"
+    plain = Style(**{**st.__dict__, "taken": {"ت.I": {"polys": cup}}, "seen": "ت.I"})     # cut where the engine's letter stood
+    assert find_cut(plain, "س", "M")[0] is None
+    assert find_cut(Style(**{**plain.__dict__, "variants": {"س.M": TEETH_CHOICE}}), "س", "M")[0] is not None
+    assert teeth_from_logo(Style(), "س", "M") is None                       # no tooth in the logo
+
+
+def test_kaf_on_the_logos_reh_carries_its_arm_or_its_mark():
+    from khatt.recipes import ON_REH
+    from khatt.typeset import find_cut
+    st = Style()
+    X, w = st.x_height, st.stem
+    reh = {"polys": [[(0, X), (0, -0.3 * X), (-2 * w, -0.4 * X), (-2 * w, -0.4 * X + w), (-w, -0.3 * X + w), (-w, X)]]}
+    on = Style(**{**st.__dict__, "taken": {"ر.F": reh}, "seen": "ر.F", "variants": {"ك.I": ON_REH, "ك.F": ON_REH}})
+    initial = find_cut(on, "ك", "I")[0]
+    xs = [x for ring in initial["polys"] for x, _ in ring]
+    assert min(xs) < -2.5 * w                                               # the arm reaches out to the left
+    final = find_cut(on, "ك", "F")[0]
+    assert final.get("marks_dx") is not None
+    lay = typeset("مك", on)
+    mark = [sh for sh in lay.placed[-1].glyph.shapes if getattr(sh, "name", "") == "شرطة"]
+    stem_left = -w + lay.placed[-1].x
+    assert mark and max(x for sh in mark for poly in sh for x, _ in poly) + lay.placed[-1].x < stem_left
+
+
 def test_a_siblings_body_serves_the_letters_the_logo_lacks():
     """موتنرو draws its ن as a cup hanging from the top line: ب and ي of new words take that body."""
     from khatt.typeset import find_cut

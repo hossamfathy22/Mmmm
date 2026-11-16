@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 from . import geometry as g
 from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
-from .recipes import BUILDING, ON_REH, PARAMS, READS, REFERENCE, SKELETON, siblings, stretch_of, value
+from .recipes import BUILDING, ON_REH, PARAMS, TEETH_CHOICE, READS, REFERENCE, SKELETON, siblings, stretch_of, value
 from .style import Style
 
 TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
@@ -129,6 +129,10 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
     polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
     if marks is not None:
         polys = _strip_marks(polys, x_height)
+        if cut.get("marks_dx"):
+            dx = float(cut["marks_dx"])
+            marks = [Tagged([[(x + dx, y) for x, y in poly] for poly in sh], getattr(sh, "source", "engine"),
+                            getattr(sh, "name", "")) for sh in marks]
     from shapely.geometry import Polygon as _P
 
     def area(rings):
@@ -425,11 +429,12 @@ def _cut_span(glyph: Glyph) -> Optional[Tuple[float, float]]:
 
 # A logo that draws its ر as a stem (an upright stroke from the x-height down past the baseline, its
 # foot curled) shows how its designer draws every stem: ا is that ر set on the baseline, ل joined to
-# the next letter the same (its curl is the join), and ل alone or last the ر drawn up to ل's height.
+# the next letter the same (its curl is the join), and ل alone or last the ر drawn up to ل's height;
+# ك the same stems, joined with the engine's arm across the top, alone or last with its small mark.
 # What a designer does by hand with Mootanroo's ر. The designer's call (style.stem_kin, or the
 # variant ON_REH letter by letter): on the hidden ا of the other logos whose ر is a stem it fitted
 # worse than the engine's own ا three times in four (karashab's ا from 0.92 to 0.45).
-STEM_KIN = {"ا": "iF", "ل": "iIMF"}
+STEM_KIN = {"ا": "iF", "ل": "iIMF", "ك": "iIMF"}
 _STEMS: dict = {}
 
 
@@ -470,8 +475,30 @@ def stem_from_reh(st: Style, c: str, form: str) -> Optional[dict]:
             dy = -y0 if (c == "ا" or form in ("I", "M")) else 0.0     # set on the baseline, or left hanging
             yc = 0.55 * X + dy
             grow = max(0.0, top - (y1 + dy))
-            out = {"polys": [[(round(x, 2), round(y + dy + (grow if y + dy > yc else 0.0), 2)) for x, y in ring] for ring in polys],
-                   "from": "ر", "piece": bool(src.get("piece"))}
+            rings = [[(round(x, 2), round(y + dy + (grow if y + dy > yc else 0.0), 2)) for x, y in ring] for ring in polys]
+            out = {"polys": rings, "from": "ر", "piece": bool(src.get("piece"))}
+            if c == "ك":
+                # the stem's left side, high up and half way: where the arm leaves it, and the mark stands by
+                stem_left = mid[0][0]
+                arm = [sh for sh in flat(built.shapes) if getattr(sh, "name", "") == "ذراع الكاف"]
+                if form in ("I", "M") and arm:
+                    from shapely.ops import unary_union
+                    ax = max(x for sh in arm for poly in sh for x, _ in poly)
+                    ay = max(y for sh in arm for poly in sh for _, y in poly)
+                    top_y = max(y for ring in rings for _, y in ring)
+                    pieces = [Polygon(r).buffer(0) for r in rings if len(r) >= 3]
+                    pieces += [Polygon([(x - ax + stem_left + 0.5 * st.stem, y - ay + top_y) for x, y in poly]).buffer(0)
+                               for sh in arm for poly in sh if len(poly) >= 3]
+                    whole = unary_union(pieces)
+                    rings = []
+                    for poly in getattr(whole, "geoms", [whole]):
+                        if poly.geom_type == "Polygon" and not poly.is_empty:
+                            rings.append([(round(x, 2), round(y, 2)) for x, y in list(poly.exterior.coords)[:-1]])
+                            rings += [[(round(x, 2), round(y, 2)) for x, y in list(h.coords)[:-1]] for h in poly.interiors]
+                    out["polys"] = rings
+                mark = [x for sh in flat(built.shapes) if getattr(sh, "name", "") == "شرطة" for poly in sh for x, _ in poly]
+                if mark:
+                    out["marks_dx"] = round(stem_left - 0.25 * st.stem - max(mark), 2)
     if len(_STEMS) > 512:
         _STEMS.clear()
     _STEMS[key] = out
@@ -516,6 +543,79 @@ def _upright(glyph: Glyph, st: Style, side: str) -> Optional[Tuple[float, float]
     return a, b
 
 
+# A letter of teeth (س ش) the logo lacks is built of the logo's own tooth, where the logo shows one
+# (ب ت ث ي in a joined form): three of them in a row, joined as the logo joins its teeth (Mootanroo
+# hangs them as cups sharing an arm), the engine's bowl after them where the letter ends in one.
+TEETH = {"س": 3, "ش": 3}
+TOOTH_FROM = [f"{c}.{f}" for f in "MI" for c in "بتثپيی"] + ["ن.M", "ن.I"]
+_TEETH: dict = {}
+
+
+def teeth_from_logo(st: Style, c: str, form: str, cups_only: bool = False) -> Optional[dict]:
+    """`c` (س or ش) in `form` built of the logo's tooth (see TEETH), as a cut; None when the logo shows
+    no tooth. `cups_only`: only when the logo's tooth is a cup read from its pieces, an upright on
+    either side, the teeth joined by the arm they share (where a tooth is cut with the joins on either
+    side of it, three of them make a long س: on the hidden س of three logos that were so, the word
+    matched worse every time)."""
+    src_key = next((q for q in TOOTH_FROM if q in st.taken), None)
+    if src_key is None or c not in TEETH or (cups_only and not st.taken[src_key].get("piece")):
+        return None
+    src = st.taken[src_key]
+    key = (c, form, src_key, cups_only, round(st.x_height, 2), round(st.stem, 2), len(src["polys"]), tuple(map(tuple, src["polys"][0][:3])))
+    if key in _TEETH:
+        return _TEETH[key]
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from shapely import affinity
+    X = st.x_height
+    body = _strip_marks([[(float(x), float(y)) for x, y in ring] for ring in src["polys"]], X)
+    acc = None
+    for ring in body:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+    out = None
+    if acc is not None and not acc.is_empty and 0.5 * X <= acc.bounds[3] - acc.bounds[1] <= 1.8 * X:
+        tooth = Glyph([Tagged([list(r) for r in body], "logo", "سن")], left=acc.bounds[0])
+        tooth.shapes[0].piece = True
+        a, b = _upright(tooth, st, "left"), _upright(tooth, st, "right")
+        if cups_only and not (a and b):
+            if len(_TEETH) > 512:
+                _TEETH.clear()
+            _TEETH[key] = None
+            return None
+        x0, _, x1, _ = acc.bounds
+        # the step from one tooth to the next: the arms they share, or the teeth side by side
+        step = (0.5 * (b[0] + b[1]) - 0.5 * (a[0] + a[1])) if (a and b) else (x1 - x0)
+        teeth = [affinity.translate(acc, xoff=-x1 - k * step) for k in range(TEETH[c])]
+        parts = list(teeth)
+        built = LETTERS[c][1](st, form)
+        bowl = [sh for sh in flat(built.shapes) if getattr(sh, "name", "") == "كأس سفلي"]
+        if bowl:
+            # the engine's bowl, its right end at the foot of the last tooth's left side
+            left = min(t.bounds[0] for t in teeth)
+            bx = max(x for sh in bowl for poly in sh for x, _ in poly)
+            for sh in bowl:
+                for poly in sh:
+                    if len(poly) >= 3:
+                        parts.append(Polygon([(x - bx + left + 0.5 * st.stem, y) for x, y in poly]).buffer(0))
+        whole = unary_union(parts)
+        rings = []
+        for poly in getattr(whole, "geoms", [whole]):
+            if poly.geom_type == "Polygon" and not poly.is_empty:
+                rings.append([(round(x, 2), round(y, 2)) for x, y in list(poly.exterior.coords)[:-1]])
+                rings += [[(round(x, 2), round(y, 2)) for x, y in list(h.coords)[:-1]] for h in poly.interiors]
+        # the engine's marks (ش) over the middle of the new teeth
+        eng = [x for sh in flat(built.shapes) if getattr(sh, "name", "") in ("جذع", "كأس الوصل") for poly in sh for x, _ in poly]
+        mid_new = 0.5 * (min(t.bounds[0] for t in teeth) + max(t.bounds[2] for t in teeth))
+        mid_eng = 0.5 * (min(eng) + max(eng)) if eng else mid_new
+        out = {"polys": rings, "from": src_key, "piece": True, "marks_dx": round(mid_new - mid_eng, 2)}
+    if len(_TEETH) > 512:
+        _TEETH.clear()
+    _TEETH[key] = out
+    return out
+
+
 def find_cut(st: Style, c: str, form: str):
     """The letter as the logo draws it, for `c` in `form`: cut in this form, else in the other form
     that differs only by the join from the right (isolated/final, initial/medial), else the same of a
@@ -526,6 +626,11 @@ def find_cut(st: Style, c: str, form: str):
     # body serves only letters the logo does not have
     kin_ok = f"{c}.{form}" not in st.seen.split()
     want = st.variants.get(f"{c}.{form}")
+    if (c in TEETH and kin_ok and (want == TEETH_CHOICE or (st.teeth_kin and want is None))
+            and not any(f"{c}.{f}" in st.taken for f in (form, other))):
+        got = teeth_from_logo(st, c, form, cups_only=want != TEETH_CHOICE)
+        if got is not None:
+            return got, None, True
     if ((want == ON_REH or (st.stem_kin and want is None)) and kin_ok and c in STEM_KIN and form in STEM_KIN[c]
             and not any(f"{c}.{f}" in st.taken for f in (form, other))):
         got = stem_from_reh(st, c, form)

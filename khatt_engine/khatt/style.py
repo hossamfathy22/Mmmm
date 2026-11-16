@@ -79,7 +79,10 @@ class Style:
     # ا and ل drawn on the logo's ر when it draws ر as an upright stem (typeset.stem_from_reh). Off: on
     # the hidden ا of the other logos it fitted worse three times in four; the designer chooses it
     # ("على الراء"), for every ا and ل or letter by letter
-    stem_kin: bool = False          # a typeface family left out of the references (the one playing the logo in the examination)
+    stem_kin: bool = False
+    # س and ش built of the logo's own tooth where the logo hangs its teeth as cups sharing an arm
+    # (typeset.teeth_from_logo); for any other tooth, the designer's choice ("أسنان الشعار")
+    teeth_kin: bool = True          # a typeface family left out of the references (the one playing the logo in the examination)
     seen: str = ""              # the letter forms in the logo's word ("ت.I ن.M ..."): they keep their own drawing
     # the reference typeface the logo is nearest to (reference.py): letters the logo lacks are built on
     # its structure with the logo's pen; `ref_wide` is how much wider the logo's rhythm draws them
