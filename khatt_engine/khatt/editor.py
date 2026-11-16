@@ -130,8 +130,15 @@ def draw(style: Dict[str, Any], word: str, params: Optional[Dict[str, float]] = 
                          for c, f in forms) if "letters" in h and h["letters"] else bool(in_word & set(SHAPE_LETTERS.get(h["shape"], ""))))
     present = {(SKELETON.get(c, c), f) for c, f in forms} | set(forms)
     cs = [dict(c, form_ar=FORM_AR[c["form"]]) for c in choices(st) if (c["letter"], c["form"]) in present]
+    # the letters the logo gave nothing to (no letter of its, no piece): the engine's own drawing, which
+    # the user is told of, to complete in the kit if they wish
+    from .typeset import flat as _flat
+    marks = ("نقطة", "شرطة", "همزة")
+    alone = sorted({p.char for p in lay.placed
+                    if not any(getattr(sh, "source", "") in ("logo", "designer") for sh in _flat(p.glyph.shapes)
+                               if getattr(sh, "name", "") not in marks)})
     out = {"svg": to_svg(lay, background=None), "handles": hs, "choices": cs, "skipped": lay.skipped,
-           "letters": [{"letter": c, "form": FORM_AR[f]} for c, f in forms]}
+           "letters": [{"letter": c, "form": FORM_AR[f]} for c, f in forms], "engine_only": alone}
     if check:
         out["critic"] = [d.text() for d in critique(lay, word)]
     return _plain(out)

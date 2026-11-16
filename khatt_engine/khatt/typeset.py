@@ -118,7 +118,7 @@ def _strip_marks(polys, x_height: float):
 
 
 def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] = None, stem: float = 0.0,
-              marks: Optional[list] = None, x_height: float = 0.0) -> Glyph:
+              marks: Optional[list] = None, x_height: float = 0.0, trim_exit: bool = False) -> Glyph:
     """The letter as the logo draws it, standing in for the engine's: the engine's letter is kept
     only for where joins arrive and leave. A letter nothing joins from the right (isolated, initial)
     keeps its right edge where the engine's is, so it does not reach into the white before it.
@@ -169,6 +169,38 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
                 if poly.geom_type == "Polygon" and not poly.is_empty:
                     polys.append(list(poly.exterior.coords)[:-1])
                     polys += [list(h.coords)[:-1] for h in poly.interiors]
+    if trim_exit and form in ("I", "M") and stem:
+        # the join the logo draws out of this letter was drawn to land on its neighbour there (the
+        # hairline of موتنرو's م on the و); before another letter it is cut at the letter's body and
+        # the engine's join takes over
+        from shapely.geometry import Polygon, box
+        acc = None
+        for ring in polys:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+        if acc is not None and not acc.is_empty:
+            left = acc.bounds[0]
+            body_left = left
+            for xc in np.arange(left, left + 6 * stem, 0.25 * stem):
+                band = acc.intersection(box(xc, -1e4, xc + 0.25 * stem, 1e4))
+                if band.area > 0.6 * stem * stem:              # thicker than a hairline: the body begins
+                    body_left = xc
+                    break
+            if body_left - left > 0.5 * stem:
+                cut_acc = acc.intersection(box(body_left, -1e6, 1e6, 1e6))
+                # where the join left the letter its body was open (موتنرو's م opens its head to let the
+                # hairline out): without the join, that slit is closed, as a hand closes the letter
+                r = 0.3 * stem
+                sealed = cut_acc.buffer(r, 8).buffer(-r, 8)
+                if not sealed.is_empty and sealed.area <= 1.15 * cut_acc.area:
+                    cut_acc = sealed
+                kept = []
+                for poly in getattr(cut_acc, "geoms", [cut_acc]):
+                    if poly.geom_type == "Polygon" and not poly.is_empty:
+                        kept.append(list(poly.exterior.coords)[:-1])
+                        kept += [list(h.coords)[:-1] for h in poly.interiors]
+                if kept and area(kept) >= 0.6 * full:
+                    polys = kept
     if not polys or (borrowed and area(polys) < 0.5 * full):
         return built                                     # trimming the join left too little of the letter
     xs = [x for ring in polys for x, _ in ring]
@@ -560,6 +592,12 @@ def _upright(glyph: Glyph, st: Style, side: str) -> Optional[Tuple[float, float]
     span = next(((lo, hi) for lo, hi in ys if lo <= 0.5 * X <= hi), None)
     if span is None or span[0] > 0.15 * X or span[1] < 0.85 * X:
         return None
+    # and free at its top: the arm of a cup ends there; the side of a head meets its top bar (the م of
+    # موتنرو took the ر after it into its side)
+    top = _sections(acc, min(0.92 * X, span[1] - 0.1 * st.stem), X)
+    here = [sp for sp in top if sp[0] - 0.5 * st.stem <= c <= sp[1] + 0.5 * st.stem]
+    if not here or here[0][1] - here[0][0] > 1.6 * st.stem:
+        return None
     return a, b
 
 
@@ -612,13 +650,14 @@ def teeth_from_logo(st: Style, c: str, form: str, cups_only: bool = False) -> Op
         built = LETTERS[c][1](st, form)
         bowl = [sh for sh in flat(built.shapes) if getattr(sh, "name", "") == "كأس سفلي"]
         if bowl:
-            # the engine's bowl, its right end at the foot of the last tooth's left side
+            # the engine's bowl, its right end on the right side of the last tooth's left arm, where the engine
+            # sets it on its own last tooth (half a stem further in, the bowl lay beside the arm: a pile)
             left = min(t.bounds[0] for t in teeth)
             bx = max(x for sh in bowl for poly in sh for x, _ in poly)
             for sh in bowl:
                 for poly in sh:
                     if len(poly) >= 3:
-                        parts.append(Polygon([(x - bx + left + 0.5 * st.stem, y) for x, y in poly]).buffer(0))
+                        parts.append(Polygon([(x - bx + left + 1.0 * st.stem, y) for x, y in poly]).buffer(0))
         whole = unary_union(parts)
         rings = []
         for poly in getattr(whole, "geoms", [whole]):
@@ -820,7 +859,12 @@ def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                     exs = [x for sh in flat(glyph.shapes) if not _is_mark(sh, st) for poly in sh for x, _ in poly]
                     if cxs and exs:
                         cut = {**cut, "marks_dx": 0.5 * (min(cxs) + max(cxs)) - 0.5 * (min(exs) + max(exs))}
-            glyph = from_logo(glyph, cut, form, borrowed, st.stem, marks, st.x_height)
+            trim = False
+            if cut.get("ox") is not None and form in ("I", "M") and i + 1 < len(forms):
+                nc, nf = forms[i + 1]
+                ncut, nb_, nk = find_cut(st, nc, nf) if nc in LETTERS else (None, None, False)
+                trim = not (ncut and ncut.get("at") == (cut.get("at", -9) + 1) and not nb_ and not nk and not borrowed and not kin)
+            glyph = from_logo(glyph, cut, form, borrowed, st.stem, marks, st.x_height, trim_exit=trim)
             ext = 0.0                    # the letter as the logo draws it already has the logo's length
         if ext > 0 and form in ("i", "F"):
             longer = stretch_glyph(glyph, ext, st)
@@ -839,24 +883,21 @@ def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 # neighbours in the logo itself: set as they stand there, their cut edges fitting
                 x = prev.x + (nb[0] - na[0])
                 joined = False
-            elif joined and pc and gc:
-                # two letters as the logo draws them: the logo's join is in them (the hairline of م,
-                # the arm two cups share), so they meet as they meet in the logo, with no join of the
-                # engine's between them
-                x = prev.x + pc[0] - gc[1] + SEAM * st.stem
-                # and where the one before ends in an upright arm and this one begins with an upright,
-                # they are one stroke, as two cups share an arm in the logo (and the arm of a cup rises
-                # into the ا after it)
+            elif joined and pc and gc and _upright(prev.glyph, st, "left") and _upright(glyph, st, "right"):
+                # two letters as the logo draws them, the one ending in an upright arm and the other
+                # beginning with an upright: one stroke, as two cups share an arm in the logo (and the
+                # arm of a cup rises into the ا after it)
                 a, b = _upright(prev.glyph, st, "left"), _upright(glyph, st, "right")
-                if a and b:
-                    x = prev.x + 0.5 * (a[0] + a[1]) - 0.5 * (b[0] + b[1])
+                x = prev.x + 0.5 * (a[0] + a[1]) - 0.5 * (b[0] + b[1])
                 joined = False
             elif i in top:
                 # joined at the top: the bar reaches the left edge of the previous tooth
                 x = prev.x + prev.glyph.left - st.white - glyph.entry_edge
                 joined = False
             elif joined and prev.glyph.exit_edge is not None:
-                x = prev.x + prev.glyph.exit_edge - (st.join_white or st.white) - glyph.entry_edge
+                # a letter cut from the logo begins where its ink begins (the ر of موتنرو carries the
+                # start of the join that came into it there, right of where the engine's ر begins)
+                x = prev.x + prev.glyph.exit_edge - (st.join_white or st.white) - max(glyph.entry_edge, gc[1] if gc else glyph.entry_edge)
             else:
                 gap = group_gap * (st.round_gap if glyph.entry_x < glyph.entry_edge - 1e-6 else 1.0)   # optical: rounds need more
                 x = prev.x + prev.glyph.left - gap - glyph.entry_edge

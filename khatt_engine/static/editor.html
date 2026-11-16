@@ -263,7 +263,8 @@ function showFacts(){
   html += notes.length ? '<ul class="notes">' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>'
                        : '<p class="muted" style="margin:6px 0 0">الصورة نظيفة: لا تصحيح ولا تنبيه.</p>';
   const how = {given: 'كما كتبتها', stems: 'من الجذوع', drawn: `بالرسم، تغطية ${Math.round((logo.read_match || 0) * 100)}%`}[logo.read_how] || '';
-  if(logo.read) html += `<p style="margin:8px 0 0">قرأ المحرك: <b>${esc(logo.read)}</b> <span class="muted">(${how})</span>${logo.read_sure ? '' : ' <span class="muted">— غير مكتملة: اكتب نص الشعار</span>'}</p>`;
+  if(logo.read) html += `<p style="margin:8px 0 0">قرأ المحرك: <b>${esc(logo.read)}</b> <span class="muted">(${how})</span></p>`;
+  if(!logo.read_sure) html += `<p class="err" style="margin:8px 0 0">لم يقرأ المحرك كلمة الشعار قراءة مؤكدة، فلم يأخذ منه حروفه ولا قطعه، والكلمات بحروف المحرك. اكتب كلمة الشعار في الخانة أعلاه ثم اقرأه من جديد.</p>`;
   $('health').innerHTML = html;
   $('measures').innerHTML = Object.entries(logo.measures).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${fmt(v)}</td></tr>`).join('');
   const s = logo.self_check;
@@ -295,7 +296,8 @@ async function redraw(check){
     if(!r.ok) throw new Error(j.detail || 'تعذّر الرسم.');
     lastSvg = j.svg; $('board').innerHTML = j.svg;
     if(check){
-      $('critic').innerHTML = (j.critic || []).map(t => `<li>${esc(t)}</li>`).join('');
+      $('critic').innerHTML = (j.critic || []).map(t => `<li>${esc(t)}</li>`).join('')
+        + ((j.engine_only || []).length ? `<li>بناها المحرك وحده، فالشعار لا يعطيها حرفًا ولا قطعة: <b>${esc(j.engine_only.join(' '))}</b>. ارسم قطعها في طقم القطع إن أردتها من يدك.</li>` : '');
       buildControls(j);
     }
     const n = Object.keys(params).length + Object.keys(variants).length + Object.keys(kitParts).length;
