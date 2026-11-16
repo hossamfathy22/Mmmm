@@ -356,14 +356,17 @@ def choices(st: Style) -> List[Dict]:
                 if key in st.seen.split() or key in st.taken:
                     continue
                 entry = have.get((c, f)) or have.get((SKELETON.get(c, c), f))
+                from .typeset import REF_LETTERS, _logo_source
+                auto = (st.ref_auto and st.seen and SKELETON.get(c, c) in REF_LETTERS and key not in st.variants
+                        and not _logo_source(st, c, f, None, parts=False))
                 if entry is not None and not any(o["name"] in ("من الشعار", "المحرك") for o in entry["options"]):
                     entry["options"].append({"name": REFERENCE, "note": note})
-                    if st.variants.get(key) == REFERENCE:
+                    if st.variants.get(key) == REFERENCE or auto:
                         entry["chosen"] = REFERENCE
                     continue
                 if entry is not None:
                     continue
-                out.append({"letter": c, "form": f, "chosen": st.variants.get(key) or "المحرك",
+                out.append({"letter": c, "form": f, "chosen": st.variants.get(key) or (REFERENCE if auto else "المحرك"),
                             "options": [{"name": "المحرك", "note": "الحرف كما يبنيه المحرك بقواعد الشعار"},
                                         {"name": REFERENCE, "note": note}],
                             "set_by_designer": key in st.variants})

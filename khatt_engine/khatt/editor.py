@@ -60,9 +60,13 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     check = check_and_take(L, own, st, k, take=not R.text_drawn and an["health"]["confidence"] >= TAKE_MIN) if own else None
     ref = None
     if own and an["health"]["confidence"] >= TAKE_MIN:
-        # the reference typeface nearest the logo: the letters the logo lacks may be built on it
+        # the reference typeface nearest the logo: the letters the logo lacks may be built on it. Judged
+        # on the logo's word drawn with the engine's letters (with the letters cut from the logo every
+        # typeface redraws the word alike, and the first of them was taken)
         from .reference import nearest
-        ref = nearest(L, own, st, k, widths=(1.0,))
+        from .style import Style as _Style
+        bare = _Style(**{**st.__dict__, "taken": {}, "parts": {}, "variants": {}})
+        ref = nearest(L, own, bare, k, widths=(1.0,))
         if ref:
             st.reference, st.ref_wide = str(ref["path"]), ref["wide"]
     overlay = None

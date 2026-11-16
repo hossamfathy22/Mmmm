@@ -539,6 +539,7 @@ def test_editor_reads_a_logo_once(read_example):
 
 def test_editor_draws_with_the_designers_changes(read_example):
     from khatt.editor import draw
+    read_example = {**read_example, "style": {**read_example["style"], "ref_auto": False}}
     plain = draw(read_example["style"], "معهد")
     assert plain["svg"].startswith("<svg") and plain["critic"] == []
     used = {h["name"] for h in plain["handles"] if h["used"]}
@@ -558,7 +559,7 @@ def test_editor_draws_with_the_designers_changes(read_example):
 
 def test_editor_logs_what_was_changed(read_example, tmp_path):
     from khatt.editor import draw, load_edits, save_edit, summarise
-    style = read_example["style"]
+    style = {**read_example["style"], "ref_auto": False}
     rule = {h["name"]: h for h in draw(style, "معهد", check=False)["handles"]}["meem.height"]["rule_value"]
     log = tmp_path / "edits.jsonl"
     out = save_edit(style, "معهد", {"meem.height": 0.8 * rule, "dal.base": None}, {"ع.M": "حلقة بشقّ"},
@@ -987,7 +988,7 @@ def _a_reference():
 def test_a_letter_is_built_on_a_reference_structure_with_the_logos_pen():
     from khatt.reference import ref_glyph
     path = _a_reference()
-    st = Style(slant=0.0)
+    st = Style(slant=0.0, ref_how="strokes")
     sad = ref_glyph(path, "ص", "M", st)
     body = sad.shapes[0]
     assert len(body) >= 2                                   # its loop keeps an open counter under the logo's pen
@@ -1000,16 +1001,74 @@ def test_a_letter_is_built_on_a_reference_structure_with_the_logos_pen():
     assert dots and all(min(y for p in sh for _, y in p) > 0.9 * st.x_height for sh in dots)
 
 
+def test_a_letter_is_taken_whole_from_the_reference_outline_at_the_logos_weight():
+    """The typeface's own outline, not its centre line redrawn (which broke where a heavy typeface's
+    strokes meet): whole, its counters open, as thick as the logo's stem."""
+    from shapely.geometry import Polygon
+    from skimage.morphology import skeletonize
+    from scipy import ndimage as ndi_
+    from khatt.reference import ref_outline
+    path = _a_reference()
+    for st in (Style(slant=0.0), Style(slant=0.0, stem=1.6 * Style().stem)):
+        for c, f in (("ع", "I"), ("ح", "I"), ("ص", "M"), ("ه", "i")):
+            g = ref_outline(path, c, f, st)
+            body = g.shapes[0]
+            acc = None
+            for ring in body:
+                q = Polygon(ring).buffer(0)
+                acc = q if acc is None else acc.symmetric_difference(q)
+            assert len(getattr(acc, "geoms", [acc])) == 1, (c, f)                 # one piece
+            if c in "صه":
+                assert any(len(p.interiors) for p in getattr(acc, "geoms", [acc])), (c, f)   # the counter open
+            # its weight: twice the half-width along its centre line, at 4 pixels a unit
+            x0, y0, x1, y1 = acc.bounds
+            from PIL import Image, ImageDraw
+            k = 4.0
+            im = Image.new("L", (int((x1 - x0) * k) + 4, int((y1 - y0) * k) + 4), 0)
+            for poly in getattr(acc, "geoms", [acc]):
+                ImageDraw.Draw(im).polygon([((x - x0) * k + 2, (y1 - y) * k + 2) for x, y in poly.exterior.coords], fill=255)
+                for h in poly.interiors:
+                    ImageDraw.Draw(im).polygon([((x - x0) * k + 2, (y1 - y) * k + 2) for x, y in h.coords], fill=0)
+            m = np.array(im) > 0
+            w = 2 * float(np.median(ndi_.distance_transform_edt(m)[skeletonize(m)])) / k
+            assert w == pytest.approx(st.stem, rel=0.3), (c, f, w, st.stem)
+
+
 def test_a_reference_letter_is_the_designers_choice_for_letters_the_logo_lacks():
     from khatt.recipes import REFERENCE, choices
     path = _a_reference()
-    st = Style(reference=path, seen="ب.I")
+    st = Style(reference=path, seen="ب.I", ref_auto=False)
     plain = typeset("حب", st)
     asked = typeset("حب", Style(**{**st.__dict__, "variants": {"ح.I": REFERENCE}}))
     assert "بنية الخط المرجعي" not in [n for p in plain.placed for _, n in p.parts]
     assert "بنية الخط المرجعي" in [n for _, n in asked.placed[0].parts]
     keys = {(c["letter"], c["form"]) for c in choices(st) if any(o["name"] == REFERENCE for o in c["options"])}
     assert ("ح", "I") in keys and ("ب", "I") not in keys          # a letter the logo has keeps its own drawing
+
+
+def test_the_letters_few_logos_show_come_from_the_reference_unless_the_logo_has_its_own():
+    """ح ص ط ع ف ق ه the logo lacks: the reference typeface's outline at the logo's weight; a letter the
+    logo has, or one the designer sets to the engine's, is not; nor one that would not pass the critic."""
+    from khatt.recipes import REFERENCE, choices
+    path = _a_reference()
+    st = Style(reference=path, seen="ب.I")
+    lay = typeset("حبع", st)
+    names = [[n for _, n in p.parts] for p in lay.placed]
+    assert "بنية الخط المرجعي" in names[0] and "بنية الخط المرجعي" in names[2]
+    assert "بنية الخط المرجعي" not in names[1]                     # ب: not a letter of few logos
+    chosen = {(c["letter"], c["form"]): c["chosen"] for c in choices(st)}
+    assert chosen[("ح", "I")] == REFERENCE
+    engine = typeset("حب", Style(**{**st.__dict__, "variants": {"ح.I": "المحرك"}}))
+    assert "بنية الخط المرجعي" not in [n for p in engine.placed for _, n in p.parts]
+    # the gate is the critic's: ink piled thicker than the pen, a counter closed, or a stroke thinner than
+    # the hairline is refused (and the engine's letter drawn)
+    from shapely.geometry import Polygon, box
+    from khatt.reference import _passes
+    w = st.stem
+    assert not _passes(box(0, 0, 3 * w, 3 * w), st, 0)                       # a lump
+    ring = box(0, 0, 4 * w, st.x_height).difference(box(w, w, 1.2 * w, st.x_height - w))
+    assert not _passes(ring, st, 1)                                       # a counter shut to a slit
+    assert _passes(box(0, 0, 3 * w, st.x_height).difference(box(w, w, 2 * w, st.x_height - w)), st, 1)
 
 
 # ---------------------------------------------------------------- what the logo measures and the drawing now uses

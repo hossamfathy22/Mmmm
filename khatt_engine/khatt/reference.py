@@ -128,14 +128,28 @@ def _structure(path: str, char: str, form: str):
 WIDER = (1.0, 1.15, 1.3, 1.5, 1.75, 2.0, 2.4)
 
 
-def ref_glyph(path: str, char: str, form: str, st: Style, wide: float = 1.0, engine: Optional[Glyph] = None) -> Optional[Glyph]:
-    """`char` in `form`, built on the structure of the typeface at `path` and drawn with the logo's pen.
+def ref_glyph(path: str, char: str, form: str, st: Style, wide: float = 1.0, engine: Optional[Glyph] = None,
+              fit: bool = False) -> Optional[Glyph]:
+    """`char` in `form`, built on the structure of the typeface at `path` and drawn with the logo's pen
+    (st.ref_how "pen" or "strokes"), or taken from its outline at the logo's weight ("outline").
     `wide`: how much wider than the typeface the logo's rhythm draws a letter. A letter with a counter
     (a loop, a head) is drawn wider still if the logo's pen would close it, as a hand lengthens a loop
     to fit a heavy pen. The marks are the engine's letter's (`engine`, built if not given)."""
+    if st.ref_how == "outline":
+        return ref_outline(path, char, form, st, engine, fit=fit, wide=wide)
+    # "pen" (and "strokes", without the check below): the structure, drawn with the logo's pen
     got = _structure(path, char, form)
     if got is None:
         return None
+    if fit and engine is not None:
+        # the reference's structure, the engine's proportions: the letter as wide as the engine draws
+        # it for this logo (its width carries the logo's rhythm and the hand's judgement), the pen's
+        # thickness kept (the structure is drawn wider or narrower, not stretched)
+        from .typeset import _is_mark, flat
+        exs = [x for sh in flat(engine.shapes) if not _is_mark(sh, st) for poly in sh for x, _ in poly]
+        span = -got[1]
+        if exs and span > 0.05:
+            wide = max(0.3, (max(exs) - min(exs) - st.stem) / (span * st.x_height))
     need = len(got[2])
     best = None
     for k in WIDER:
@@ -144,10 +158,61 @@ def ref_glyph(path: str, char: str, form: str, st: Style, wide: float = 1.0, eng
             return None
         open_ = _counters(g, st)
         if open_ >= need:
-            return g
+            best = (open_, g)
+            break
         if best is None or open_ > best[0]:
             best = (open_, g)
-    return best[1]
+    g = best[1]
+    if st.ref_how == "pen" and not _whole(g, path, char, form, st, need):
+        # the centre line of a heavy typeface breaks where its strokes meet (Lalezar's ع ه ف came out in
+        # pieces): its outline at the logo's weight then, or (refused by the critic too) the engine's
+        return ref_outline(path, char, form, st, engine, fit=fit, wide=wide)
+    return g
+
+
+def _whole(g: Glyph, path: str, char: str, form: str, st: Style, need: int) -> bool:
+    """A letter drawn on the reference's centre line holds together as the typeface draws it (no more
+    pieces than its outline has) and passes the critic's measures."""
+    from shapely.geometry import Polygon
+    acc = None
+    for ring in g.shapes[0]:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+    if acc is None or acc.is_empty:
+        return False
+    rings = _outline(path, char, form)
+    if rings is None:
+        return False
+    out = None
+    for ring in rings:
+        q = Polygon(ring).buffer(0)
+        out = q if out is None else out.symmetric_difference(q)
+    pieces = lambda shape: len([p for p in getattr(shape, "geoms", [shape]) if p.geom_type == "Polygon" and p.area > 1e-4 * shape.area])
+    if pieces(acc) > pieces(out):
+        return False
+    # and it is still the typeface's letter: against its outline at the logo's weight, as wide, the
+    # common ink over all (a good typeface's letters, drawn with the logo's pen, 0.56 to 0.67; Lalezar's,
+    # broken into stubs and hooks, 0.33 to 0.51)
+    from shapely import affinity
+    X = st.x_height
+    stem = _stem(path)
+    ref = affinity.scale(out, xfact=X, yfact=X, origin=(0, 0))
+    if stem is not None:
+        ref = ref.buffer(0.5 * (st.stem - stem * X), 8)
+    if ref.is_empty:
+        return False
+    a = affinity.translate(acc, xoff=-acc.bounds[2])
+    ref = affinity.translate(ref, xoff=-ref.bounds[2])
+    w = ref.bounds[2] - ref.bounds[0]
+    if w > 1e-6:
+        ref = affinity.scale(ref, xfact=(a.bounds[2] - a.bounds[0]) / w, yfact=1.0, origin=(0, 0))
+    if a.intersection(ref).area < SAME_SHAPE * a.union(ref).area:
+        return False
+    return _passes(acc, st, need)
+
+
+SAME_SHAPE = 0.52          # how much of a letter drawn with the logo's pen must lie on the typeface's own
 
 
 def _counters(g: Glyph, st: Style) -> int:
@@ -222,12 +287,20 @@ def _draw(got, char: str, form: str, st: Style, wide: float, engine: Optional[Gl
     body = unary_union(shapes)
     if body.is_empty:
         return None
+    return _finish(body, char, form, st, engine)
+
+
+def _finish(body, char: str, form: str, st: Style, engine: Optional[Glyph]) -> Optional[Glyph]:
+    """A letter's body (a shapely shape in the logo's units) as a glyph: its right end at 0, the
+    engine's marks over it, joined where the form joins."""
     rings = []
     for poly in getattr(body, "geoms", [body]):
         if poly.geom_type != "Polygon" or poly.is_empty:
             continue
         rings.append(list(poly.exterior.coords)[:-1])
         rings += [list(h.coords)[:-1] for h in poly.interiors]
+    if not rings:
+        return None
     xs = [x for ring in rings for x, _ in ring]
     right, lft = max(xs), min(xs)
     rings = [[(x - right, y) for x, y in ring] for ring in rings]
@@ -493,3 +566,237 @@ def substitutions(skip: str = "", least: int = 3) -> Dict[Tuple[str, str, str, s
     out.update({k: float(np.median(v)) for k, v in kinds.items() if len(v) >= least})
     _SUBS[skip] = out
     return out
+
+
+# ------------------------------------------------------------------ the typeface's own outline
+# The centre line, redrawn with the logo's pen, breaks where a heavy typeface's strokes meet (Lalezar's
+# ع, ه, ف came out in pieces, with stubs). The outline as the typeface draws it is whole: it is taken
+# as it is, its weight brought to the logo's stem by moving the outline in or out all round.
+@lru_cache(maxsize=4096)
+def _outline(path: str, char: str, form: str):
+    """The body of the letter in the typeface, its marks left out: rings in units of its tooth
+    (x-height = 1), the right end at 0, the baseline at 0. None when the typeface has no such letter."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from .bench.fonts import load, shape
+    from .bench.truth import _area, x_height
+    face = load(path)
+    text = FORMS[form].format(char)
+    idx = text.index(char)
+    try:
+        cs = [c for cl, cont in shape(face, text) if cl == idx for c in cont]
+    except Exception:
+        return None
+    cs = [c for c in cs if len(c) >= 3]
+    if not cs:
+        return None
+    X = x_height(face)
+    big = max(cs, key=lambda c: abs(_area(c)))
+    outer = 1 if _area(big) > 0 else -1
+    fill = [Polygon([(x / X, y / X) for x, y in c]).buffer(0) for c in cs if (1 if _area(c) > 0 else -1) == outer]
+    holes = [Polygon([(x / X, y / X) for x, y in c]).buffer(0) for c in cs if (1 if _area(c) > 0 else -1) != outer]
+    body = unary_union(fill)
+    if holes:
+        body = body.difference(unary_union(holes))
+    pieces = [g for g in getattr(body, "geoms", [body]) if g.geom_type == "Polygon" and not g.is_empty]
+    if not pieces:
+        return None
+    top = max(g.area for g in pieces)
+    keep = [g for g in pieces if not (g.area < 0.2 * top and (g.bounds[1] >= 0.75 or g.bounds[3] <= 0.1))]
+    body = unary_union(keep)
+    right = body.bounds[2]
+    out = []
+    for poly in getattr(body, "geoms", [body]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            out.append(tuple((round(x - right, 4), round(y, 4)) for x, y in list(poly.exterior.coords)[:-1]))
+            out += [tuple((round(x - right, 4), round(y, 4)) for x, y in list(h.coords)[:-1]) for h in poly.interiors]
+    return tuple(out) if out else None
+
+
+@lru_cache(maxsize=64)
+def _stem(path: str) -> Optional[float]:
+    """The typeface's stem in units of its tooth: twice the median half-width along the centre line of
+    its medial ب (and its ا)."""
+    rs = []
+    for c, f in (("ب", "M"), ("ا", "i")):
+        got = _structure(path, c, f)
+        if got is not None:
+            rs += [r for stroke in got[0] for _, _, r in stroke]
+    return 2.0 * float(np.median(rs)) if rs else None
+
+
+def _without_joins(acc, X: float, right: bool, left: bool):
+    """The shape without the thin strokes along the baseline at its joining sides: cut where, going
+    in from the edge, the shape first rises above the lower part of the tooth."""
+    from shapely.geometry import box
+    x0, _, x1, _ = acc.bounds
+
+    def low(x: float) -> bool:
+        cut = acc.intersection(box(x - 0.01 * X, -1e5, x + 0.01 * X, 1e5))
+        if cut.is_empty:
+            return False
+        geoms = [g for g in getattr(cut, "geoms", [cut]) if not g.is_empty and g.area > 0]
+        if len(geoms) != 1:
+            return False
+        _, ya, _, yb = geoms[0].bounds
+        return ya >= -0.15 * X and yb <= 0.4 * X
+    step = 0.02 * X
+    for side in (("right",) if right else ()) + (("left",) if left else ()):
+        x = x1 if side == "right" else x0
+        edge = x
+        while abs(x - edge) < 0.6 * X and low(x - 0.5 * step if side == "right" else x + 0.5 * step):
+            x = x - step if side == "right" else x + step
+        if abs(x - edge) >= 0.6 * X or abs(x - edge) < step:
+            continue                                     # all join (a lone stroke), or none
+        acc = acc.intersection(box(-1e6, -1e6, x, 1e6) if side == "right" else box(x, -1e6, 1e6, 1e6))
+        x0, _, x1, _ = acc.bounds
+    return acc
+
+
+def ref_outline(path: str, char: str, form: str, st: Style, engine: Optional[Glyph] = None,
+                fit: bool = False, wide: float = 1.0) -> Optional[Glyph]:
+    """`char` in `form` as the typeface at `path` draws it, at the logo's x-height, its weight the logo's
+    stem, the engine's marks over it. `fit`: as wide as the engine draws the letter for this logo."""
+    from shapely.geometry import Polygon
+    from shapely import affinity
+    rings = _outline(path, char, form)
+    stem = _stem(path)
+    if rings is None or stem is None:
+        return None
+    X = st.x_height
+    acc = None
+    for ring in rings:
+        q = Polygon([(x * X, y * X) for x, y in ring]).buffer(0)
+        acc = q if acc is None else acc.symmetric_difference(q)
+    if acc is None or acc.is_empty:
+        return None
+    # the typeface's own join, on a side the letter joins, is cut off at the letter's body: the
+    # engine's join meets the body, as every join of the word does (two joins of two thicknesses
+    # met in a lump, and the critic saw it)
+    acc = _without_joins(acc, X, right=form in ("M", "F"), left=form in ("I", "M"))
+    if acc is None or acc.is_empty:
+        return None
+    if fit and engine is not None:
+        from .typeset import _is_mark, flat
+        exs = [x for sh in flat(engine.shapes) if not _is_mark(sh, st) for poly in sh for x, _ in poly]
+        w = acc.bounds[2] - acc.bounds[0]
+        if exs and w > 1e-6:
+            acc = affinity.scale(acc, xfact=max(0.5, min(2.0, (max(exs) - min(exs)) / w)), yfact=1.0, origin=(0, 0))
+    # the typeface's weight brought to the logo's: the outline moved in or out by half the difference;
+    # a counter the heavier pen would close is kept open as the hand keeps it, the letter drawn wider
+    grow = 0.5 * (st.stem - stem * X)
+    need = sum(1 for poly in getattr(acc, "geoms", [acc]) if poly.geom_type == "Polygon"
+               for h in poly.interiors if abs(Polygon(h).area) >= 0.02 * X * X)
+    # The letter must pass what the engine's own letters pass (critic.critique): its counters open
+    # (as wide as half the white between the logo's teeth), no ink piled thicker than the pen. Wider
+    # first, as the hand lengthens a loop; then lighter, as the hand draws a loop lighter than its
+    # stem; a letter that passes neither way is left to the engine.
+    for frac in (1.0, 0.75, 0.5, 0.25, 0.0, -0.25):
+        for k in (1.0, 1.15, 1.3, 1.5):
+            a = affinity.scale(acc, xfact=k * wide, yfact=1.0, origin=(0, 0)) if k * wide != 1.0 else acc
+            g = grow * frac if grow > 0 else grow + (1.0 - frac) * 0.15 * st.stem * (-1)
+            body = a.buffer(g, 8, join_style=1) if abs(g) > 1e-6 else a
+            if body.is_empty or body.area < 0.3 * a.area:
+                continue
+            if _passes(body, st, need):
+                return _finish(body, char, form, st, engine)
+    return None
+
+
+def _passes(body, st: Style, need: int) -> bool:
+    """The critic's measures on one letter: `need` counters open (0.55 white wide at their widest
+    row), and nowhere thicker than the pen allows."""
+    from PIL import Image, ImageDraw
+    s = 20.0 / max(st.stem, 1e-6)                  # the stem 20 pixels thick
+    x0, y0, x1, y1 = body.bounds
+    W, H = int((x1 - x0) * s) + 6, int((y1 - y0) * s) + 6
+    if W * H > 4_000_000:
+        return True
+    im = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(im)
+    for poly in getattr(body, "geoms", [body]):
+        if poly.geom_type != "Polygon":
+            continue
+        d.polygon([((x - x0) * s + 3, (y1 - y) * s + 3) for x, y in poly.exterior.coords], fill=255)
+        for h in poly.interiors:
+            d.polygon([((x - x0) * s + 3, (y1 - y) * s + 3) for x, y in h.coords], fill=0)
+    m = np.array(im) > 0
+    mono = float(np.clip((st.hair / st.stem - 0.5) / 0.5, 0.0, 1.0)) if st.stem else 0.0
+    dist = ndi.distance_transform_edt(m)
+    if 2 * float(dist.max()) > (1.32 + 0.43 * mono) * 20.0:
+        return False
+    # nor thinner than the logo's hairline (its centre line, the ends pruned, as the critic measures)
+    from skimage.morphology import skeletonize
+    sk = skeletonize(m)
+    for _ in range(12):
+        nb = ndi.convolve(sk.astype(np.uint8), np.ones((3, 3), np.uint8), mode="constant")
+        ends = sk & (nb <= 2)
+        if not ends.any():
+            break
+        sk = sk & ~ends
+    w = 2 * dist[sk]
+    if len(w) > 20 and float(np.percentile(w, 5)) < (0.6 - 0.1 * mono) * st.hair * s:
+        return False
+    holes = ndi.binary_fill_holes(m) & ~m
+    lab, n = ndi.label(holes)
+    wide_open = 0
+    for i, sl in enumerate(ndi.find_objects(lab), start=1):
+        hm = lab[sl] == i
+        if hm.sum() >= 36 and float(hm.sum(axis=1).max()) >= 0.55 * st.white * s:
+            wide_open += 1
+    return wide_open >= need
+
+
+# ------------------------------------------------------------------ the logo's parts on the reference's structure
+def with_logo_head(g: Glyph, st: Style) -> Optional[Glyph]:
+    """The reference's letter with its loop (the head of ف ق ه, around its counter) taken out and the
+    logo's own head (st.parts["رأس"]) put in its place: as tall as the loop it stands for, centred on
+    it, its shape and its counter the logo's. None when the letter has no loop or the logo no head."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from shapely import affinity
+    head = st.parts.get("رأس")
+    if not head or not head.get("polys") or not g.shapes:
+        return None
+    acc = None
+    for ring in g.shapes[0]:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+    if acc is None or acc.is_empty:
+        return None
+    holes = [Polygon(h) for poly in getattr(acc, "geoms", [acc]) if poly.geom_type == "Polygon" for h in poly.interiors]
+    if not holes:
+        return None
+    hole = max(holes, key=lambda h: h.area)
+    loop = acc.intersection(hole.buffer(1.3 * st.stem, 8))      # the stroke around the counter
+    if loop.is_empty:
+        return None
+    lx0, ly0, lx1, ly1 = loop.bounds
+    logo = None
+    for ring in head["polys"]:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            logo = q if logo is None else logo.symmetric_difference(q)
+    if logo is None or logo.is_empty:
+        return None
+    hx0, hy0, hx1, hy1 = logo.bounds
+    k = (ly1 - ly0) / max(hy1 - hy0, 1e-6)
+    logo = affinity.scale(logo, xfact=k, yfact=k, origin=(hx1, hy0))
+    hx0, hy0, hx1, hy1 = logo.bounds
+    logo = affinity.translate(logo, xoff=0.5 * (lx0 + lx1) - 0.5 * (hx0 + hx1), yoff=ly0 - hy0)
+    rest = acc.difference(hole.buffer(1.3 * st.stem, 8).union(logo.envelope.buffer(-0.2 * st.stem)))
+    body = unary_union([rest, logo]).buffer(0)
+    rings = []
+    for poly in getattr(body, "geoms", [body]):
+        if poly.geom_type == "Polygon" and not poly.is_empty and poly.area > 0.02 * st.stem * st.stem:
+            rings.append(list(poly.exterior.coords)[:-1])
+            rings += [list(h.coords)[:-1] for h in poly.interiors]
+    if not rings:
+        return None
+    xs = [x for r in rings for x, _ in r]
+    return Glyph([Tagged(rings, "reference", "بنية الخط المرجعي ورأس الشعار")] + list(g.shapes[1:]),
+                 left=min(min(xs), g.left), entry_x=g.entry_x, entry_edge=g.entry_edge,
+                 exit_x=g.exit_x if g.exit_x is None else min(g.exit_x, min(xs)),
+                 exit_edge=g.exit_edge if g.exit_edge is None else min(g.exit_edge, min(xs)))
+

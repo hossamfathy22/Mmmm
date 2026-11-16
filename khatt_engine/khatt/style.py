@@ -89,6 +89,14 @@ class Style:
     reference: str = ""
     ref_wide: float = 1.0
     ref_all: bool = False       # every letter on the reference's structure (to judge a reference on the logo's word)
+    # how a letter is taken from the reference: "pen", its centre line (the structure) drawn with the
+    # logo's pen, or, where that breaks the letter or fails the critic, its outline at the logo's
+    # weight; "outline", always the outline; "strokes", always the centre line
+    ref_how: str = "pen"
+    # a letter of few logos (ح ص ط ع ف ق ه and their siblings) the logo lacks, and has no letter of its
+    # own for, taken from the reference typeface's outline instead of the engine's construction
+    # (typeset.REF_LETTERS: better on 194 hidden letters, worse on 99)
+    ref_auto: bool = True
     # how far the logo draws a letter longer than the engine builds it (kashida): "letter.form" -> length.
     # A joining letter lengthens its join to the next; a final or isolated letter stretches its body
     # along the baseline; a letter with neither leaves more white after it. Fitted by the self-check.

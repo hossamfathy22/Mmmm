@@ -616,6 +616,26 @@ def teeth_from_logo(st: Style, c: str, form: str, cups_only: bool = False) -> Op
     return out
 
 
+# The letters few logos show, and the engine builds worst. Hidden in 324 words set in open typefaces
+# standing in for logos, the reference typeface's outline at the logo's weight (the typeface chosen
+# by the word's other letters) matched the logo's letter 0.461, the engine's construction 0.396, the
+# engine's with the logo's parts 0.407 (better 194, worse 99); every one of them gained (خ 0.22 to
+# 0.42, ف 0.35 to 0.51). On the simple letters (teeth, stems, ر و) the engine stays the better.
+REF_LETTERS = set("حصطعفقه")
+HEADED = set("فق")          # letters of a head on a neck: on the reference, the head is the logo's (reference.with_logo_head)
+
+
+def _logo_source(st: Style, c: str, form: str, glyph: Glyph, parts: bool = True) -> bool:
+    """Whether the logo gives this letter anything of its own: a cut (its own, a sibling's, its teeth,
+    its stem), or (`parts`) one of its parts."""
+    if find_cut(st, c, form)[0] is not None:
+        return True
+    if not parts:
+        return False
+    names = {getattr(sh, "name", "") for sh in flat(glyph.shapes)}
+    return bool(st.parts) and bool(names & set(st.parts))
+
+
 def find_cut(st: Style, c: str, form: str):
     """The letter as the logo draws it, for `c` in `form`: cut in this form, else in the other form
     that differs only by the join from the right (isolated/final, initial/medial), else the same of a
@@ -696,14 +716,21 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 if rtok is not None:
                     READS.reset(rtok)
         BUILDING.reset(ltok)
-        if st.reference and (st.ref_all or (f"{c}.{form}" not in st.seen.split()
-                                             and REFERENCE in (st.variants.get(f"{c}.{form}"),
-                                                               st.variants.get(f"{SKELETON.get(c, c)}.{form}")))):
+        # a letter of few logos (ح ص ط ع ف ق ه ...) the logo lacks and has no letter of its own for (no
+        # cut, no sibling's body): on the reference typeface's outline (see REF_LETTERS)
+        auto = (st.ref_auto and st.seen and SKELETON.get(c, c) in REF_LETTERS and f"{c}.{form}" not in st.seen.split()
+                and st.variants.get(f"{c}.{form}") is None and not _logo_source(st, c, form, glyph, parts=False))
+        if st.reference and (st.ref_all or auto or (f"{c}.{form}" not in st.seen.split()
+                                                    and REFERENCE in (st.variants.get(f"{c}.{form}"),
+                                                                      st.variants.get(f"{SKELETON.get(c, c)}.{form}")))):
             # a letter the logo lacks, asked of the logo's reference typeface: built on its structure
             # with the logo's pen (the examination found this no better than the engine on average,
             # so it is the designer's choice, not the default)
-            from .reference import ref_glyph
+            from .reference import ref_glyph, with_logo_head
             got = ref_glyph(st.reference, c, form, st, st.ref_wide, engine=glyph)
+            if got is not None and SKELETON.get(c, c) in HEADED and st.parts.get("رأس"):
+                # the logo's own head on the reference's neck (ف ق): the logo's part where it has one
+                got = with_logo_head(got, st) or got
             if got is not None:
                 glyph = got
         if (st.legible_fallback and st.seen and f"{c}.{form}" not in st.seen.split()
