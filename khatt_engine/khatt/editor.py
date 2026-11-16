@@ -57,7 +57,17 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     an = analyse(image, texts=[text] if text.strip() else None)
     L, R, st, k = an["lines"][an["src"]], an["readings"][an["src"]], an["style"], an["k"]
     own = own_text(R)
-    check = check_and_take(L, own, st, k, take=not R.text_drawn and an["health"]["confidence"] >= TAKE_MIN) if own else None
+    take = not R.text_drawn and an["health"]["confidence"] >= TAKE_MIN
+    check = check_and_take(L, own, st, k, take=take) if own else None
+    if check and take:
+        # the logo's parts box: the new letters are built of the logo's own pieces
+        from .selfcheck import adopt_library
+        dropped = adopt_library(an["lib"], L, own, st, k)
+        check["library"] = sorted((st.library.get("parts") or {}).keys())
+        if dropped:
+            from .library import PART_NAMES
+            check["notes"].append("لم تُستعمل من قطع الشعار: " + "، ".join(PART_NAMES.get(q, q) for q in dropped)
+                                  + " (رسمت كلمة الشعار نفسها أسوأ من صيغة المحرك).")
     ref = None
     if own and an["health"]["confidence"] >= TAKE_MIN:
         # the reference typeface nearest the logo: the letters the logo lacks may be built on it. Judged
@@ -267,7 +277,11 @@ def kit(style: Dict[str, Any], params: Optional[Dict[str, float]] = None, varian
                               "closed": bool(here.get("closed")) if here else False,
                               "thickness": float(here.get("thickness", 1.0)) if here else 1.0,
                               "ends": here.get("ends", "round") if here else "round"}})
+    from .library import PART_NAMES
+    basics = [{"key": q, "label": PART_NAMES.get(q, q), "from": (v.get("source") or "")}
+              for q, v in ((st.library or {}).get("parts") or {}).items()]
     return _plain({"parts": out, "pen": {"stem": st.stem, "hair": st.hair, "power": st.contrast_power},
+                   "basics": basics,
                    "complete": sum(1 for o in out if o["source"] != "engine"), "total": len(out)})
 
 

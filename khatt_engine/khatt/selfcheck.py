@@ -418,6 +418,10 @@ def _take(logo: np.ndarray, glyphs, letters, s: float, x_of: float, base_row: fl
             out[f"{p.char}.{p.form}"] = {"polys": rings, "match_before": letters[i]["match"]}
             if pieces is not None:
                 out[f"{p.char}.{p.form}"]["piece"] = True        # read from the logo's own pieces
+                # where the cut stood in the logo (its frame's origin, in the style's units) and which
+                # letter of the word it was: two neighbours of the logo are set as they stand there
+                out[f"{p.char}.{p.form}"]["ox"] = round(dx / s + p.x, 3)
+                out[f"{p.char}.{p.form}"]["at"] = i
     return out
 
 
@@ -1132,6 +1136,43 @@ def _lengthen(L: Line, text: str, st: Style, k: float, first: Dict[str, Any], la
         first["notes"].append("الشعار يمدّ " + "، ".join(longer) + " من ارتفاع الحروف أطول مما يبنيه المحرك: مدّها مثله فارتفع التطابق من "
                               f"{before * 100:.0f}% إلى {r['overall'] * 100:.0f}%. يُستعمل المدّ نفسه في كل كلمة جديدة.")
     return first
+
+
+def adopt_library(lib, L: Line, text: str, st: Style, k: float) -> List[str]:
+    """The logo's part library, kept with its style so every new letter is built of the logo's own
+    pieces: each piece first earns its place on the logo's own word (prune_parts). Returns what was
+    dropped."""
+    if lib is None or not lib.parts or not text:
+        return []
+    st.library = {}
+    dropped = prune_parts(lib, L, text, st, k)
+    # and on new letters: a piece that leaves the critic more to find in a fixed set of words (a head
+    # stretched into the head of ف and ه cracked at its joins) is not used
+    from .critic import critique
+    from .library import ACTIVE
+
+    def defects() -> int:
+        tok = ACTIVE.set(lib)
+        try:
+            return sum(len(critique(typeset(w, st), w)) for w in SPECIMEN)
+        finally:
+            ACTIVE.reset(tok)
+    now = defects()
+    for key in list(lib.parts):
+        part = lib.parts.pop(key)
+        got = defects()
+        if got < now:
+            now = got
+            dropped.append(key)
+        else:
+            lib.parts[key] = part
+    if lib.parts:
+        st.library = lib.to_dict()
+    return dropped
+
+
+# words that use every kind of piece: teeth and their feet, stems, heads, tails, dots and dashes
+SPECIMEN = ("بيت سلام", "فجر هادئ", "قمر حلم", "طعم عطر", "كتب شمس", "ونور زيت")
 
 
 def prune_parts(lib, L: Line, text: str, st: Style, k: float) -> List[str]:

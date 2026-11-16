@@ -172,16 +172,21 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
     if not polys or (borrowed and area(polys) < 0.5 * full):
         return built                                     # trimming the join left too little of the letter
     xs = [x for ring in polys for x, _ in ring]
+    moved = 0.0
     if form in ("i", "I") and max(xs) > 0:
         over = max(xs)
         polys = [[(x - over, y) for x, y in ring] for ring in polys]
         xs = [x - over for x in xs]
+        moved = over
     # the next letter joins at the cut's own left end, not where the engine's letter would have ended
     reach = min(0.0, min(xs) - built.left)
     exit_x = built.exit_x + reach if built.exit_x is not None else None
     exit_edge = built.exit_edge + reach if built.exit_edge is not None else None
     body = Tagged(polys, "logo", "من الشعار")
     body.piece = bool(cut.get("piece"))                  # read from the logo's own pieces (selfcheck._by_pieces)
+    # where it stood in the logo, in this glyph's frame (moved with it below), and which letter it was
+    body.ox = float(cut["ox"]) + moved if cut.get("ox") is not None and marks is None and not borrowed else None
+    body.at = cut.get("at") if body.ox is not None else None
     # a cut read from the logo's pieces is as wide as it is (the engine's ر is twice the logo's, and its
     # width put a gap after the logo's ر that the logo does not have)
     left = min(xs) if cut.get("piece") else min(min(xs), built.left)
@@ -421,7 +426,16 @@ def with_parts(glyph: Glyph, st: Style, key: str = "") -> Glyph:
                  tail=glyph.tail)
 
 
-SEAM = 0.15        # two letters cut from the logo that meet overlap by this much of a stem (edge to edge, a white seam showed)
+SEAM = 0.1         # two letters cut from the logo, never neighbours there, overlap by this much of a stem where they meet
+
+
+def _logo_place(glyph: Glyph) -> Optional[Tuple[float, int]]:
+    """Where a letter cut from the logo's pieces stood there (its frame's origin) and which letter of the
+    logo's word it was; None for any other letter."""
+    for sh in glyph.shapes:
+        if getattr(sh, "source", "") == "logo" and getattr(sh, "ox", None) is not None:
+            return sh.ox, sh.at
+    return None
 
 
 def _cut_span(glyph: Glyph) -> Optional[Tuple[float, float]]:
@@ -678,7 +692,37 @@ def _dep_value(st: Style, dep: str):
     return value(st, dep) if dep in PARAMS else None
 
 
+_LIBS: dict = {}
+
+
+def _library(st: Style):
+    """The logo's part library kept in the style, as the letters' builders use it (library.ACTIVE)."""
+    from .library import Library
+    d = st.library
+    parts = d.get("parts") or {}
+    key = (round(float(d.get("stem", 0)), 3), tuple(sorted((k, len(v["polys"]), tuple(tuple(q) for q in v["polys"][0][:2]) if v["polys"] else ())
+                                                         for k, v in parts.items())))
+    if key not in _LIBS:
+        if len(_LIBS) > 32:
+            _LIBS.clear()
+        _LIBS[key] = Library.from_dict(d)
+    return _LIBS[key]
+
+
 def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
+    """Lay out `word`; with the logo's part library (st.library) every letter is built of the logo's
+    own stems, feet, tails, heads, dots and dashes (see library.py), unless a library is active already."""
+    from .library import ACTIVE
+    if st.library and st.library.get("parts") and ACTIVE.get() is None:
+        tok = ACTIVE.set(_library(st))
+        try:
+            return _typeset(word, st, cache)
+        finally:
+            ACTIVE.reset(tok)
+    return _typeset(word, st, cache)
+
+
+def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
     """Lay out `word` right to left. `cache` (a dict kept by the caller) reuses the letters built for
     an earlier layout of the same logo whose parameters and variants they read are unchanged: for
     trying many values on the same word. (Only the designer's and the measured values are compared:
@@ -764,7 +808,7 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":
             marks = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)] if kin else None
-            if not kin:
+            if not kin and borrowed is not None:
                 # a letter whose dots the logo drew into another's (the dash over موتنرو's ت carries
                 # the ن's dot): cut without them it reads as another letter (ن as ع), so the engine's
                 # marks go over its body
@@ -790,7 +834,12 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         joined = prev is not None and form in ("M", "F")
         if prev is not None:
             pc, gc = _cut_span(prev.glyph), _cut_span(glyph)
-            if joined and pc and gc:
+            na, nb = _logo_place(prev.glyph), _logo_place(glyph)
+            if joined and na and nb and nb[1] == na[1] + 1:
+                # neighbours in the logo itself: set as they stand there, their cut edges fitting
+                x = prev.x + (nb[0] - na[0])
+                joined = False
+            elif joined and pc and gc:
                 # two letters as the logo draws them: the logo's join is in them (the hairline of م,
                 # the arm two cups share), so they meet as they meet in the logo, with no join of the
                 # engine's between them

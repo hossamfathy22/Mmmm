@@ -48,6 +48,9 @@ class Style:
     # parts of letters as the logo draws them (selfcheck.take_parts): part name -> outlines, relative to
     # the right end of the engine's part; they stand in for that part in every letter the logo lacks
     parts: Dict[str, Dict] = field(default_factory=dict)
+    # the logo's part library (library.Library.to_dict): its own stem, the feet of its teeth where they
+    # flow into a join, its tail, head, dot and dash, that every letter the engine builds is made of
+    library: Dict = field(default_factory=dict)
     # a part the logo lacks made from another of its parts, mirrored or turned: tried, and off (on 551
     # hidden letters it drew worse than the parts as they are, above all the cups of ل ن ي)
     derive_parts: object = False   # False, "engine" (alike in the engine's construction) or "real" (in real typefaces)
@@ -93,10 +96,11 @@ class Style:
     # logo's pen, or, where that breaks the letter or fails the critic, its outline at the logo's
     # weight; "outline", always the outline; "strokes", always the centre line
     ref_how: str = "pen"
-    # a letter of few logos (ح ص ط ع ف ق ه and their siblings) the logo lacks, and has no letter of its
-    # own for, taken from the reference typeface's outline instead of the engine's construction
-    # (typeset.REF_LETTERS: better on 194 hidden letters, worse on 99)
-    ref_auto: bool = True
+    # a letter of few logos (ح ص ط ع ف ق ه and their siblings) the logo lacks, drawn from the reference
+    # typeface instead of the engine's recipe. Off: the typefaces are a reference for a letter's
+    # structure and an examiner, not what the letters are drawn from; a letter is built of the logo's
+    # parts on its recipe (the method of the hand-made words). The user may choose it, letter by letter.
+    ref_auto: bool = False
     # how far the logo draws a letter longer than the engine builds it (kashida): "letter.form" -> length.
     # A joining letter lengthens its join to the next; a final or isolated letter stretches its body
     # along the baseline; a letter with neither leaves more white after it. Fitted by the self-check.

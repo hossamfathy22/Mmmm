@@ -42,6 +42,8 @@ KIT: List[Tuple[str, str, str]] = [
     ("الياء", "الياء المنفصلة", "ي.i"),
 ]
 LABEL = {n: label for n, label, _ in KIT}
+# parts of the kit the logo's part library (library.py) gives the letters' builders directly
+LIBRARY_OF = {"ذيل": "tail", "رأس": "loop"}
 SAMPLE = {n: sample for n, _, sample in KIT}
 
 
@@ -89,10 +91,13 @@ def users(st: Style) -> Dict[str, List[str]]:
 def status(st: Style) -> List[Dict]:
     """Every part of the kit for this logo: where it comes from, and the letters it builds."""
     by = users(st)
+    lib = (st.library or {}).get("parts") or {}
     out = []
     for name, label, sample in KIT:
         p = st.parts.get(name)
         src = (p.get("source") or "logo") if p else "engine"
+        if src == "engine" and LIBRARY_OF.get(name) in lib:
+            src = "logo"                     # the letters take it from the logo's part library (library.py)
         out.append({"name": name, "label": label, "sample": sample, "source": src,
                     "from": p.get("from", "") if p else "", "letters": by.get(name, [])})
     return out

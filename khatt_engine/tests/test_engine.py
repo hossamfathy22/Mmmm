@@ -537,6 +537,28 @@ def test_editor_reads_a_logo_once(read_example):
     assert abs(r["style"]["stem"] - 46.4) < 0.5 and "الجذع" in r["measures"]
 
 
+def test_the_logos_part_library_travels_with_its_style_and_builds_the_letters():
+    """The parts box cut from the logo (its stem, the feet of its teeth, its tail...) is kept in the
+    style the editor gets, and the letters drawn from that style are built of it."""
+    from khatt.library import Library
+    from khatt.pipeline import analyse
+    an = analyse(EXAMPLE.read_bytes(), texts=["بيدوناق"], read=False)
+    lib = an["lib"]
+    assert lib.parts
+    back = Library.from_dict(lib.to_dict())
+    assert set(back.parts) == set(lib.parts)
+    st = Style(**{**an["style"].__dict__, "library": lib.to_dict()})
+    sources = {getattr(sh, "source", "") for p in typeset("بيت", st).placed for sh in flat(p.glyph.shapes)}
+    assert "logo" in sources
+    plain = {getattr(sh, "source", "") for p in typeset("بيت", an["style"]).placed for sh in flat(p.glyph.shapes)}
+    assert "logo" not in plain
+
+
+def test_the_editor_keeps_the_pieces_that_earn_their_place(read_example):
+    lib = read_example["style"].get("library") or {}
+    kept = set((lib.get("parts") or {}))
+    assert set(read_example["self_check"].get("library") or []) == kept
+
 def test_editor_draws_with_the_designers_changes(read_example):
     from khatt.editor import draw
     read_example = {**read_example, "style": {**read_example["style"], "ref_auto": False}}
@@ -1046,12 +1068,15 @@ def test_a_reference_letter_is_the_designers_choice_for_letters_the_logo_lacks()
     assert ("ح", "I") in keys and ("ب", "I") not in keys          # a letter the logo has keeps its own drawing
 
 
-def test_the_letters_few_logos_show_come_from_the_reference_unless_the_logo_has_its_own():
-    """ح ص ط ع ف ق ه the logo lacks: the reference typeface's outline at the logo's weight; a letter the
-    logo has, or one the designer sets to the engine's, is not; nor one that would not pass the critic."""
+def test_the_letters_few_logos_show_come_from_the_reference_only_when_asked():
+    """By default every letter is built on its recipe of the logo's parts (the typefaces are a reference
+    for structure, not what is drawn); asked for (ref_auto, or the choice letter by letter), ح ص ط ع ف ق ه
+    the logo lacks come from the reference; a letter the logo has, or one set to the engine's, do not."""
     from khatt.recipes import REFERENCE, choices
     path = _a_reference()
-    st = Style(reference=path, seen="ب.I")
+    plain = typeset("حبع", Style(reference=path, seen="ب.I"))
+    assert all("بنية الخط المرجعي" not in [n for _, n in p.parts] for p in plain.placed)
+    st = Style(reference=path, seen="ب.I", ref_auto=True)
     lay = typeset("حبع", st)
     names = [[n for _, n in p.parts] for p in lay.placed]
     assert "بنية الخط المرجعي" in names[0] and "بنية الخط المرجعي" in names[2]

@@ -213,6 +213,21 @@ class Library:
             out.append(foot)
         return out
 
+    def to_dict(self) -> Dict:
+        """The library as plain numbers, to keep with the logo's style (the editor draws with it)."""
+        return {"stem": self.stem, "hair": self.hair, "x_height": self.x_height, "white": self.white, "y_cut": self.y_cut,
+                "parts": {k: {"source": p.source, "info": {a: float(b) for a, b in p.info.items()},
+                              "polys": [[(round(float(x), 2), round(float(y), 2)) for x, y in poly] for poly in p.polys]}
+                          for k, p in self.parts.items()}}
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> "Library":
+        lib = cls(stem=float(d["stem"]), hair=float(d["hair"]), x_height=float(d["x_height"]), white=float(d["white"]),
+                  y_cut=float(d["y_cut"]))
+        for k, p in (d.get("parts") or {}).items():
+            lib.parts[k] = Part(k, p.get("source", ""), [], [[tuple(q) for q in poly] for poly in p["polys"]], dict(p.get("info") or {}))
+        return lib
+
     def summary(self) -> List[Dict]:
         return [{"key": p.key, "name": p.name, "source": p.source,
                  **{k: round(v, 2) for k, v in p.info.items()}} for p in self.parts.values()]

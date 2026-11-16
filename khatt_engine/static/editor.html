@@ -379,7 +379,8 @@ function srcText(p){
 }
 function renderKit(){
   $('kitPanel').classList.remove('hidden');
-  $('kitCount').textContent = `${kit.complete} من ${kit.total} مكتملة`;
+  $('kitCount').textContent = `${kit.complete} من ${kit.total} مكتملة`
+    + ((kit.basics || []).length ? ` · قطع الأساس من الشعار: ${kit.basics.map(b => b.label).join('، ')}` : '');
   $('cards').innerHTML = kit.parts.map(p => `<div class="card ${current === p.name ? 'on' : ''}" data-part="${esc(p.name)}" tabindex="0" role="button" aria-label="${esc(p.label)}">
       <div class="pv">${p.preview}</div><b>${esc(p.label)}</b>
       <span class="badge ${p.source}">${esc(srcText(p))}</span>
