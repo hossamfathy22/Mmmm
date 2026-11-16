@@ -182,7 +182,10 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
     exit_edge = built.exit_edge + reach if built.exit_edge is not None else None
     body = Tagged(polys, "logo", "من الشعار")
     body.piece = bool(cut.get("piece"))                  # read from the logo's own pieces (selfcheck._by_pieces)
-    return Glyph([body] + list(marks or []), left=min(min(xs), built.left), entry_x=built.entry_x,
+    # a cut read from the logo's pieces is as wide as it is (the engine's ر is twice the logo's, and its
+    # width put a gap after the logo's ر that the logo does not have)
+    left = min(xs) if cut.get("piece") else min(min(xs), built.left)
+    return Glyph([body] + list(marks or []), left=left, entry_x=built.entry_x,
                  entry_edge=built.entry_edge, exit_x=exit_x, exit_edge=exit_edge, stems=built.stems,
                  tail=built.tail)
 
@@ -416,6 +419,9 @@ def with_parts(glyph: Glyph, st: Style, key: str = "") -> Glyph:
     return Glyph(shapes, left=min(glyph.left, min(xs)) if xs else glyph.left, entry_x=glyph.entry_x,
                  entry_edge=glyph.entry_edge, exit_x=glyph.exit_x, exit_edge=glyph.exit_edge, stems=glyph.stems,
                  tail=glyph.tail)
+
+
+SEAM = 0.15        # two letters cut from the logo that meet overlap by this much of a stem (edge to edge, a white seam showed)
 
 
 def _cut_span(glyph: Glyph) -> Optional[Tuple[float, float]]:
@@ -758,6 +764,18 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":
             marks = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)] if kin else None
+            if not kin:
+                # a letter whose dots the logo drew into another's (the dash over موتنرو's ت carries
+                # the ن's dot): cut without them it reads as another letter (ن as ع), so the engine's
+                # marks go over its body
+                own = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)]
+                polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
+                if own and len(_strip_marks(polys, st.x_height)) == len(polys):
+                    marks = own
+                    cxs = [x for ring in polys for x, _ in ring]
+                    exs = [x for sh in flat(glyph.shapes) if not _is_mark(sh, st) for poly in sh for x, _ in poly]
+                    if cxs and exs:
+                        cut = {**cut, "marks_dx": 0.5 * (min(cxs) + max(cxs)) - 0.5 * (min(exs) + max(exs))}
             glyph = from_logo(glyph, cut, form, borrowed, st.stem, marks, st.x_height)
             ext = 0.0                    # the letter as the logo draws it already has the logo's length
         if ext > 0 and form in ("i", "F"):
@@ -776,7 +794,7 @@ def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 # two letters as the logo draws them: the logo's join is in them (the hairline of م,
                 # the arm two cups share), so they meet as they meet in the logo, with no join of the
                 # engine's between them
-                x = prev.x + pc[0] - gc[1]
+                x = prev.x + pc[0] - gc[1] + SEAM * st.stem
                 # and where the one before ends in an upright arm and this one begins with an upright,
                 # they are one stroke, as two cups share an arm in the logo (and the arm of a cup rises
                 # into the ا after it)

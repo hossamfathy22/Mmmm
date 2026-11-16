@@ -301,6 +301,16 @@ def _finish(body, char: str, form: str, st: Style, engine: Optional[Glyph]) -> O
         rings += [list(h.coords)[:-1] for h in poly.interiors]
     if not rings:
         return None
+    # within the logo's lines: what the typeface draws below its descender or above its ascender
+    # further than the logo does is drawn in to the logo's (the critic: a part outside the grid)
+    ys = [y for ring in rings for _, y in ring]
+    low, high = -st.descender, st.x_height + st.ascender
+    if min(ys) < low:
+        k = low / min(ys)
+        rings = [[(x, y * k if y < 0 else y) for x, y in ring] for ring in rings]
+    if max(ys) > high:
+        k = (high - st.x_height) / (max(ys) - st.x_height)
+        rings = [[(x, st.x_height + (y - st.x_height) * k if y > st.x_height else y) for x, y in ring] for ring in rings]
     xs = [x for ring in rings for x, _ in ring]
     right, lft = max(xs), min(xs)
     rings = [[(x - right, y) for x, y in ring] for ring in rings]
