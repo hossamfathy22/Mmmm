@@ -797,9 +797,34 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     return fitted, chosen, traits
 
 
+def text_mismatch(r: Optional[Dict[str, Any]]) -> bool:
+    """Does the text given for the logo not match it? The engine's own drawing of the right word matches
+    the logo far beyond chance, even where the logo draws a letter or two its own way; a wrong word
+    matches poorly as a whole, or poorly in most of its letters. Every cut, every rule measured off the
+    logo's word and every part taken from it rests on the letters being where the text says they are:
+    with a wrong text they are cut from the wrong ink and then match by construction."""
+    if not r or not r.get("letters"):
+        return False
+    weak = sum(1 for x in r["letters"] if x["match"] < GOOD)
+    return r["overall"] < FAIR or weak > 0.5 * len(r["letters"])
+
+
+MISMATCH_NOTE = ("النص المكتوب لا يطابق الشعار (التطابق {:.0f}%، و{} من {} حروف لا تطابق): لم يُؤخذ من الشعار حرف "
+                 "ولا قطعة ولا قاعدة. تأكد من كتابة الكلمة التي في الشعار نفسها.")
+
+
 def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -> Optional[Dict[str, Any]]:
     """The self-check and everything read off the logo's own word (see _check_and_take), and then the
-    parts of its letters, cut from it for the letters it lacks."""
+    parts of its letters, cut from it for the letters it lacks. Nothing is taken when the text does
+    not match the logo (text_mismatch)."""
+    if take:
+        probe = self_check(L, text, Style(**st.__dict__), k)
+        if text_mismatch(probe):
+            weak = sum(1 for x in probe["letters"] if x["match"] < GOOD)
+            probe["taken"] = {}
+            probe["mismatch"] = True
+            probe["notes"] = [MISMATCH_NOTE.format(probe["overall"] * 100, weak, len(probe["letters"]))]
+            return probe
     r = _check_and_take(L, text, st, k, take)
     if r and take and st.take_all:
         r = _take_the_rest(L, text, st, k, r)
