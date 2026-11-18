@@ -1380,3 +1380,13 @@ def test_a_lowered_tooth_cut_from_the_logo_is_body_not_join():
     tooth = box(0, 4, 0.25 * U, 58.5).union(box(0, 0, 0.25 * U, 4.5)).difference(box(0, 30, 2.5, 50))
     assert tooth.area < 0.6 * U * U and _body_band(tooth, U, X)
     assert not _body_band(box(0, 0, 0.25 * U, 4.5), U, X)
+
+
+def test_the_descender_is_the_logos_own_where_its_word_goes_below_the_baseline():
+    """سیرنگ's ر goes 24 below the baseline where its ascender is 36: the drawing's descender was made
+    equal to the ascender in every logo (a choice of the hand-made بيدوناق). It is the measured one
+    where the logo's word has a letter that goes below the baseline; a word with none (ماکیتا, only
+    dots under it) still takes the ascender."""
+    from khatt.pipeline import descends
+    assert descends("سیرنگ") and descends("بيدوناق") and descends("موتنرو")
+    assert not descends("ماکیتا") and not descends("كتب")

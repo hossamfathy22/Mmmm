@@ -77,14 +77,28 @@ def pick_line(lines: List[Line], readings: List[Reading], line: Optional[int]) -
     return (typed or arabic or usable)[0]
 
 
-def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) -> Style:
+# letters that go below the baseline in these forms: a tail (ر و), a bowl (ن ی ق ل س ص), a hook (ع ح م)
+DESCENDING = {"i": set("رزژوؤىيیئنںقلسشصضعغحجخچمه"), "F": set("رزژوؤىيیئنںقلسشصضعغحجخچم")}
+
+
+def descends(text: str) -> bool:
+    """Does the logo's word have a letter that goes below the baseline? Only then is the depth measured
+    under its baseline the logo's descender; otherwise it is only dots, or nothing."""
+    from .typeset import shape_forms
+    return any(c in DESCENDING.get(f, ()) for c, f in shape_forms(text or ""))
+
+
+def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None, text: str = "") -> Style:
     X = L.x_height * k
     asc = L.ascender * k
     dot = lib.parts["dot"].info["diameter"] if "dot" in lib.parts else 1.1 * L.stem * k
     base = Style(stem=L.stem * k, hair=(L.stem if L.monoline else L.hair) * k, x_height=X,
                  ascender=asc if asc >= 0.3 * X else 0.55 * X,
-                 # the descender is made equal to the ascender (vertical balance), never shorter than the logo's
-                 descender=max(L.descender * k, asc if asc >= 0.3 * X else 0.55 * X),
+                 # the descender is the logo's own where its word has a letter that goes below the baseline
+                 # (سیرنگ's ر: 24, where the ascender is 36). Where it has none, the logo says nothing of
+                 # it, and it is made equal to the ascender (vertical balance, as in the hand-made بيدوناق)
+                 descender=(L.descender * k if descends(text) and L.descender * k >= 0.15 * X
+                            else max(L.descender * k, asc if asc >= 0.3 * X else 0.55 * X)),
                  slant=L.slant, white=(L.white if L.white == L.white else L.stem) * k, dot=dot,
                  dash_marks=bool(L.dashes) or not L.dots, contrast_power=float(np.clip(L.power, 0.8, 6.0)))
     f = {k_: v["value"] for k_, v in (feats or {}).items()}
@@ -231,7 +245,7 @@ def place_texts(lines: List[Line], texts: List[str], k: float) -> List[str]:
         for i in free:
             R = read_line(lines[i], t)
             try:
-                st = style_from(lines[i], build_library(lines[i], R, k), k,
+                st = style_from(lines[i], build_library(lines[i], R, k), k, text=t, feats=
                                 measure_features(lines, [R if j == i else read_line(Lj, None) for j, Lj in enumerate(lines)], i, k))
                 r = self_check(lines[i], t, st, k)
             except Exception:                    # a line that cannot be measured as this text is not its line
@@ -283,7 +297,7 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
     # 4. parts
     lib = build_library(L, R, k)
     feats = measure_features(lines, readings, src, k)
-    style = style_from(L, lib, k, feats)
+    style = style_from(L, lib, k, feats, R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else ""))
     for key, v in (overrides or {}).items():
         if hasattr(style, key) and v is not None:
             setattr(style, key, type(getattr(style, key))(v))
