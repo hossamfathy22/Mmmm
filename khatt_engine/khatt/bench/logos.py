@@ -135,6 +135,134 @@ def held_out(folder: Path) -> List[Dict]:
     return rows
 
 
+# The six families of parts (the part a letter shares with others), by letter and form:
+# الساق a straight stem, الحوض an open bowl, السن a tooth, العروة a closed loop, القوس an arc open to the
+# right, الذيل a tail under the baseline. A letter may belong to two (و: loop and tail).
+FAMILIES = {
+    "الساق": {f: set("الكکگطظ") for f in "iIMF"},
+    "الحوض": {f: set("بتثپنيیىل") for f in "iF"},
+    "السن": {f: set("بتثپنيیئسش") for f in "IM"},
+    "العروة": {f: set("وؤفڤقم") for f in "iIMF"},
+    "القوس": {f: set("جحخچعغ") for f in "iIMF"},
+    "الذيل": {f: set("رزژوؤقڤ") for f in "iF"},
+}
+
+
+def family_of(letter: str, form: str) -> List[str]:
+    return [n for n, by in FAMILIES.items() if letter in by.get(form, ())]
+
+
+def family_exam(folder: Path) -> List[Dict]:
+    """Can a letter be built from the parts of its family, and a whole family from the others?
+
+    For every family the logo's word has letters of, all its letters are hidden at once; their ink
+    is left out, the rules are measured on the other letters, and each hidden letter is drawn
+      - by the engine's general rules (general);
+      - with the rules measured on the other letters (measured);
+      - with the parts cut from the other letters as well, as the engine maps parts to letters (parts);
+      - and with parts of other families turned into the missing ones, as real typefaces relate them
+        (links: style.derive_parts = "real");
+    and matched on the logo. And every letter whose family has another letter in the word is hidden
+    alone, and drawn with the parts of that family's other letters (within)."""
+    from ..pipeline import TAKE_MIN, analyse
+    from ..recipes import SKELETON
+    from ..selfcheck import _Trial, fit_letters, self_check, take_parts
+    from ..style import Style
+    texts = json.loads((folder / "texts.json").read_text(encoding="utf-8"))
+    rows = []
+
+    def drawn(st, L, text, k, n, idx):
+        r = self_check(L, text, st, k)
+        if not r or len(r["letters"]) != n:
+            return None
+        return [r["letters"][i]["match"] for i in idx]
+
+    for name, text in texts.items():
+        pics = [p for p in folder.glob(name + ".*") if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")]
+        if not pics:
+            continue
+        try:
+            an = analyse(pics[0].read_bytes(), texts=[text], read=False)
+        except Exception:
+            continue
+        if an["health"]["confidence"] < TAKE_MIN:
+            continue
+        L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+        base = self_check(L, text, st, k)
+        if not base:
+            continue
+        letters = base["letters"]
+        n = len(letters)
+
+        def rules_without(hide):
+            t = _Trial(L, text, st, k, hide=hide)
+            if not t.ok:
+                return None
+            fitted, chosen, traits = fit_letters(L, text, st, k, trial=t)
+            on = " ".join(sorted({f"{SKELETON.get(y['letter'], y['letter'])}.{y['form']}" for j, y in enumerate(letters) if j not in hide}))
+            return Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on})
+
+        for fam in FAMILIES:
+            idx = [i for i, x in enumerate(letters) if fam in family_of(x["letter"], x["form"])]
+            if not idx:
+                continue
+            hide = set(idx)
+            fit = rules_without(hide)
+            if fit is None:
+                continue
+            seen = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(letters) if j not in hide)
+            row = {"name": name, "text": text, "family": fam, "letters": "".join(letters[i]["letter"] for i in idx),
+                   "general": [letters[i]["match"] for i in idx]}
+            row["measured"] = drawn(fit, L, text, k, n, idx)
+            parts = take_parts(L, text, fit, k, skip=hide)
+            row["parts"] = drawn(Style(**{**fit.__dict__, "parts": parts, "seen": seen}), L, text, k, n, idx) if parts else row["measured"]
+            row["links"] = drawn(Style(**{**fit.__dict__, "parts": parts, "seen": seen, "derive_parts": "real"}), L, text, k, n, idx) \
+                if parts else row["measured"]
+            row["have_parts"] = sorted(parts)
+            # within: each letter alone, its family's other letters (and every other letter) in view
+            within = []
+            if len(idx) >= 2:
+                for i in idx:
+                    one = rules_without({i})
+                    if one is None:
+                        continue
+                    seen1 = " ".join(f"{y['letter']}.{y['form']}" for j, y in enumerate(letters) if j != i)
+                    p1 = take_parts(L, text, one, k, skip={i})
+                    got = drawn(Style(**{**one.__dict__, "parts": p1, "seen": seen1}), L, text, k, n, [i])
+                    if got:
+                        within.append((letters[i]["match"], got[0]))
+            row["within"] = within
+            if row["measured"] and row["parts"] and row["links"]:
+                rows.append(row)
+    return rows
+
+
+def family_summary(rows: List[Dict]) -> str:
+    import numpy as np
+    out = ["| الشعار | العائلة المخفية | حروفها | المحرك (قواعد عامة) | قواعد مقيسة من البقية | + قطع البقية | + الروابط بين العائلات |",
+           "|---|---|---|---|---|---|---|"]
+    for r in rows:
+        m = lambda q: f"{np.mean(r[q]) * 100:.0f}%"
+        out.append(f"| {r['text']} | {r['family']} | {r['letters']} | {m('general')} | {m('measured')} | {m('parts')} | {m('links')} |")
+    out += ["", "| العائلة | حروف مخفية | المحرك | مقيسة | + قطع البقية | + الروابط |", "|---|---|---|---|---|---|"]
+    tot = {q: [] for q in ("general", "measured", "parts", "links")}
+    for fam in FAMILIES:
+        rs = [r for r in rows if r["family"] == fam]
+        if not rs:
+            continue
+        v = {q: [x for r in rs for x in r[q]] for q in tot}
+        for q in tot:
+            tot[q] += v[q]
+        out.append(f"| {fam} | {len(v['general'])} | " + " | ".join(f"{np.mean(v[q]) * 100:.1f}%" for q in tot) + " |")
+    out.append(f"| **الكل** | {len(tot['general'])} | " + " | ".join(f"**{np.mean(tot[q]) * 100:.1f}%**" for q in tot) + " |")
+    w = [x for r in rows for x in r["within"]]
+    if w:
+        a = np.array(w)
+        out += ["", f"حرف مخفي وحده وبقية عائلته ظاهرة ({len(w)} حرفًا، عائلات بأكثر من حرف في الكلمة): "
+                f"{a[:, 0].mean() * 100:.1f}% بالمحرك، و{a[:, 1].mean() * 100:.1f}% بقطع عائلته وبقية الحروف من الشعار."]
+    return "\n".join(out)
+
+
 def reference_exam(folder: Path, widths=(0.85, 1.0, 1.2)) -> List[Dict]:
     """Would the letters a logo lacks be better built on the structure of a reference typeface?
     Every letter of the word is hidden in turn; the typeface (and width) that redraws the other
@@ -404,6 +532,7 @@ def main() -> int:
     p.add_argument("-o", "--out", default="")
     p.add_argument("--no-read", action="store_true", help="لا تجرّب القراءة دون نص (أسرع)")
     p.add_argument("--held-out", action="store_true", help="امتحان الحرف المخفي: هل يفهم المحرك الشعار أم ينسخه")
+    p.add_argument("--families", action="store_true", help="امتحان العائلة المخفية: عائلة كاملة تُخفى وتُبنى من البقية")
     p.add_argument("--reference", action="store_true", help="امتحان الحرف المخفي ببنية أقرب خط مرجعي")
     p.add_argument("--parts", action="store_true", help="امتحان قطع الحروف على الخطوط المفتوحة بديلًا عن الشعارات")
     p.add_argument("--kit", action="store_true", help="امتحان طقم القطع حين يكمله المصمم")
@@ -443,6 +572,13 @@ def main() -> int:
             m = lambda q: sum(x[q] for x in xs) / len(xs) * 100
             print(f"  {c}: {len(xs)} — المحرك {m('engine'):.0f}%، كما هي {m('as_is'):.0f}%، "
                   f"مبدّلة بحكم المحرك {m('engine_subs'):.0f}%، بحكم الخطوط {m('real_subs'):.0f}%")
+        return 0
+    if a.families:
+        text = family_summary(family_exam(folder))
+        print(text)
+        if a.out:
+            Path(a.out).mkdir(parents=True, exist_ok=True)
+            (Path(a.out) / "families.md").write_text(text, encoding="utf-8")
         return 0
     if a.reference:
         text = reference_summary(reference_exam(folder))

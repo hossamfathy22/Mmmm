@@ -581,7 +581,7 @@ class _Trial:
     Shared by the fits below. `hide`: the index of a letter whose ink is left out of the score (the
     held-out examination: rules measured on the other letters, judged on this one)."""
 
-    def __init__(self, L: Line, text: str, st: Style, k: float, hide: Optional[int] = None):
+    def __init__(self, L: Line, text: str, st: Style, k: float, hide=None):
         self.text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
         self.ok = bool(self.text) and bool(L.stems)
         if not self.ok:
@@ -611,8 +611,13 @@ class _Trial:
             dist = np.stack([ndi.distance_transform_edt(~m) for _, m, _, _ in slid])
             idx = [i for i, p in enumerate(first.placed) if any(p is q for q, _, _, _ in slid)]
             owner = np.array(idx)[dist.argmin(axis=0)]
-            self.count = owner != hide
+            self.count = ~np.isin(owner, sorted(hide) if isinstance(hide, (set, frozenset, list, tuple)) else [hide])
         self.logo_sum = float((logo & self.count).sum())
+
+    def hidden(self, i: int) -> bool:
+        """Is letter `i` held out (one index, or a set of them: a whole family)?"""
+        h = self.hide
+        return h is not None and (i in h if isinstance(h, (set, frozenset, list, tuple)) else i == h)
 
     CACHED = {"fitted", "chosen", "traits", "stretch", "params", "variants", "measured_on"}
 
@@ -634,10 +639,10 @@ class _Trial:
         each = []
         for i, (p, m, dx, j) in enumerate(slid):
             union |= m if j is None else (m | j)
-            if i != self.hide:
+            if not self.hidden(i):
                 moved, n = moved + abs(dx), n + 1
             cols = np.flatnonzero(m.any(axis=0))
-            if len(cols) and i != self.hide:
+            if len(cols) and not self.hidden(i):
                 band = self.logo[:, cols[0]:cols[-1] + 1] & self.count[:, cols[0]:cols[-1] + 1]
                 mm = m[:, cols[0]:cols[-1] + 1]
                 inter = float((mm & band).sum())
@@ -656,7 +661,7 @@ class _Trial:
         with `skip`, only what some other letter than that one reads."""
         out: List[str] = []
         for i, (c, f) in enumerate(self.placed):
-            if i == skip:
+            if i == skip or (isinstance(skip, (set, frozenset, list, tuple)) and i in skip):
                 continue
             for (cc, ff, _), (_, deps) in self.cache.items():
                 if (cc, ff) == (c, f):
@@ -678,7 +683,7 @@ def fit_stretch(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     if not t.ok:
         return {}
     X = t.X
-    keys = list(dict.fromkeys(f"{c}.{f}" for i, (c, f) in enumerate(t.placed) if i != t.hide))
+    keys = list(dict.fromkeys(f"{c}.{f}" for i, (c, f) in enumerate(t.placed) if not t.hidden(i)))
     cur: Dict[str, float] = {}
     base = now = t.score(stretch=cur)
     # best first: every round tries every letter at every length and keeps the one change that helps
@@ -724,11 +729,11 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     if not t.ok:
         return {}, {}, {}
     reads = t.reads(skip=t.hide)
-    hidden = t.placed[t.hide] if t.hide is not None else None
+    hidden = {t.placed[i] for i in range(len(t.placed)) if t.hidden(i)}
     # constructions: a variant key a letter reads, with more than one option, the designer has not set
     options: Dict[str, List[str]] = {}
     for c, f in dict.fromkeys(t.placed):
-        if (c, f) == hidden:
+        if (c, f) in hidden:
             continue
         for letter in dict.fromkeys((c, SKELETON.get(c, c))):
             key = f"{letter}.{f}"
@@ -999,7 +1004,7 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
     near = dist.min(axis=0) <= 0.6 * pitch
     out: Dict[str, Dict] = {}
     for i, (p, m, dx, join) in enumerate(slid):
-        if i == skip:
+        if i == skip or (isinstance(skip, (set, frozenset, list, tuple)) and i in skip):
             continue
         mine = logo & (owner == i) & near
         uni = float((m | mine).sum())
