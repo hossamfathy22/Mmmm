@@ -357,7 +357,7 @@ def choices(st: Style) -> List[Dict]:
                     continue
                 entry = have.get((c, f)) or have.get((SKELETON.get(c, c), f))
                 from .typeset import REF_LETTERS, _logo_source
-                auto = (st.ref_auto and st.seen and SKELETON.get(c, c) in REF_LETTERS and key not in st.variants
+                auto = (((st.ref_auto and SKELETON.get(c, c) in REF_LETTERS) or st.ref_missing) and st.seen and key not in st.variants
                         and not _logo_source(st, c, f, None, parts=False))
                 if entry is not None and not any(o["name"] in ("من الشعار", "المحرك") for o in entry["options"]):
                     entry["options"].append({"name": REFERENCE, "note": note})

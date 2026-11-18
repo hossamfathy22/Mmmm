@@ -101,6 +101,13 @@ class Style:
     # structure and an examiner, not what the letters are drawn from; a letter is built of the logo's
     # parts on its recipe (the method of the hand-made words). The user may choose it, letter by letter.
     ref_auto: bool = False
+    # every letter the logo lacks (and has no letter or sibling of its own for) on the reference
+    # typeface's structure, with the logo's pen. Set when the reference redraws the logo's own word
+    # clearly better than the engine (reference.REF_MARGIN): on five real logos the hidden letter then
+    # matched 52.8% against the engine's 46.5%, on eight typeface logos (their own family left out of
+    # the references) 64.5% against 55.7%. Where the reference is no better, as on سیرنگ, the logo the
+    # engine's recipes were drawn on, the engine keeps its letters.
+    ref_missing: bool = False
     # how far the logo draws a letter longer than the engine builds it (kashida): "letter.form" -> length.
     # A joining letter lengthens its join to the next; a final or isolated letter stretches its body
     # along the baseline; a letter with neither leaves more white after it. Fitted by the self-check.

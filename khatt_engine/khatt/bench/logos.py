@@ -165,7 +165,9 @@ def reference_exam(folder: Path, widths=(0.85, 1.0, 1.2)) -> List[Dict]:
         n = len(base["letters"])
         eng = np.array([x["match"] for x in base["letters"]])
         found = []
-        for path in paths:
+        # a logo made of a typeface (the examination's stand-in for logos) is not given its own family
+        own = [p for p in paths if Path(p).stem.rsplit("-", 1)[0] == name]
+        for path in [p for p in paths if p not in own]:
             for w in widths:
                 try:
                     r = self_check(L, text, Style(**{**st.__dict__, "reference": path, "ref_wide": w, "ref_all": True}), k)
@@ -176,26 +178,34 @@ def reference_exam(folder: Path, widths=(0.85, 1.0, 1.2)) -> List[Dict]:
         if not found:
             continue
         A = np.array([m for _, _, m in found])
-        ref = []
+        ref, gated, margin = [], [], []
         for i in range(n):
             others = [j for j in range(n) if j != i]
-            ref.append(float(A[A[:, others].mean(axis=1).argmax(), i]))
+            pick = A[A[:, others].mean(axis=1).argmax()]
+            ref.append(float(pick[i]))
+            margin.append(float(pick[others].mean() - eng[others].mean()))
+            # the rule a logo can follow without the hidden letter: the reference only where it redraws
+            # the letters the logo shows better than the engine does
+            gated.append(float(pick[i]) if pick[others].mean() > eng[others].mean() else float(eng[i]))
         best = found[int(A.mean(axis=1).argmax())]
-        rows.append({"name": name, "text": text, "engine": float(eng.mean()), "reference": float(np.mean(ref)), "letters": n,
+        rows.append({"name": name, "text": text, "engine": float(eng.mean()), "reference": float(np.mean(ref)), "gated": float(np.mean(gated)), "margin": float(np.mean(margin)), "letters": n,
                      "font": Path(best[0]).stem, "better": int(sum(r > e + 0.02 for r, e in zip(ref, eng))),
                      "worse": int(sum(r < e - 0.02 for r, e in zip(ref, eng)))})
     return rows
 
 
 def reference_summary(rows: List[Dict]) -> str:
-    lines = ["| الشعار | الحرف المخفي بصيغة المحرك | ببنية الخط المرجعي | تحسّن / ساء | أقرب خط |", "|---|---|---|---|---|"]
+    lines = ["| الشعار | الحرف المخفي بصيغة المحرك | ببنية الخط المرجعي | المرجع حيث يرسم الحروف الظاهرة أحسن | تحسّن / ساء | أقرب خط |",
+             "|---|---|---|---|---|---|"]
     for r in rows:
-        lines.append(f"| {r['text']} | {r['engine'] * 100:.0f}% | {r['reference'] * 100:.0f}% | {r['better']} / {r['worse']} | {r['font']} |")
+        lines.append(f"| {r['text']} | {r['engine'] * 100:.0f}% | {r['reference'] * 100:.0f}% | {r['gated'] * 100:.0f}% | {r['better']} / {r['worse']} | {r['font']} |")
     n = sum(r["letters"] for r in rows)
     e = sum(r["engine"] * r["letters"] for r in rows) / max(1, n)
     f = sum(r["reference"] * r["letters"] for r in rows) / max(1, n)
+    gt = sum(r["gated"] * r["letters"] for r in rows) / max(1, n)
     lines += ["", f"على {n} حرفًا مخفيًا: {e * 100:.1f}% بصيغة المحرك، و{f * 100:.1f}% ببنية الخط المرجعي المختار من بقية الحروف "
-              f"(تحسّن {sum(r['better'] for r in rows)} وساء {sum(r['worse'] for r in rows)})."]
+              f"(تحسّن {sum(r['better'] for r in rows)} وساء {sum(r['worse'] for r in rows)}), "
+              f"و{gt * 100:.1f}% بالمرجع حيث يرسم الحروف الظاهرة أحسن من المحرك."]
     return "\n".join(lines)
 
 

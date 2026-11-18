@@ -324,6 +324,15 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
             check["notes"].append("لم تُستعمل من قطع الشعار: " + "، ".join(PART_NAMES.get(q, q) for q in dropped)
                                   + " (رسمت كلمة الشعار نفسها أسوأ من صيغة المحرك).")
 
+    # the letters the logo lacks on the structure of the reference typeface nearest it, where that
+    # redraws the logo's word clearly better than the engine (as in the editor)
+    if own and health["confidence"] >= TAKE_MIN:
+        from .reference import adopt_nearest
+        ref = adopt_nearest(L, own, style, k)
+        if ref and ref["used"] and check:
+            check["notes"].append(f"الحروف التي لا يحويها الشعار مبنية على بنية الخط المرجعي {Path(ref['path']).stem} بقلم الشعار: "
+                                  f"يرسم كلمة الشعار {ref['match'] * 100:.0f}% مقابل {ref['engine'] * 100:.0f}% للمحرك.")
+
     # 5-6. build and verify
     def build(st: Style):
         tok = ACTIVE.set(lib if use_parts else None)

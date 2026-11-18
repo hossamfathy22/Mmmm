@@ -820,7 +820,7 @@ def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         BUILDING.reset(ltok)
         # a letter of few logos (ح ص ط ع ف ق ه ...) the logo lacks and has no letter of its own for (no
         # cut, no sibling's body): on the reference typeface's outline (see REF_LETTERS)
-        auto = (st.ref_auto and st.seen and SKELETON.get(c, c) in REF_LETTERS and f"{c}.{form}" not in st.seen.split()
+        auto = (((st.ref_auto and SKELETON.get(c, c) in REF_LETTERS) or st.ref_missing) and st.seen and f"{c}.{form}" not in st.seen.split()
                 and st.variants.get(f"{c}.{form}") is None and not _logo_source(st, c, form, glyph, parts=False))
         if st.reference and (st.ref_all or auto or (f"{c}.{form}" not in st.seen.split()
                                                     and REFERENCE in (st.variants.get(f"{c}.{form}"),

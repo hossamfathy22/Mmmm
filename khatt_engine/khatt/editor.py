@@ -73,12 +73,8 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
         # the reference typeface nearest the logo: the letters the logo lacks may be built on it. Judged
         # on the logo's word drawn with the engine's letters (with the letters cut from the logo every
         # typeface redraws the word alike, and the first of them was taken)
-        from .reference import nearest
-        from .style import Style as _Style
-        bare = _Style(**{**st.__dict__, "taken": {}, "parts": {}, "variants": {}})
-        ref = nearest(L, own, bare, k, widths=(1.0,))
-        if ref:
-            st.reference, st.ref_wide = str(ref["path"]), ref["wide"]
+        from .reference import adopt_nearest
+        ref = adopt_nearest(L, own, st, k)
     overlay = None
     if check:
         overlay = base64.b64encode(check.pop("overlay_png")).decode("ascii")
@@ -89,7 +85,8 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
         "style": st.to_dict(), "health": an["health"], "read": R.text_given or R.text_guess, "read_sure": bool(own),
         "read_how": "given" if R.text_given else ("drawn" if R.text_drawn else "stems"), "read_match": R.drawn_match,
         "self_check": check, "self_check_png": overlay,
-        "reference": ({"font": Path(ref["path"]).stem, "match": round(ref["match"], 3), "engine": round(ref["engine"], 3)}
+        "reference": ({"font": Path(ref["path"]).stem, "match": round(ref["match"], 3), "engine": round(ref["engine"], 3),
+                       "used": ref["used"], "recommended": ref["recommended"]}
                       if ref else None),
         "measures": {"الجذع": st.stem, "الخط الشعري": st.hair, "ارتفاع الحروف": st.x_height, "الطالع": st.ascender,
                      "النازل": st.descender, "البياض بين الأسنان": st.white, "الميل °": st.slant, "قطر النقطة": st.dot},

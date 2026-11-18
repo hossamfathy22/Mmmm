@@ -335,6 +335,27 @@ def _finish(body, char: str, form: str, st: Style, engine: Optional[Glyph]) -> O
 WIDTHS = (0.85, 1.0, 1.2)
 
 
+REF_MARGIN = 0.05   # the reference builds the letters a logo lacks when it redraws the logo's word this much better
+# Off for now: the hidden letter matches better on the reference (above), but drawn whole the letters
+# show seams where a reference letter meets the engine's join, and a heavy reference (Lalezar, chosen
+# for یشم) breaks. Until the eye has judged them, the reference is recommended, not applied.
+AUTO_REFERENCE = False
+
+
+def adopt_nearest(L, text: str, st: Style, k: float) -> Optional[Dict]:
+    """Choose the reference typeface for a logo (nearest) and, when it redraws the logo's own word
+    clearly better than the engine, build every letter the logo lacks on it (st.ref_missing).
+    Judged on the logo's word drawn with the engine's letters: with the letters cut from the logo,
+    every typeface redraws the word alike."""
+    bare = Style(**{**st.__dict__, "taken": {}, "parts": {}, "variants": {}})
+    ref = nearest(L, text, bare, k, widths=(1.0,))
+    if ref:
+        st.reference, st.ref_wide = str(ref["path"]), ref["wide"]
+        ref["recommended"] = bool(ref["match"] >= ref["engine"] + REF_MARGIN)
+        ref["used"] = st.ref_missing = ref["recommended"] and AUTO_REFERENCE
+    return ref
+
+
 def nearest(L, text: str, st: Style, k: float, widths=WIDTHS) -> Optional[Dict]:
     """The reference typeface whose structure, drawn with the logo's pen, redraws the logo's own word
     best: {"path", "wide", "match", "engine"} (the engine's match for comparison), or None when no
