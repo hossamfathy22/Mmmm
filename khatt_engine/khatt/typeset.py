@@ -117,6 +117,19 @@ def _strip_marks(polys, x_height: float):
     return out
 
 
+def _body_band(band, stem: float, x_height: float) -> bool:
+    """Is this narrow slice of a letter cut from the logo its body, or a join? A join is a hairline
+    near the baseline: its slice holds little ink and rises little. A tooth holds much ink, or, where
+    the logo sets its inner teeth lower (سیرنگ's س, eight units down), less ink but still rises over
+    half the x-height; by ink alone such a tooth was taken for a join and cut off with it."""
+    if band.is_empty:
+        return False
+    if band.area > 0.6 * stem * stem:
+        return True
+    lo, hi = band.bounds[1], band.bounds[3]
+    return bool(x_height) and hi - lo > 0.55 * x_height and band.area > 0.15 * stem * stem
+
+
 def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] = None, stem: float = 0.0,
               marks: Optional[list] = None, x_height: float = 0.0, trim_exit: bool = False) -> Glyph:
     """The letter as the logo draws it, standing in for the engine's: the engine's letter is kept
@@ -160,7 +173,7 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
             body_right = right
             for xc in np.arange(right, right - 6 * stem, -0.25 * stem if stem else -1.0):
                 band = acc.intersection(box(xc - 0.25 * stem, -1e4, xc, 1e4))
-                if band.area > 0.6 * stem * stem:              # thicker than a hairline: the body begins
+                if _body_band(band, stem, x_height):           # thicker or taller than a hairline: the body begins
                     body_right = xc
                     break
             acc = acc.intersection(box(-1e6, -1e6, body_right, 1e6))
@@ -183,7 +196,7 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
             body_left = left
             for xc in np.arange(left, left + 6 * stem, 0.25 * stem):
                 band = acc.intersection(box(xc, -1e4, xc + 0.25 * stem, 1e4))
-                if band.area > 0.6 * stem * stem:              # thicker than a hairline: the body begins
+                if _body_band(band, stem, x_height):           # thicker or taller than a hairline: the body begins
                     body_left = xc
                     break
             if body_left - left > 0.5 * stem:

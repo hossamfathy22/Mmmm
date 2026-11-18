@@ -1368,3 +1368,15 @@ def test_the_typed_word_goes_to_its_own_line_when_a_latin_one_stands_above_it():
     an = analyse(buf.getvalue(), texts=["بيدوناق"])
     assert len(an["lines"]) == 2
     assert an["src"] == 1 and an["readings"][1].text_given == "بيدوناق" and not an["readings"][0].text_given
+
+
+def test_a_lowered_tooth_cut_from_the_logo_is_body_not_join():
+    """سیرنگ sets the inner teeth of its س eight units lower: a slice of such a tooth holds less ink
+    than the rule for a body asked, and the tooth was cut off as if it were the join out of the letter
+    (its س lost a tooth, and a gap opened after it). A low hairline is still a join."""
+    from shapely.geometry import box
+    from khatt.typeset import _body_band
+    U, X = 23.0, 67.0
+    tooth = box(0, 4, 0.25 * U, 58.5).union(box(0, 0, 0.25 * U, 4.5)).difference(box(0, 30, 2.5, 50))
+    assert tooth.area < 0.6 * U * U and _body_band(tooth, U, X)
+    assert not _body_band(box(0, 0, 0.25 * U, 4.5), U, X)
