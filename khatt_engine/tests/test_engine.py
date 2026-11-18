@@ -1349,3 +1349,17 @@ def test_the_editor_offers_the_kit_suggestions_and_a_board_to_draw_on(tmp_path):
     if [f for f in faces() if f.endswith("-400.woff2")]:
         c = kit_candidates(st.to_dict(), "عروة")["candidates"]
         assert c and c[0]["part"]["polys"] and c[0]["preview"].startswith("<svg")
+
+
+def test_a_text_that_is_not_the_logos_takes_nothing_from_it():
+    """A wrong text would cut letters from the wrong ink, and the cuts would then match by
+    construction. Its pieces of writing are not the logo's (مربع is two, بيدوناق four): nothing is
+    taken, and the note says so. The right text still takes what it should."""
+    from khatt.pipeline import analyse
+    from khatt.selfcheck import check_and_take, text_mismatch
+    an = analyse(EXAMPLE.read_bytes(), texts=["مربع"])
+    L, k, st = an["lines"][an["src"]], an["k"], an["style"]
+    assert text_mismatch(L, "مربع", None) and not text_mismatch(L, "بيدوناق", None)
+    r = check_and_take(L, "مربع", st, k)
+    assert r["mismatch"] and not r["taken"] and not st.taken and not st.parts
+    assert r["notes"][0].startswith("النص المكتوب لا يطابق الشعار")
