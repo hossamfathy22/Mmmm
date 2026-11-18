@@ -797,49 +797,9 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     return fitted, chosen, traits
 
 
-def _blocks(text: str) -> int:
-    """How many separate pieces of writing the text makes: a new one begins at every letter that is
-    not joined from the right (an initial or isolated form)."""
-    from .typeset import shape_forms
-    return sum(1 for c, f in shape_forms(text) if c in LETTERS and f in "iI")
-
-
-def text_mismatch(L: Line, text: str, r: Optional[Dict[str, Any]]) -> Optional[str]:
-    """Why the text given for the logo does not match it, or None. Every cut, every rule measured off
-    the logo's word and every part taken from it rests on the letters being where the text says they
-    are: with a wrong text they are cut from the wrong ink, and then match by construction.
-
-    How well the engine redraws the word is no test on its own: on a style far from the engine's
-    (a calligraphic naskh, a heavy display face) the right word matches 0.3 to 0.6, while a wrong word
-    of the same length can match 0.6 on a plain one. What does not depend on the style is how many
-    separate pieces of writing there are: every style joins the same letters. So a text is refused
-    when its pieces are not the logo's, or, with the same pieces, when it matches nowhere at all."""
-    bodies = sum(1 for p in L.pieces if p.kind == "body")
-    want = _blocks(text)
-    if bodies and want and bodies != want:
-        return f"الكلمة المكتوبة {want} قطعة متصلة، وفي الشعار {bodies}"
-    if r and r.get("letters") and r["overall"] < NOWHERE and all(x["match"] < FAIR for x in r["letters"]):
-        return f"التطابق {r['overall'] * 100:.0f}% ولا حرف يطابق"
-    return None
-
-
-NOWHERE = 0.3      # below this, with no letter matching even fairly, the text is not the logo's
-MISMATCH_NOTE = ("النص المكتوب لا يطابق الشعار ({}): لم يُؤخذ من الشعار حرف ولا قطعة ولا قاعدة. "
-                 "تأكد من كتابة الكلمة التي في الشعار نفسها.")
-
-
 def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -> Optional[Dict[str, Any]]:
     """The self-check and everything read off the logo's own word (see _check_and_take), and then the
-    parts of its letters, cut from it for the letters it lacks. Nothing is taken when the text does
-    not match the logo (text_mismatch)."""
-    if take:
-        probe = self_check(L, text, Style(**st.__dict__), k)
-        why = text_mismatch(L, text, probe)
-        if why and probe:
-            probe["taken"] = {}
-            probe["mismatch"] = True
-            probe["notes"] = [MISMATCH_NOTE.format(why)]
-            return probe
+    parts of its letters, cut from it for the letters it lacks."""
     r = _check_and_take(L, text, st, k, take)
     if r and take and st.take_all:
         r = _take_the_rest(L, text, st, k, r)

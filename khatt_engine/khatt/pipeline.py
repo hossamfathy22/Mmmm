@@ -265,7 +265,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
     own = own_text(R)
     # letters are taken from the logo only on a sure reading: typed, or read whole from the stems
     check = check_and_take(L, own, style, k, take=not R.text_drawn and health["confidence"] >= TAKE_MIN) if own else None
-    if use_parts and own and check and not check.get("mismatch"):
+    if use_parts and own and check:
         # a piece of the logo that draws the logo's own word worse is not used
         dropped = prune_parts(lib, L, own, style, k)
         if dropped:

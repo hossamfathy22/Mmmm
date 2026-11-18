@@ -59,7 +59,7 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
     own = own_text(R)
     take = not R.text_drawn and an["health"]["confidence"] >= TAKE_MIN
     check = check_and_take(L, own, st, k, take=take) if own else None
-    if check and take and not check.get("mismatch"):
+    if check and take:
         # the logo's parts box: the new letters are built of the logo's own pieces
         from .selfcheck import adopt_library
         dropped = adopt_library(an["lib"], L, own, st, k)
