@@ -1061,3 +1061,67 @@ LETTERS: Dict[str, Tuple[str, Builder]] = {
     "ء": ("U", lambda s, f: hamza(s, f, None)),
     "ـ": ("D", lambda s, f: tatweel(s, f, None)),
 }
+
+
+# ---- the parts a letter shares with its family -----------------------------------------------
+# A part is carried from letter to letter by its name (typeset.with_parts): a letter whose part has no
+# name, or a name its family's other letters do not use, takes nothing from them. The arc family
+# (ح ج خ ع غ): the isolated and final ح were one shape ("الحاء"), sharing no name with the nose of
+# the initial and medial ones; the head of the isolated and initial ع had none.
+def _rings(geom) -> List[List[Tuple[float, float]]]:
+    out = []
+    for poly in getattr(geom, "geoms", [geom]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            out.append(list(poly.exterior.coords)[:-1])
+            out += [list(h.coords)[:-1] for h in poly.interiors]
+    return out
+
+
+def _split_at_baseline(shape, above: str, below: str) -> List[g.Shape]:
+    """A shape that runs above and below the baseline, as two named parts: what stands on the line
+    (the nose of ح) and what hangs under it (its bowl)."""
+    from shapely.geometry import Polygon, box
+    acc = None
+    for ring in shape:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+    if acc is None or acc.is_empty:
+        return [shape]
+    x0, y0, x1, y1 = acc.bounds
+    up = acc.intersection(box(x0 - 1, 0.0, x1 + 1, y1 + 1))
+    down = acc.intersection(box(x0 - 1, y0 - 1, x1 + 1, 0.0))
+    if up.area < 0.05 * acc.area or down.area < 0.05 * acc.area:
+        return [shape]
+    return [Tagged(_rings(up), "engine", above), Tagged(_rings(down), "engine", below)]
+
+
+def family_names(letter: str, form: str, glyph: Glyph) -> Glyph:
+    from .recipes import SKELETON
+    base = SKELETON.get(letter, letter)
+    if base == "ح":
+        # every construction of ح (square, slanted arm, ...) names its parts alike: the nose standing
+        # on the line, and the bowl hanging under it in the isolated and final forms
+        out = []
+        for sh in glyph.shapes:
+            if not isinstance(sh, Compound) and getattr(sh, "name", "") == "الحاء":
+                if min(y for poly in sh for _, y in poly) < -0.05 * max(1.0, max(y for poly in sh for _, y in poly)):
+                    out += _split_at_baseline(sh, "أنف الحاء", "كأس أيمن")
+                else:
+                    out.append(Tagged(sh, sh.source if hasattr(sh, "source") else "engine", "أنف الحاء"))
+            else:
+                out.append(sh)
+        glyph.shapes = out
+    elif base == "ع" and form in ("i", "I"):
+        plain = [i for i, sh in enumerate(glyph.shapes) if not isinstance(sh, Compound) and not getattr(sh, "name", "")]
+        if plain:
+            i = max(plain, key=lambda j: max(y for poly in glyph.shapes[j] for _, y in poly))
+            glyph.shapes[i] = Tagged(glyph.shapes[i], "engine", "رأس العين")
+    return glyph
+
+
+def _with_family_names(letter: str, build: Builder) -> Builder:
+    return lambda s, f: family_names(letter, f, build(s, f))
+
+
+LETTERS = {c: (j, _with_family_names(c, b)) for c, (j, b) in LETTERS.items()}

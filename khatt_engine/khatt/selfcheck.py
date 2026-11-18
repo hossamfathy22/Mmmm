@@ -970,7 +970,7 @@ def _take_rest(L: Line, text: str, st: Style, k: float, kept: Dict, now: float, 
 # the parts that carry a logo's manner from letter to letter (named by the letter builders)
 PART_LIKE = 0.5            # how like the engine's part (IoU) a part cut from the logo must be to be kept (0.25 let
                            # through heads and tails that made letters read as others: Mootanroo's head 0.49)
-PART_KINDS = ("كأس سفلي", "رأس", "ذيل", "ذيل الميم", "عروة", "ذراع الكاف", "كأس أيمن", "أنف الحاء")
+PART_KINDS = ("كأس سفلي", "رأس", "ذيل", "ذيل الميم", "عروة", "ذراع الكاف", "كأس أيمن", "أنف الحاء", "رأس العين", "عين")
 
 
 def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = None, every: bool = False):

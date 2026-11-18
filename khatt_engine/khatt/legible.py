@@ -112,10 +112,16 @@ def keeps_reading(engine: Glyph, drawn: Glyph, char: str, form: str, st: Style) 
         return _KEPT[key]
     def fine(now, was):
         return now is None or now == was or _same(now, SKELETON.get(char, char), form) or _same(now, char, form)
-    # two judges: the engine's alphabet of this style, and real typefaces' letters
-    ok = fine(reads_as(drawn, char, form, st), reads_as(engine, char, form, st))
-    if ok:
-        ok = fine(reads_as_real(drawn, form, st), reads_as_real(engine, form, st))
+    # two judges: real typefaces' letters, and the engine's alphabet of this style. Real typefaces
+    # decide where they are at hand: the engine's alphabet shares the engine's weaknesses, and a part
+    # the logo draws better than the engine (the nose of ح in a naskh logo) reads to it as another
+    # letter (م) while every real typeface reads it right. The engine's alphabet judges alone only
+    # where no real typeface is at hand.
+    real_now, real_was = reads_as_real(drawn, form, st), reads_as_real(engine, form, st)
+    if real_now is not None:
+        ok = fine(real_now, real_was)
+    else:
+        ok = fine(reads_as(drawn, char, form, st), reads_as(engine, char, form, st))
     if len(_KEPT) > 4096:
         _KEPT.clear()
     _KEPT[key] = ok

@@ -259,7 +259,14 @@ def family_summary(rows: List[Dict]) -> str:
     if w:
         a = np.array(w)
         out += ["", f"حرف مخفي وحده وبقية عائلته ظاهرة ({len(w)} حرفًا، عائلات بأكثر من حرف في الكلمة): "
-                f"{a[:, 0].mean() * 100:.1f}% بالمحرك، و{a[:, 1].mean() * 100:.1f}% بقطع عائلته وبقية الحروف من الشعار."]
+                f"{a[:, 0].mean() * 100:.1f}% بالمحرك، و{a[:, 1].mean() * 100:.1f}% بقطع عائلته وبقية الحروف من الشعار.",
+                "", "| العائلة | حروف | المحرك | من عائلته | تحسّن / ساء |", "|---|---|---|---|---|"]
+        for fam in FAMILIES:
+            v = [x for r in rows if r["family"] == fam for x in r["within"]]
+            if v:
+                b = np.array(v)
+                out.append(f"| {fam} | {len(v)} | {b[:, 0].mean() * 100:.1f}% | {b[:, 1].mean() * 100:.1f}% | "
+                           f"{int((b[:, 1] > b[:, 0] + 0.02).sum())} / {int((b[:, 1] < b[:, 0] - 0.02).sum())} |")
     return "\n".join(out)
 
 
@@ -574,11 +581,13 @@ def main() -> int:
                   f"مبدّلة بحكم المحرك {m('engine_subs'):.0f}%، بحكم الخطوط {m('real_subs'):.0f}%")
         return 0
     if a.families:
-        text = family_summary(family_exam(folder))
+        rows = family_exam(folder)
+        text = family_summary(rows)
         print(text)
         if a.out:
             Path(a.out).mkdir(parents=True, exist_ok=True)
             (Path(a.out) / "families.md").write_text(text, encoding="utf-8")
+            (Path(a.out) / "families.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
         return 0
     if a.reference:
         text = reference_summary(reference_exam(folder))

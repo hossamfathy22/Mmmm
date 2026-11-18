@@ -1390,3 +1390,25 @@ def test_the_descender_is_the_logos_own_where_its_word_goes_below_the_baseline()
     from khatt.pipeline import descends
     assert descends("سیرنگ") and descends("بيدوناق") and descends("موتنرو")
     assert not descends("ماکیتا") and not descends("كتب")
+
+
+def test_the_arc_family_shares_its_parts_by_name():
+    """A part passes from letter to letter by its name. The isolated and final ح were one shape named
+    apart from the nose of the initial and medial ones, and the head of the isolated and initial ع had
+    no name: the arc family (ح ج خ ع غ) shared nothing. Every construction of ح now stands a nose on
+    the line (and hangs a bowl under it where it has one), and ع names its head."""
+    from khatt.letters import LETTERS
+    from khatt.typeset import flat
+    st = Style()
+    names = lambda c, f: [getattr(sh, "name", "") for sh in flat(LETTERS[c][1](st, f).shapes)]
+    for c in "حجخ":
+        for f in "iIMF":
+            assert "أنف الحاء" in names(c, f) and "الحاء" not in names(c, f)
+        for f in "iF":
+            assert "كأس أيمن" in names(c, f)
+    for f in "iI":
+        assert "رأس العين" in names("ع", f)
+    # the nose of the isolated ح is the nose of the initial one: one part, cut from either
+    nose = lambda f: [sh for sh in flat(LETTERS["ح"][1](st, f).shapes) if getattr(sh, "name", "") == "أنف الحاء"][0]
+    xs = lambda sh: [x for poly in sh for x, _ in poly]
+    assert abs(min(xs(nose("i"))) - min(xs(nose("I")))) < 0.1 * st.pitch
