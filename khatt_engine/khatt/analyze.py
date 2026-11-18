@@ -113,7 +113,13 @@ def find_lines(ink: np.ndarray) -> List[Tuple[int, int]]:
     gap = max(3, H * 0.012)
     merged: List[List[int]] = []
     for gr in groups:
+        # a small gap joins a band of dots or marks to its line; two bands both as tall as writing are two
+        # lines set close (an Arabic name over its Latin one), and stay apart
         if merged and gr[0] - merged[-1][1] <= gap:
+            h0, h1 = merged[-1][1] - merged[-1][0], gr[1] - gr[0]
+            if min(h0, h1) >= 0.5 * max(h0, h1) and min(h0, h1) >= 8 * gap:
+                merged.append(list(gr))
+                continue
             merged[-1][1] = gr[1]
         else:
             merged.append(list(gr))

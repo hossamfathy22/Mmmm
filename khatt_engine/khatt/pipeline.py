@@ -72,8 +72,9 @@ def pick_line(lines: List[Line], readings: List[Reading], line: Optional[int]) -
         raise ValueError("لم أجد في الصورة كتابة يمكن قياسها. استعمل صورة أوضح بخلفية سادة.")
     if line is not None and line in usable:
         return line
+    typed = [i for i in usable if readings[i].text_given and readings[i].script == "arabic"]
     arabic = [i for i in usable if readings[i].script == "arabic"]
-    return (arabic or usable)[0]
+    return (typed or arabic or usable)[0]
 
 
 def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) -> Style:
@@ -204,6 +205,57 @@ def own_text(R) -> str:
     return t if t and not any(c in "ٮ?" for c in t) else ""
 
 
+STEM_COST = 0.05     # an upright stroke more or less than the text has
+TEETH = {**dict.fromkeys("سش", 3), **dict.fromkeys("مهةعغحجخء", 0)}
+PIECE_COST = 0.1      # a piece of writing more or less than the text makes weighs as much as 10 points of redrawing
+
+
+def place_texts(lines: List[Line], texts: List[str], k: float) -> List[str]:
+    """Which line each typed text belongs to. As many texts as lines: in order, top to bottom. Fewer
+    (the designer typed the Arabic word of a logo that also has a Latin line, which may stand above
+    it): each text goes to the line it redraws best on, so it is never forced on a line of another
+    script, whose letters would then be measured and cut as Arabic ones."""
+    from .selfcheck import self_check
+    from .typeset import shape_forms
+    _blocks = lambda t: sum(1 for c, f in shape_forms(t) if f in "iI")
+    _teeth = lambda t: sum(TEETH.get(c, 1) for c in t if not c.isspace())
+    out = [""] * len(lines)
+    texts = [t for t in texts if t]
+    if not texts:
+        return out
+    if len(texts) >= len(lines) or len(lines) == 1:
+        return (texts + [""] * len(lines))[:len(lines)]
+    free = [i for i, L in enumerate(lines) if L.stems]
+    for t in texts:
+        best, at = -1e9, None
+        for i in free:
+            R = read_line(lines[i], t)
+            try:
+                st = style_from(lines[i], build_library(lines[i], R, k), k,
+                                measure_features(lines, [R if j == i else read_line(Lj, None) for j, Lj in enumerate(lines)], i, k))
+                r = self_check(lines[i], t, st, k)
+            except Exception:                    # a line that cannot be measured as this text is not its line
+                r = None
+            if not r:
+                continue
+            # how well it redraws is not enough on its own: an engine far from the logo's style can redraw
+            # a calligraphic Arabic word worse on its own line than on the Latin one (یشم). How many
+            # separate pieces of writing the line has is the other witness: Latin letters stand apart,
+            # Arabic ones join, so a Latin line has far more pieces than the Arabic word makes.
+            # And how many upright strokes: Latin draws one or more for nearly every letter, Arabic a tooth
+            # for most and none for round letters (ماکیتا has about five, Makita nine).
+            bodies = sum(1 for p in lines[i].pieces if p.kind == "body")
+            score = (r["overall"] - PIECE_COST * abs(bodies - _blocks(t))
+                     - STEM_COST * abs(len(lines[i].stems) - _teeth(t)))
+            if score > best:
+                best, at = score, i
+        if at is None:
+            break
+        out[at] = t
+        free.remove(at)
+    return out
+
+
 def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
             overrides: Optional[Dict[str, Any]] = None, read: bool = True) -> Dict[str, Any]:
     """Stages 1-4 alone: guard the picture, measure and read every line, and turn the chosen line
@@ -216,16 +268,15 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
     g = np.asarray(work, float) / 255.0
     ink01 = g if inverted else 1.0 - g
     # 2-3. measure and read every line
-    lines, readings = [], []
+    lines = []
     for i, (a, b) in enumerate(find_lines(ink)):
         L = measure_line(ink01, ink.astype(bool), a, b, len(lines))
-        if L is None:
-            continue
-        t = (texts or [None] * 99)[len(lines)] if texts and len(lines) < len(texts) else None
-        readings.append(read_line(L, (t or "").strip() or None))
-        lines.append(L)
+        if L is not None:
+            lines.append(L)
     if not lines:
         raise ValueError("لم أجد في الصورة كتابة يمكن قياسها. استعمل صورة أوضح بخلفية سادة.")
+    given = place_texts(lines, [(t or "").strip() for t in (texts or [])], k)
+    readings = [read_line(L, given[i] or None) for i, L in enumerate(lines)]
     src = pick_line(lines, readings, line)
     health = assess(lines, readings, src, notes)
     L, R = lines[src], readings[src]

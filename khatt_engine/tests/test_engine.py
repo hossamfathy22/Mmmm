@@ -1349,3 +1349,22 @@ def test_the_editor_offers_the_kit_suggestions_and_a_board_to_draw_on(tmp_path):
     if [f for f in faces() if f.endswith("-400.woff2")]:
         c = kit_candidates(st.to_dict(), "عروة")["candidates"]
         assert c and c[0]["part"]["polys"] and c[0]["preview"].startswith("<svg")
+
+
+def test_the_typed_word_goes_to_its_own_line_when_a_latin_one_stands_above_it():
+    """A logo with its Latin name set close above the Arabic one (یشم، ماکیتا): the two lines are two
+    lines, not one, and the Arabic word typed for the logo is measured on the Arabic line, not forced
+    on the first."""
+    from PIL import Image, ImageDraw, ImageFont
+    from khatt.pipeline import analyse
+    ar = Image.open(EXAMPLE).convert("L")
+    ar = ar.crop(ar.point(lambda v: 255 - v).getbbox())
+    lat = Image.new("L", (ar.width, 200), 255)
+    ImageDraw.Draw(lat).text((10, 0), "Bidonaq", fill=0, font=ImageFont.load_default(size=170))
+    lat = lat.crop(lat.point(lambda v: 255 - v).getbbox())
+    pic = Image.new("L", (max(ar.width, lat.width) + 80, ar.height + lat.height + 80), 255)
+    pic.paste(lat, (40, 30)); pic.paste(ar, (40, 30 + lat.height + 8))
+    buf = io.BytesIO(); pic.save(buf, "PNG")
+    an = analyse(buf.getvalue(), texts=["بيدوناق"])
+    assert len(an["lines"]) == 2
+    assert an["src"] == 1 and an["readings"][1].text_given == "بيدوناق" and not an["readings"][0].text_given
