@@ -1541,3 +1541,25 @@ def test_a_shear_at_the_end_of_the_range_searched_is_no_slant():
                 ink[y, x:x + 8] = 1.0
     L = measure_line(ink, ink > 0.5, 30, 170)
     assert L is not None and L.slant == 0.0
+
+
+def test_the_logos_own_letters_are_redrawn_with_its_own_pen():
+    """own.own_word: every letter of the typed word, found in the logo, read as the centre lines of its
+    strokes and its dots, and drawn again with the logo's nib, covers the logo's own ink (a free hand,
+    which the engine's constructions draw badly)."""
+    from khatt.bench import fonts
+    from khatt.match import ref_labels
+    files = {f.stem: f for f in fonts.font_files()}
+    if "aref-ruqaa-400" not in files or "amiri-400" not in files:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    from PIL import Image
+    from khatt.own import own_word
+    text = "حرية"
+    truth, _ = ref_labels(fonts.load(str(files["aref-ruqaa-400"])), text, 160)
+    pic = np.pad(truth > 0, 60)
+    buf = io.BytesIO(); Image.fromarray(np.where(pic, 0, 255).astype(np.uint8)).save(buf, "PNG")
+    got = own_word(buf.getvalue(), text)
+    assert [o.char for o in got["letters"]] == list(text)
+    assert [o.form for o in got["letters"]] == ["I", "F", "I", "F"]
+    assert got["match"] > 0.55
+    assert all(o.strokes for o in got["letters"])
