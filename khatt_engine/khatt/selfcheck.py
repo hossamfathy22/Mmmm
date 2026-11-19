@@ -18,6 +18,8 @@ import math
 import io
 from typing import Any, Dict, List, Optional, Tuple
 
+import os
+
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage as ndi
@@ -973,6 +975,113 @@ PART_LIKE = 0.5            # how like the engine's part (IoU) a part cut from th
 PART_KINDS = ("كأس سفلي", "رأس", "ذيل", "ذيل الميم", "عروة", "ذراع الكاف", "كأس أيمن", "أنف الحاء", "رأس العين", "عين")
 
 
+# How parts are cut from the logo: "engine" (the ink nearest the engine's part, kept if like it),
+# "geometry" (the part by its geometry where the engine's part stands), or "both" (the engine's way
+# first, the geometric one where it fails). KHATT_CUT overrides it (the examinations).
+# "engine" for now. "both" cut 24 more parts on fifteen logos (loops, tails, arcs, the arm of ك, a
+# bowl) but drew worse with them: a letter hidden with its family in view 63.7% -> 62.4% on ten
+# typeface logos (the tail 68.2% -> 62.1%), 50.8% -> 50.1% on five real ones. The shape of a part is
+# found well; which ink is the letter's is not, where the engine's letter, laid over the logo to share
+# the ink out, is far from the logo's (it takes a neighbour's teeth with it).
+CUT_MODE = "engine"
+GEO_LETTER = 0.2           # the least the engine's letter must cover the logo's to place its parts in it
+HOLED = ("رأس", "عروة", "عين")                               # parts round a closed counter
+UNDER = ("ذيل", "ذيل الميم", "كأس سفلي", "كأس أيمن")          # parts that hang under the baseline
+STANDING = ("أنف الحاء", "رأس العين")                          # parts standing on the baseline
+
+
+def _ink_polys(ink: np.ndarray, dx: float, x_of: float, s: float, xr: float, base_row: float, st: Style):
+    """The outline of a part's ink, in the units of the style, its right end at the engine part's."""
+    from shapely.geometry import Polygon
+    from skimage.measure import find_contours
+    rings = []
+    for c in find_contours(np.pad(ink.astype(float), 1), 0.5):
+        pts = [(((col - 1) - dx - x_of) / s - xr, (base_row - (row - 1)) / s) for row, col in c]
+        if len(pts) >= 4:
+            rings.append(pts)
+    if not rings:
+        return []
+    shape = None
+    for ring in rings:                               # even-odd: an outline inside another is a counter
+        q_ = Polygon(ring).buffer(0)
+        shape = q_ if shape is None else shape.symmetric_difference(q_)
+    shape = shape.simplify(max(0.25 / s, 0.012 * st.pitch), preserve_topology=True)
+    shape = clean_outline(shape, 1.0 / s)
+    polys = []
+    for poly in getattr(shape, "geoms", [shape]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            polys.append([[round(x, 2), round(y, 2)] for x, y in list(poly.exterior.coords)[:-1]])
+            polys += [[[round(x, 2), round(y, 2)] for x, y in list(h.coords)[:-1]] for h in poly.interiors]
+    return polys
+
+
+def _geo_ink(name: str, mine: np.ndarray, mm: np.ndarray, join, base_row: float, U: float,
+             own: Optional[np.ndarray] = None):
+    """The ink of the part `name` of a letter by its geometry, in the window where the engine's part
+    stands (its box, grown by half a stem): round a closed counter, under the baseline, or standing on
+    it. None when the window holds nothing of the kind."""
+    rows, cols = np.flatnonzero(mm.any(axis=1)), np.flatnonzero(mm.any(axis=0))
+    if not len(rows):
+        return None
+    g = int(round(0.6 * U))
+    H, W = mine.shape
+    win = np.zeros_like(mine)
+    win[max(0, rows[0] - g):min(H, rows[-1] + g + 1), max(0, cols[0] - g):min(W, cols[-1] + g + 1)] = True
+    if own is not None:
+        mine = mine & own                                # no dot, no dash, no other piece of writing
+    ink = mine & win
+    if join is not None and join.any():
+        ink &= ~ndi.binary_dilation(join, iterations=max(1, int(0.25 * U)))
+    base = int(round(base_row))
+    holes = ndi.binary_fill_holes(mine) & ~mine
+    holes &= ndi.binary_dilation(win, iterations=g)
+    if holes.any():
+        lab, n = ndi.label(holes)
+        sizes = ndi.sum(holes, lab, range(1, n + 1))
+        holes = lab == (1 + int(np.argmax(sizes))) if n else holes
+    ring = (ndi.distance_transform_edt(~holes) <= 1.3 * U) & mine if holes.any() else None
+    if name in HOLED:
+        if ring is not None:
+            ink = ring & win
+        else:
+            ink[base + int(0.15 * U):] = False               # a filled head: what stands on the line
+    elif name in UNDER:
+        if ring is not None and name in ("ذيل", "ذيل الميم"):
+            ink &= ~ring                                     # the tail of و, not its head
+        if not ink[base + 1:].any():
+            return None
+    elif name in STANDING:
+        ink[base + int(0.15 * U):] = False
+    if not ink.any():
+        return None
+    lab, n = ndi.label(ink)                              # crumbs of the neighbours' ink are no part of it
+    if n > 1:
+        sizes = ndi.sum(ink, lab, range(1, n + 1))
+        ink = np.isin(lab, 1 + np.flatnonzero(sizes >= 0.08 * sizes.max()))
+    return ink
+
+
+def _geo_ok(name: str, polys, st: Style) -> bool:
+    """Is a part cut by its geometry what it must be: a tail that goes under the line, a head with its
+    top near the x-height, a nose standing on the line."""
+    ys = [y for r in polys for _, y in r]
+    lo, hi = min(ys), max(ys)
+    X = st.x_height
+    if name in UNDER:
+        return lo < -0.2 * max(st.descender, 0.3 * X)
+    if name in HOLED or name in STANDING:
+        return hi > 0.5 * X and lo > -0.35 * X
+    return True
+
+
+# why each part was cut from the logo or not (for the examinations): [(letter.form, part, verdict, value)]
+WHY: List[Tuple[str, str, str, float]] = []
+
+
+def _why(p, name: str, verdict: str, value: float) -> None:
+    WHY.append((f"{p.char}.{p.form}", name, verdict, round(float(value), 3)))
+
+
 def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = None, every: bool = False):
     """Cut the parts of the logo's letters out of the logo: each letter of the word is drawn in the
     engine's construction and laid on the logo where it covers it best; the logo's ink that is that
@@ -1003,14 +1112,22 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
     owner = dist.argmin(axis=0)
     near = dist.min(axis=0) <= 0.6 * pitch
     out: Dict[str, Dict] = {}
+    U = st.stem * s                                      # the stem, in the logo's working pixels
+    mode = os.environ.get("KHATT_CUT", CUT_MODE)
+    lab = np.asarray(L.lab)
+    marks = np.isin(lab, [pc.comp for pc in L.pieces if pc.kind in ("dot", "dash")]) if lab.shape == logo.shape else None
     for i, (p, m, dx, join) in enumerate(slid):
         if i == skip or (isinstance(skip, (set, frozenset, list, tuple)) and i in skip):
             continue
         mine = logo & (owner == i) & near
         uni = float((m | mine).sum())
         match = float((m & mine).sum()) / uni if uni else 0.0
-        if match < 0.35:
+        # the engine's letter must cover the logo's to say which ink is that letter's; to say where its
+        # parts are in it, much less (the geometric cut takes the shape of a part from the logo)
+        if match < (GEO_LETTER if mode != "engine" else 0.35):
+            _why(p, "", "letter", match)
             continue
+        by_engine = match >= 0.35 and mode != "geometry"
         subs = []
         for sh in flat(p.glyph.shapes):
             polys = [[(x + p.x, y) for x, y in poly] for poly in sh if len(poly) >= 3]
@@ -1028,46 +1145,57 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
         dists = np.stack([ndi.distance_transform_edt(~mm) for _, mm, _ in subs])
         part_of = dists.argmin(axis=0)
         close = dists.min(axis=0) <= 0.35 * pitch       # ink far from every part of the letter is no part of it
+        from .typeset import _same_part
         for q, (name, mm, xr) in enumerate(subs):
             if name not in PART_KINDS or (not every and name in out and out[name]["match"] >= match):
                 continue
-            ink = mine & (part_of == q) & close
-            if not (0.4 * mm.sum() <= ink.sum() <= 2.5 * mm.sum()):
-                continue
-            rings = []
-            for c in find_contours(np.pad(ink.astype(float), 1), 0.5):
-                pts = [(((col - 1) - dx - x_of) / s - xr, (base_row - (row - 1)) / s) for row, col in c]
-                if len(pts) >= 4:
-                    rings.append(pts)
-            if not rings:
-                continue
-            from shapely.geometry import Polygon
-            shape = None
-            for ring in rings:                               # even-odd: an outline inside another is a counter
-                q_ = Polygon(ring).buffer(0)
-                shape = q_ if shape is None else shape.symmetric_difference(q_)
-            shape = shape.simplify(max(0.25 / s, 0.012 * st.pitch), preserve_topology=True)
-            shape = clean_outline(shape, 1.0 / s)
-            polys = []
-            for poly in getattr(shape, "geoms", [shape]):
-                if poly.geom_type == "Polygon" and not poly.is_empty:
-                    polys.append([[round(x, 2), round(y, 2)] for x, y in list(poly.exterior.coords)[:-1]])
-                    polys += [[[round(x, 2), round(y, 2)] for x, y in list(h.coords)[:-1]] for h in poly.interiors]
-            if polys:
-                # the engine's own part in that letter, in the same frame: a letter that would take this
-                # part must have a part of the same shape (the tail of و is not the tail of ر)
-                # (the letter's shapes are in its own frame; xr is in the word's, where the letter stands at p.x)
-                eng = [[[round(x + p.x - xr, 2), round(y, 2)] for x, y in poly]
-                       for sh in flat(p.glyph.shapes) if getattr(sh, "name", "") == name for poly in sh if len(poly) >= 3]
-                # a cut that is not much like the part it is meant to be is a misplaced letter's ink
-                from .typeset import _same_part
-                if _same_part(polys, eng) < PART_LIKE:
-                    continue
-                entry = {"polys": polys, "engine": eng, "from": f"{p.char}.{p.form}", "index": i, "match": round(match, 3)}
-                if every:
-                    out.setdefault("_all", []).append({**entry, "name": name})
+            # the engine's own part in that letter, in the same frame: a letter that would take this
+            # part must have a part of the same shape (the tail of و is not the tail of ر)
+            # (the letter's shapes are in its own frame; xr is in the word's, where the letter stands at p.x)
+            eng = [[[round(x + p.x - xr, 2), round(y, 2)] for x, y in poly]
+                   for sh in flat(p.glyph.shapes) if getattr(sh, "name", "") == name for poly in sh if len(poly) >= 3]
+            to_units = lambda ink: _ink_polys(ink, dx, x_of, s, xr, base_row, st)
+            got = None
+            if by_engine:
+                # 1. the logo's ink nearest this part of the engine's letter, kept if it is like that part
+                ink = mine & (part_of == q) & close
+                if not (0.4 * mm.sum() <= ink.sum() <= 2.5 * mm.sum()):
+                    _why(p, name, "ink", float(ink.sum()) / max(1.0, float(mm.sum())))
                 else:
-                    out[name] = entry
+                    polys = to_units(ink)
+                    if polys:
+                        # a cut that is not much like the part it is meant to be is a misplaced letter's ink
+                        like = _same_part(polys, eng)
+                        _why(p, name, "kept" if like >= PART_LIKE else "like", like)
+                        if like >= PART_LIKE:
+                            got = (polys, "engine")
+            if got is None and mode != "engine":
+                # 2. where the engine's part is too unlike the logo's: the part by its geometry, in the
+                # window where the engine's part stands (a ring round a closed counter, the ink under the
+                # baseline, the ink standing on it), judged by what it must be, not by the engine's shape
+                own = None
+                if marks is not None:
+                    # the pieces of writing this letter stands in (not a neighbour's), without the dots
+                    body = mine & ~marks & ndi.binary_dilation(m, iterations=max(1, int(0.3 * U)))
+                    own = np.isin(lab, np.unique(lab[body])) & ~marks if body.any() else ~marks
+                ink = _geo_ink(name, mine, mm, join, base_row, U, own)
+                if ink is not None and 0.35 * mm.sum() <= ink.sum() <= 3.0 * mm.sum():
+                    polys = to_units(ink)
+                    if polys and _geo_ok(name, polys, st):
+                        got = (polys, "geometry")
+                        _why(p, name, "geo", float(ink.sum()) / max(1.0, float(mm.sum())))
+                    else:
+                        _why(p, name, "geo-shape", 0.0)
+                elif ink is not None:
+                    _why(p, name, "geo-ink", float(ink.sum()) / max(1.0, float(mm.sum())))
+            if got is None:
+                continue
+            entry = {"polys": got[0], "engine": eng, "from": f"{p.char}.{p.form}", "index": i, "match": round(match, 3),
+                     "cut": got[1]}
+            if every:
+                out.setdefault("_all", []).append({**entry, "name": name})
+            else:
+                out[name] = entry
     return out.get("_all", []) if every else out
 
 
