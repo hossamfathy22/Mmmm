@@ -234,6 +234,9 @@ def _draw(got, char: str, form: str, st: Style, wide: float, engine: Optional[Gl
     X = st.x_height
     sx, sy = X * wide, X
     edge = 0.06 * X                                    # how near a line an edge must come to rest on it
+    # the logo's nib where it is measured and slanted (style.nib_pen): the stroke is its sweep along the
+    # centre line, as the logo's own strokes are; otherwise the pen rule (width by direction alone)
+    nib = st.nib_pen()
     shapes = []
     for stroke in strokes:
         pts = []
@@ -243,7 +246,7 @@ def _draw(got, char: str, form: str, st: Style, wide: float, engine: Optional[Gl
             dx, dy = (b[0] - a[0]) * sx, (b[1] - a[1]) * sy
             d = math.hypot(dx, dy) or 1.0
             tx, ty = dx / d, dy / d
-            w = st.width_at(ty)
+            w = nib.thickness(math.atan2(ty, tx)) if nib is not None else st.width_at(ty)
             X0, Y0, R = x * sx, y * sy, r * sy
             # an edge the typeface rests on the baseline or the x-height stays there with the logo's pen
             if abs(Y0 - R) < edge and abs(ty) < 0.5:
@@ -267,6 +270,10 @@ def _draw(got, char: str, form: str, st: Style, wide: float, engine: Optional[Gl
             d = math.hypot(ux, uy) or 1.0
             ext = max(0.0, R - w / 2)
             pts[end] = (X0 + ux / d * ext, Y0 + uy / d * ext, tx, ty, w, R)
+        if nib is not None and len(pts) >= 2:
+            from .qalam import stroke as sweep
+            shapes.append(sweep([(p[0], p[1]) for p in pts], nib))
+            continue
         quads = []
         for p, q in zip(pts, pts[1:]):
             (x0, y0, _, _, w0, _), (x1, y1, _, _, w1, _) = p, q
