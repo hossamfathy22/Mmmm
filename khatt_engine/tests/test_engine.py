@@ -1412,3 +1412,25 @@ def test_the_arc_family_shares_its_parts_by_name():
     nose = lambda f: [sh for sh in flat(LETTERS["ح"][1](st, f).shapes) if getattr(sh, "name", "") == "أنف الحاء"][0]
     xs = lambda sh: [x for poly in sh for x, _ in poly]
     assert abs(min(xs(nose("i"))) - min(xs(nose("I")))) < 0.1 * st.pitch
+
+
+def test_the_pen_of_a_logo_is_measured_as_a_flat_nib():
+    """A flat nib drawn along curves of every direction is measured back: its width, its thickness and
+    its angle (the angle the engine's pen rule took as 0 for every logo; a diwani reed holds it near 70)."""
+    import numpy as np
+    from PIL import Image, ImageDraw
+    from khatt.qalam import Nib, fit_nib, stroke
+    for angle in (0.0, 70.0):
+        nib = Nib(14.0, 4.0, angle)
+        t = np.linspace(0, 2 * np.pi, 120)
+        shapes = [stroke(np.c_[60 + 40 * np.cos(t), 60 + 40 * np.sin(t)], nib),
+                  stroke(np.c_[np.linspace(140, 260, 60), 60 + 25 * np.sin(np.linspace(0, 6, 60))], nib)]
+        im = Image.new("L", (300, 130), 0); d = ImageDraw.Draw(im)
+        for g in shapes:
+            for p in getattr(g, "geoms", [g]):
+                d.polygon([(x, 125 - y) for x, y in p.exterior.coords], fill=1)
+                for h in p.interiors:
+                    d.polygon([(x, 125 - y) for x, y in h.coords], fill=0)
+        got = fit_nib(np.asarray(im, bool), 1)
+        assert abs(got["width"] - 14) < 2.5 and got["thick"] < 7
+        assert min(abs(got["angle"] - angle), 180 - abs(got["angle"] - angle)) < 8
