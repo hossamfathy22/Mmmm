@@ -1563,3 +1563,18 @@ def test_the_logos_own_letters_are_redrawn_with_its_own_pen():
     assert [o.form for o in got["letters"]] == ["I", "F", "I", "F"]
     assert got["match"] > 0.55
     assert all(o.strokes for o in got["letters"])
+
+
+def test_two_single_teeth_cut_from_the_logo_do_not_share_one_stroke():
+    """Two letters cut from the logo share an upright only where one of them is a cup (two arms): two
+    single teeth that shared theirs became one tooth (بيدوناق from سیرنگ read بدوناق)."""
+    from khatt.letters import Glyph
+    from khatt.library import Tagged
+    from khatt.typeset import _uprights
+    st = Style()
+    X, U = st.x_height, st.stem
+    tooth = Glyph([Tagged([[(-U, 0), (0, 0), (0, X), (-U, X)]], "logo", "من الشعار")], left=-U)
+    cup = Glyph([Tagged([[(-3 * U, 0), (0, 0), (0, X), (-U, X), (-U, U), (-2 * U, U), (-2 * U, X), (-3 * U, X)]],
+                        "logo", "من الشعار")], left=-3 * U)
+    assert _uprights(tooth, st) == 1
+    assert _uprights(cup, st) == 2

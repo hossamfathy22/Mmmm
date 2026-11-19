@@ -570,6 +570,19 @@ def stem_from_reh(st: Style, c: str, form: str) -> Optional[dict]:
     return out
 
 
+def _uprights(glyph: Glyph, st: Style) -> int:
+    """How many strokes a cut letter has at half the x-height. Two letters share an arm only where one
+    of them is a cup (two arms, or more): two single teeth sharing theirs are one tooth, and a letter is
+    lost (سیرنگ's ی, cut, set after a ب cut from its ن: بيدوناق read بدوناق)."""
+    from shapely.geometry import Polygon
+    rings = [poly for sh in glyph.shapes if getattr(sh, "source", "") == "logo" for poly in sh if len(poly) >= 3]
+    acc = None
+    for ring in rings:
+        q = Polygon(ring).buffer(0)
+        acc = q if acc is None else acc.symmetric_difference(q)
+    return len(_sections(acc, 0.5 * st.x_height, st.x_height)) if acc is not None else 0
+
+
 def _upright(glyph: Glyph, st: Style, side: str) -> Optional[Tuple[float, float]]:
     """The upright stroke a cut letter begins (right) or ends (left) with, standing on the baseline and
     reaching the x-height: its left and right sides at half the x-height; None when the letter has none
@@ -860,6 +873,16 @@ def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         ext = extension(st, f"{c}.{form}")
         if cut and st.variants.get(f"{c}.{form}") != "المحرك":
             marks = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)] if kin else None
+            if marks and not cut.get("marks_dx"):
+                # another letter's body with this letter's marks (ب on ن, ي on ی): the marks go over the
+                # body that was cut, as the engine sets them over its own; left where the engine's letter
+                # has them, they slid off a narrower cut onto the next letter's (the dash of بيدوناق's ي
+                # on its ب's dot, from سیرنگ's ی)
+                body = _strip_marks([[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]], st.x_height)
+                cxs = [x for ring in body for x, _ in ring]
+                exs = [x for sh in flat(glyph.shapes) if not _is_mark(sh, st) for poly in sh for x, _ in poly]
+                if cxs and exs:
+                    cut = {**cut, "marks_dx": 0.5 * (min(cxs) + max(cxs)) - 0.5 * (min(exs) + max(exs))}
             if not kin and borrowed is not None:
                 # a letter whose dots the logo drew into another's (the dash over موتنرو's ت carries
                 # the ن's dot): cut without them it reads as another letter (ن as ع), so the engine's
@@ -896,7 +919,8 @@ def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 # neighbours in the logo itself: set as they stand there, their cut edges fitting
                 x = prev.x + (nb[0] - na[0])
                 joined = False
-            elif joined and pc and gc and _upright(prev.glyph, st, "left") and _upright(glyph, st, "right"):
+            elif (joined and pc and gc and _upright(prev.glyph, st, "left") and _upright(glyph, st, "right")
+                  and max(_uprights(prev.glyph, st), _uprights(glyph, st)) > 1):
                 # two letters as the logo draws them, the one ending in an upright arm and the other
                 # beginning with an upright: one stroke, as two cups share an arm in the logo (and the
                 # arm of a cup rises into the ا after it)
