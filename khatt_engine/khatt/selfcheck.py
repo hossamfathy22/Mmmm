@@ -1074,6 +1074,39 @@ def _geo_ok(name: str, polys, st: Style) -> bool:
     return True
 
 
+# Which ink is which letter when parts are cut: "engine" (its letters laid over the logo) or "match"
+# (KHATT_OWN=match: the word in real typefaces warped onto it). "engine": on the hidden-family
+# examination "match" changed nothing (a letter hidden with its family in view 61.5% -> 61.4% on ten
+# typeface logos, 44.7% both ways on seven real ones), the parts that pass (heads, tails) being cut
+# well either way: what holds the hidden letter back is the letter built round them, not the cut.
+OWN_MODE = "engine"
+_OWNERS: Dict = {}
+
+
+def _match_owner(L: Line, text: str):
+    """The letter each ink pixel of the line belongs to, by match.match (1 + index in `text`), cached."""
+    key = (id(L), text, np.asarray(L.B).shape, int(np.asarray(L.B).sum()))
+    if key not in _OWNERS:
+        from .match import match
+        from .pipeline import MATCH_FACES
+        from .bench import fonts
+        try:
+            faces = _FACES.get("faces")
+            if faces is None:
+                files = {f.stem: f for f in fonts.font_files()}
+                faces = _FACES["faces"] = [fonts.load(str(files[n])) for n in MATCH_FACES if n in files]
+            got = match(np.asarray(L.B, bool), text, faces) if faces else None
+        except Exception:
+            got = None
+        if len(_OWNERS) > 64:
+            _OWNERS.clear()
+        _OWNERS[key] = got["owner"] if got else None
+    return _OWNERS[key]
+
+
+_FACES: Dict = {}
+
+
 # why each part was cut from the logo or not (for the examinations): [(letter.form, part, verdict, value)]
 WHY: List[Tuple[str, str, str, float]] = []
 
@@ -1111,6 +1144,12 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
     dist = np.stack([ndi.distance_transform_edt(~m) for _, m, _, _ in slid])
     owner = dist.argmin(axis=0)
     near = dist.min(axis=0) <= 0.6 * pitch
+    # which ink is which letter: the engine's letters laid over the logo, or (KHATT_OWN=match) the word set
+    # in real typefaces and warped onto it (match.py: 97% of the ink to its own letter against 71%)
+    by_match = _match_owner(L, text) if os.environ.get("KHATT_OWN", OWN_MODE) == "match" else None
+    letter_at = [q for q, c in enumerate(text) if c in LETTERS]
+    if by_match is not None and len(letter_at) != len(slid):
+        by_match = None
     out: Dict[str, Dict] = {}
     U = st.stem * s                                      # the stem, in the logo's working pixels
     mode = os.environ.get("KHATT_CUT", CUT_MODE)
@@ -1119,7 +1158,7 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
     for i, (p, m, dx, join) in enumerate(slid):
         if i == skip or (isinstance(skip, (set, frozenset, list, tuple)) and i in skip):
             continue
-        mine = logo & (owner == i) & near
+        mine = logo & (owner == i) & near if by_match is None else logo & (by_match == letter_at[i] + 1)
         uni = float((m | mine).sum())
         match = float((m & mine).sum()) / uni if uni else 0.0
         # the engine's letter must cover the logo's to say which ink is that letter's; to say where its
