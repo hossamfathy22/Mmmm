@@ -185,8 +185,9 @@ def word_lines(ink: np.ndarray) -> List[np.ndarray]:
                     break
             if merged:
                 break
+    printed = _print_runs([i for i in range(n) if i not in big and area[i] >= 2], objs)
     for i in range(n):
-        if i in big or area[i] < 2:
+        if i in big or area[i] < 2 or i in printed:
             continue
         cy, cx = (objs[i][0].start + objs[i][0].stop) / 2, (objs[i][1].start + objs[i][1].stop) / 2
         best, d0 = None, 1e18
@@ -203,6 +204,35 @@ def word_lines(ink: np.ndarray) -> List[np.ndarray]:
         m = np.isin(lab, [i + 1 for i in L["ids"]])
         if m.sum() >= 0.05 * ink.sum():
             out.append(m)
+    return out
+
+
+PRINT_RUN = 4          # this many small pieces of a height side by side on one bottom are a line of print
+
+
+def _print_runs(ids: List[int], objs) -> set:
+    """The small pieces that are letters of a line of print (FREEDOM under حرية, "Mental health services"
+    beside سكينة), not marks of the word: PRINT_RUN or more of a height, standing on one bottom, each
+    less than its height from the next. The dots of one letter are two or three; those of the next letter
+    stand a tooth away, and at another height."""
+    box = {i: (objs[i][0].start, objs[i][0].stop, objs[i][1].start, objs[i][1].stop) for i in ids}
+    out: set = set()
+    seen: set = set()
+    for i in sorted(ids, key=lambda j: box[j][2]):
+        if i in seen:
+            continue
+        run, last = [i], i
+        while True:
+            t, b, x0, x1 = box[last]
+            h = b - t
+            nxt = [j for j in ids if j not in run and 0 <= box[j][2] - x1 < h
+                   and abs(box[j][1] - b) <= 0.3 * h and 1 / 1.8 <= (box[j][1] - box[j][0]) / max(1, h) <= 1.8]
+            if not nxt:
+                break
+            last = min(nxt, key=lambda j: box[j][2]); run.append(last)
+        seen.update(run)
+        if len(run) >= PRINT_RUN:
+            out.update(run)
     return out
 
 

@@ -512,7 +512,7 @@ def self_check(L: Line, text: str, st: Style, k: float, cut_below: float = CUT_B
     that match less than `cut_below` are cut out of the logo ("taken"); `pieces`: read from the logo's
     own pieces of ink (_by_pieces), not shared out to the nearest of the engine's letters."""
     text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
-    if not text or not L.stems:
+    if not text or not (L.stems or L.by_pen):
         return None
     upright = Style(**{**st.__dict__, "slant": 0.0})
     lay = typeset(text, upright)
@@ -585,7 +585,7 @@ class _Trial:
 
     def __init__(self, L: Line, text: str, st: Style, k: float, hide=None):
         self.text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
-        self.ok = bool(self.text) and bool(L.stems)
+        self.ok = bool(self.text) and bool(L.stems or L.by_pen)
         if not self.ok:
             return
         self.up = Style(**{**st.__dict__, "slant": 0.0})
@@ -1125,7 +1125,7 @@ def take_parts(L: Line, text: str, st: Style, k: float, skip: Optional[int] = No
     letter, as a list (to learn from typefaces how the same part differs from letter to letter)."""
     from skimage.measure import find_contours
     text = "".join(c for c in text if c in LETTERS or c.isspace()).strip()
-    if not text or not L.stems:
+    if not text or not (L.stems or L.by_pen):
         return {}
     upright = Style(**{**st.__dict__, "slant": 0.0, "taken": {}, "parts": {}})
     lay = typeset(text, upright)

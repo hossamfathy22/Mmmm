@@ -93,6 +93,7 @@ class Line:
     pieces: List[Piece] = field(default_factory=list)
     counters: List[Counter] = field(default_factory=list)
     coverage: float = 0.0
+    by_pen: bool = False                         # measured by the pen on the line the typed word was found on
     width: float = 0.0
     height: float = 0.0
 
@@ -231,8 +232,11 @@ def _band_from_rows(rows: np.ndarray, h: int) -> Tuple[int, int, int]:
 
 
 # ------------------------------------------------------------------ main
-def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx: int = 0) -> Optional[Line]:
-    """ink01: working image as ink intensity 0..1 (1 = ink). binary: thresholded ink."""
+def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx: int = 0,
+                 slant: Optional[float] = None, stem: Optional[float] = None) -> Optional[Line]:
+    """ink01: working image as ink intensity 0..1 (1 = ink). binary: thresholded ink. `slant` (degrees)
+    and `stem` (the pen's width, working pixels: the run the stems, dots and dashes are told by) are
+    used instead of the measured ones where given."""
     H, W = binary.shape
     region = binary[top:bot + 1]
     h = bot - top + 1
@@ -269,7 +273,11 @@ def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx:
     a = float(angles[int(np.argmax([score(v) for v in angles]))])
     fine = np.arange(a - 1, a + 1.001, 0.05)
     a = float(fine[int(np.argmax([score(v) for v in fine]))])
-    slant = 0.0 if abs(a) < 0.3 else round(a, 2)
+    # a sharpest shear at the end of the range searched is no measure (the long diagonal strokes of a
+    # diwani hand, سكينة -36°, رملة 36°: there is no upright stroke to measure a slant by)
+    if abs(a) > 34.5:
+        a = 0.0
+    slant = (0.0 if abs(a) < 0.3 else round(a, 2)) if slant is None else float(slant)
     t = math.tan(math.radians(slant))
     # deskew the grey image row by row with linear interpolation
     off = int(abs(t) * h) + 3
@@ -294,6 +302,8 @@ def measure_line(ink01: np.ndarray, binary: np.ndarray, top: int, bot: int, idx:
     for yy in range(x_top_row + round(xh_rows * 0.3), x_top_row + round(xh_rows * 0.7) + 1):
         lens += [n for _, n in _runs(B[yy - top]) if n >= 2]
     U0, _ = _mode(lens, 2, xh_rows)
+    if stem is not None:
+        U0 = float(stem)
     L.stem_runs = U0
     if not U0 == U0:
         L.x_height = float(xh_rows)

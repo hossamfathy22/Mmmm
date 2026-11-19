@@ -326,7 +326,11 @@ def assess(lines, readings, src: int, notes: List[Note]) -> Dict[str, Any]:
 
     if L.stem == L.stem and L.stem < 5:
         add(f"الصورة صغيرة: الجذع {L.stem:.1f} بكسل فقط. القياسات تقريبية.", 0.25, stem_px=L.stem)
-    if len(L.stems) < 3:
+    if getattr(L, "by_pen", False) and len(L.stems) < 3:
+        # a hand with no upright stroke (diwani, free): its line was found by the typed word and measured
+        # by its pen, not by stems; what the stems would have told (the rhythm, the heights) is less sure
+        add("لا جذوع قائمة في الشعار: قيس بقلمه وبمكان الكلمة المكتوبة فيه، والارتفاعات تقريبية.", 0.2, stems=len(L.stems))
+    elif len(L.stems) < 3:
         add(f"وُجد {len(L.stems)} جذع فقط: لا يكفي لقراءة الإيقاع والارتفاعات.", 0.35, stems=len(L.stems))
     elif L.stems:
         w = np.array([s.w for s in L.stems])
@@ -334,7 +338,9 @@ def assess(lines, readings, src: int, notes: List[Note]) -> Dict[str, Any]:
         if spread > 0.12:
             add(f"سمك الجذوع غير ثابت (تفاوت {spread * 100:.0f}%): قد لا يكون الخط بقلم واحد.", 0.2, spread=spread)
     main = [v for v in L.levels if v.name == "x_height"]
-    if not main or main[0].n < 2:
+    if getattr(L, "by_pen", False) and len(L.stems) < 3:
+        pass                                                 # said above
+    elif not main or main[0].n < 2:
         add("ارتفاع الحروف مأخوذ من جذع واحد: غير مؤكد.", 0.3)
     else:
         # a level a little lower with as many stems is the round letters or the inner teeth; one far
@@ -353,7 +359,7 @@ def assess(lines, readings, src: int, notes: List[Note]) -> Dict[str, Any]:
         unsure = sum(1 for u in R.units if u.letter in "ٮ?" or not u.letter)
         if R.units and unsure / len(R.units) > 0.34:
             add(f"لم يُقرأ {unsure} من {len(R.units)} حرف: اكتب نص الشعار ليُفهم أدق.", 0.15, unread=unsure)
-    if L.pen_fit and L.stem == L.stem and L.pen_fit.get("median_error", 0) > 0.12 * L.stem:
+    if L.pen_fit and L.stem == L.stem and L.pen_fit.get("median_error", 0) > 0.12 * L.stem and not getattr(L, "by_pen", False):
         add("قاعدة القلم لا تطابق الشعار جيدًا: السمك لا يتبع الاتجاه وحده.", 0.15, error=L.pen_fit["median_error"])
     for n in notes:
         if n["kind"] == "outline":

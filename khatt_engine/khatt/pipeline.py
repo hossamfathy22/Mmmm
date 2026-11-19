@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -67,7 +67,7 @@ def line_json(L: Line, R: Reading, k: float) -> Dict[str, Any]:
 
 
 def pick_line(lines: List[Line], readings: List[Reading], line: Optional[int]) -> int:
-    usable = [i for i, L in enumerate(lines) if L.stems]
+    usable = [i for i, L in enumerate(lines) if L.stems or L.by_pen]
     if not usable:
         raise ValueError("لم أجد في الصورة كتابة يمكن قياسها. استعمل صورة أوضح بخلفية سادة.")
     if line is not None and line in usable:
@@ -300,21 +300,22 @@ MATCH_FACES = ("amiri-400", "noto-naskh-arabic-400", "vazirmatn-400", "cairo-400
                "noto-kufi-arabic-400", "aref-ruqaa-400")
 
 
-def line_by_match(image: bytes, text: str, lines: List[Line]) -> Optional[int]:
-    """The engine's line the typed word is written on, as match.locate finds it (None where no typeface is
-    at hand or it finds nothing): the line whose rows hold most of the ink locate gave the word."""
+def line_by_match(image: bytes, text: str, lines: List[Line]) -> Tuple[Optional[int], Optional[Dict[str, Any]]]:
+    """The engine's line the typed word is written on, as match.locate finds it, and what locate found
+    ((None, None) where no typeface is at hand or it finds nothing): the line whose rows hold most of
+    the ink locate gave the word."""
     try:
         from .bench import fonts
         from .match import locate
     except Exception:
-        return None
+        return None, None
     files = {f.stem: f for f in fonts.font_files()}
     faces = [fonts.load(str(files[n])) for n in MATCH_FACES if n in files]
     if not faces:
-        return None
+        return None, None
     got = locate(image, text, faces)
     if got is None:
-        return None
+        return None, None
     rows = np.flatnonzero(got["line"].any(axis=1))
     lo, hi = int(rows[0]), int(rows[-1])
     best, at = 0, None
@@ -322,7 +323,54 @@ def line_by_match(image: bytes, text: str, lines: List[Line]) -> Optional[int]:
         ov = min(hi, L.bot) - max(lo, L.top)
         if ov > best:
             best, at = ov, i
-    return at
+    return at, got
+
+
+PEN_STEMS = 3      # fewer stems than this do not measure a line (guard.assess): its pen does
+
+
+def line_by_pen(ink01: np.ndarray, ink: np.ndarray, mask: np.ndarray, idx: int,
+                band: Optional[Tuple[int, int]] = None) -> Optional[Line]:
+    """The line the typed word was found on (match.locate's mask, working frame), measured where the stem
+    reader finds no stem in the band it cut (diwani and free hands draw no upright; the band held the
+    Latin name and the small print too). Only the word's own ink is measured; with no stem on it either,
+    it is measured upright (there is no upright stroke to undo a slant by) and the run its stems, dots and
+    dashes are told by is the width of its pen (qalam.fit_nib), and so are its stem and hairline.
+    With PEN_STEMS stems or more the stem reader measures it, as any other line."""
+    from scipy import ndimage as _ndi
+    from .qalam import fit_nib
+    near = _ndi.binary_dilation(mask, iterations=3)
+    own = near & np.asarray(ink, bool)
+    rows = np.flatnonzero(np.asarray(mask, bool).any(axis=1))
+    if not len(rows):
+        return None
+    # the rows of the word's own ink, within the band find_lines cut it in (a page whose small print
+    # shares no empty row with the word, رملة, is cut as one band): one row more of a grey edge moved
+    # ماکیتا's x-height from its teeth to its tall letters (two stems each, the band's top the tie-break)
+    a, b = int(rows[0]), int(rows[-1])
+    if band is not None and max(a, band[0]) < min(b, band[1]):
+        a, b = max(a, band[0]), min(b, band[1])
+    g = ink01 * near
+    L = measure_line(g, own, a, b, idx)
+    if L is None or len(L.stems) >= PEN_STEMS:
+        return L
+    B = np.asarray(L.B, bool)
+    lab, n = _ndi.label(B, structure=np.ones((3, 3)))
+    if not n:
+        return None
+    sizes = _ndi.sum(B, lab, range(1, n + 1))
+    try:
+        nib = fit_nib(np.isin(lab, 1 + np.flatnonzero(sizes > 0.05 * sizes.max())), 1)
+    except Exception:
+        return None
+    L = measure_line(g, own, a, b, idx, slant=0.0, stem=nib["width"])
+    if L is None:
+        return None
+    if len(L.stems) < PEN_STEMS:
+        L.stem, L.hair = float(nib["width"]), float(max(0.5, nib["thick"]))
+        L.monoline = nib["thick"] >= 0.75 * nib["width"]
+    L.by_pen = True
+    return L
 
 
 def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
@@ -346,13 +394,20 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
         raise ValueError("لم أجد في الصورة كتابة يمكن قياسها. استعمل صورة أوضح بخلفية سادة.")
     typed = [(t or "").strip() for t in (texts or [])]
     given = place_texts(lines, typed, k)
-    if len(lines) > 1 and len([t for t in typed if t]) == 1:
-        # one word typed for a logo of several lines: the line the word, set in real typefaces, warps
-        # onto best (match.locate) is its line; the redrawing above is the engine's, and fails on a line
-        # it draws badly (الإسكندرية's Arabic: it took ALEXANDRIA)
-        at = line_by_match(image, [t for t in typed if t][0], lines)
+    one = [t for t in typed if t]
+    if len(one) == 1:
+        # one word typed: the line the word, set in real typefaces, warps onto best (match.locate) is its
+        # line; the redrawing above is the engine's, and fails on a line it draws badly (الإسكندرية's
+        # Arabic: it took ALEXANDRIA)
+        at, got = line_by_match(image, one[0], lines)
         if at is not None:
-            given = [""] * len(lines); given[at] = [t for t in typed if t][0]
+            given = [""] * len(lines); given[at] = one[0]
+            # and it is measured on the word's own ink: the band cut by empty rows held the Latin name and
+            # the small print of the page too (رملة, سكينة), and a hand with no upright stroke is measured by
+            # its pen
+            Lp = line_by_pen(ink01, ink, got["line"], at, (lines[at].top, lines[at].bot))
+            if Lp is not None:
+                lines[at] = Lp
     readings = [read_line(L, given[i] or None) for i, L in enumerate(lines)]
     src = pick_line(lines, readings, line)
     health = assess(lines, readings, src, notes)

@@ -1485,3 +1485,59 @@ def test_the_letters_of_the_typed_word_are_found_in_a_logo_of_any_style():
     ink = word > 0
     m = match(ink, text, faces)
     assert (m["owner"][ink] == word[ink]).mean() > 0.75
+
+
+def test_a_hand_with_no_upright_stroke_is_read_on_its_own_ink_by_its_pen():
+    """A free hand (no stem the stem reader can read) with a line of print under it, as حرية and its
+    FREEDOM: the typed word finds its line, the print is left out of it, and the line is measured by its
+    pen (stem and hairline from the nib, upright), not refused."""
+    from khatt.bench import fonts
+    from khatt.match import ref_labels
+    files = {f.stem: f for f in fonts.font_files()}
+    if "aref-ruqaa-400" not in files or "amiri-400" not in files:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    from PIL import Image, ImageDraw, ImageFont
+    from khatt.pipeline import analyse
+    text = "حرية"
+    truth, _ = ref_labels(fonts.load(str(files["aref-ruqaa-400"])), text, 160)
+    H, W = truth.shape
+    pic = np.zeros((H + 200, W + 200), bool)
+    pic[60:60 + H, 100:100 + W] = truth > 0
+    lat = Image.new("L", (W, 30), 0)
+    ImageDraw.Draw(lat).text((0, 0), "F R E E D O M", fill=255, font=ImageFont.load_default(size=22))
+    pic[60 + H + 15:60 + H + 45, 100:100 + W] |= np.asarray(lat) > 127
+    buf = io.BytesIO(); Image.fromarray(np.where(pic, 0, 255).astype(np.uint8)).save(buf, "PNG")
+    an = analyse(buf.getvalue(), texts=[text])
+    L, st, k = an["lines"][an["src"]], an["style"], an["k"]
+    assert L.by_pen and len(L.stems) < 3
+    assert L.slant == 0.0
+    assert L.bot * k < 60 + H + 10                            # FREEDOM is not the word's ink
+    assert abs(st.stem - st.nib_width) < 0.1 * st.nib_width and st.hair < st.stem   # the nib: its width, its edge
+    assert an["health"]["confidence"] >= 0.5                  # measured, if by the pen
+
+
+def test_a_row_of_small_print_is_not_marks_of_the_word():
+    """Four or more small pieces of a height side by side on one bottom are letters of print; the two
+    dots of a letter, or dots a tooth apart at other heights, are marks."""
+    from khatt.match import _print_runs
+    def box(t, b, x0, x1):
+        return (slice(t, b), slice(x0, x1))
+    objs = [box(100, 116, 10 + 14 * i, 20 + 14 * i) for i in range(6)]          # a word of print
+    objs += [box(40, 48, 300, 308), box(40, 48, 311, 319)]                      # two dots of one letter
+    objs += [box(30, 38, 360, 368), box(45, 53, 400, 408)]                      # dots a tooth away, higher, lower
+    assert _print_runs(list(range(len(objs))), objs) == set(range(6))
+
+
+def test_a_shear_at_the_end_of_the_range_searched_is_no_slant():
+    """The long diagonals of a diwani hand make the sharpest shear the end of the range searched (±36°):
+    that is no measure of a slant, and the line is measured upright."""
+    from khatt.measure import measure_line
+    H, W = 200, 700
+    ink = np.zeros((H, W), float)
+    for x0 in (40, 260, 480):                                  # strokes leaning 45° from the vertical
+        for y in range(40, 160):
+            x = int(x0 + (160 - y) * math.tan(math.radians(45)))
+            if x + 8 < W:
+                ink[y, x:x + 8] = 1.0
+    L = measure_line(ink, ink > 0.5, 30, 170)
+    assert L is not None and L.slant == 0.0
