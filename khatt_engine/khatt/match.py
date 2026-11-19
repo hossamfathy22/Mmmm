@@ -18,6 +18,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 BANDS = 12              # a column's ink, in this many bands from the top of the line to its bottom
+JOIN_TELLS = 0.3        # lines that differ this much in how joined their writing is are told apart by it
 BAND = 0.25             # the warp may not stretch one side more than this share of the word's length ahead
 
 
@@ -138,4 +139,114 @@ def match(logo: np.ndarray, text: str, faces: Sequence) -> Optional[Dict]:
     if best is None:
         return None
     best["owner"] = assign(logo, best["labels"], len(text))
+    return best
+
+
+def word_lines(ink: np.ndarray) -> List[np.ndarray]:
+    """The lines of writing in a picture, as masks, by its pieces of ink rather than by empty rows (a
+    tail or a dot of one line reaches into the rows of the next; a date or a signature in a corner sits
+    in the rows of the word): the large pieces that overlap in height make a line; a small piece (a dot,
+    a mark) goes to the line it sits on or next to; one far from every line (a corner's text) to none."""
+    lab, n = ndi.label(ink, structure=np.ones((3, 3)))
+    if not n:
+        return []
+    objs = ndi.find_objects(lab)
+    area = ndi.sum(ink, lab, range(1, n + 1))
+    big = [i for i in range(n) if area[i] >= 0.02 * area.max()]
+    lines: List[Dict] = []
+    for i in sorted(big, key=lambda i: (objs[i][0].start + objs[i][0].stop) / 2):
+        t, b = objs[i][0].start, objs[i][0].stop
+        for L in lines:
+            ov = min(b, L["b"]) - max(t, L["t"])
+            if ov >= 0.3 * min(b - t, L["b"] - L["t"]):
+                L["t"], L["b"] = min(L["t"], t), max(L["b"], b); L["ids"].append(i)
+                L["x0"] = min(L["x0"], objs[i][1].start); L["x1"] = max(L["x1"], objs[i][1].stop)
+                break
+        else:
+            lines.append({"t": t, "b": b, "ids": [i], "x0": objs[i][1].start, "x1": objs[i][1].stop})
+    # pieces of one word stacked over each other (a flourish over its letters, سكينة) overlap in height a
+    # little, lie over the same stretch of the line, and hold much less ink than it; a Latin name under
+    # the word leaves a gap
+    merged = True
+    while merged:
+        merged = False
+        for A in lines:
+            for B in lines:
+                if A is B:
+                    continue
+                ov_y = min(A["b"], B["b"]) - max(A["t"], B["t"])
+                ov_x = min(A["x1"], B["x1"]) - max(A["x0"], B["x0"])
+                ink_a, ink_b = sum(area[i] for i in A["ids"]), sum(area[i] for i in B["ids"])
+                # two lines of writing of a size (روزيتا's two words) stay two, however their tails reach
+                if ov_y > 0 and ov_x >= 0.5 * min(A["x1"] - A["x0"], B["x1"] - B["x0"]) and min(ink_a, ink_b) < 0.6 * max(ink_a, ink_b):
+                    A["t"], A["b"] = min(A["t"], B["t"]), max(A["b"], B["b"])
+                    A["x0"], A["x1"] = min(A["x0"], B["x0"]), max(A["x1"], B["x1"]); A["ids"] += B["ids"]
+                    lines.remove(B); merged = True
+                    break
+            if merged:
+                break
+    for i in range(n):
+        if i in big or area[i] < 2:
+            continue
+        cy, cx = (objs[i][0].start + objs[i][0].stop) / 2, (objs[i][1].start + objs[i][1].stop) / 2
+        best, d0 = None, 1e18
+        for L in lines:
+            h = L["b"] - L["t"]
+            dy = max(0, L["t"] - cy, cy - L["b"])
+            dx = max(0, L["x0"] - cx, cx - L["x1"])
+            if dy <= 0.6 * h and dx <= 0.3 * h and dy + dx < d0:
+                best, d0 = L, dy + dx
+        if best is not None:
+            best["ids"].append(i)
+    out = []
+    for L in lines:
+        m = np.isin(lab, [i + 1 for i in L["ids"]])
+        if m.sum() >= 0.05 * ink.sum():
+            out.append(m)
+    return out
+
+
+def joined_share(line: np.ndarray) -> float:
+    """The share of a line's ink in pieces wider than the line is high: Arabic letters join into long
+    pieces, Latin ones mostly stand apart (a script hand joins them too: then this does not tell)."""
+    rows = np.flatnonzero(line.any(axis=1))
+    if not len(rows):
+        return 0.0
+    h = rows[-1] - rows[0] + 1
+    lab, n = ndi.label(line, structure=np.ones((3, 3)))
+    objs = ndi.find_objects(lab)
+    area = ndi.sum(line, lab, range(1, n + 1))
+    wide = sum(a for o, a in zip(objs, area) if o[1].stop - o[1].start > 1.2 * h)
+    return float(wide / max(1.0, line.sum()))
+
+
+def locate(image: bytes, text: str, faces: Sequence, line: Optional[int] = None) -> Optional[Dict]:
+    """The letters of the word `text` found in a logo's picture, on whichever of its lines the word is
+    written: every line is matched against the word, and the one it warps onto at the least cost,
+    weighed by how joined its writing is, is its line (or `line`, the index top first, where the
+    designer says). Returns {"line": its mask, "owner": label image of the working picture, "cost",
+    "face", "ink", "lines": [(top, cost, joined)]}."""
+    from .guard import prepare
+    work, ink, scale, inverted, notes = prepare(image)
+    ink = np.asarray(ink, bool)
+    masks = sorted(word_lines(ink), key=lambda m: int(np.flatnonzero(m.any(axis=1))[0]))
+    if line is not None and 0 <= line < len(masks):
+        masks = [masks[line]]
+    found = []
+    for m in masks:
+        got = match(m, text, faces)
+        if got is not None:
+            found.append((m, got, joined_share(m)))
+    if not found:
+        return None
+    # how joined each line's writing is tells Arabic from Latin only where the lines differ in it (a
+    # Latin name in block letters, ALEXANDRIA 0.0 against 0.74); where both are joined (Kivano's touching
+    # capitals 1.0, its Arabic 0.96) it would decide on a difference of nothing: the warp alone decides
+    js = [j for _, _, j in found]
+    tell = max(js) - min(js) > JOIN_TELLS
+    score = lambda got, j: got["cost"] * ((1.5 - 0.5 * j) if tell else 1.0)
+    m, got, j = min(found, key=lambda f: score(f[1], f[2]))
+    best = {**got, "line": m}
+    tried = [(int(np.flatnonzero(mm.any(axis=1))[0]), round(g["cost"], 4), round(jj, 2)) for mm, g, jj in found]
+    best["ink"] = ink; best["lines"] = tried; best["scale"] = scale
     return best

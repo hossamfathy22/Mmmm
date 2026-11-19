@@ -1453,3 +1453,35 @@ def test_a_slanted_nib_draws_the_strokes_and_an_upright_one_keeps_the_pen_rule()
     shape = g.stroke(slanted, pts)
     ys = [y for ring in shape for _, y in ring]
     assert abs((max(ys) - min(ys)) - nib.thickness(0.0)) < 0.15 * st.nib_width
+
+
+def test_the_letters_of_the_typed_word_are_found_in_a_logo_of_any_style():
+    """The word is known: set in real typefaces and warped onto the logo, it says which ink is which
+    letter, with no stem to read, on the line it is written on, not the Latin name under it."""
+    from khatt.bench import fonts
+    from khatt.match import locate, ref_labels
+    files = {f.stem: f for f in fonts.font_files()}
+    if "aref-ruqaa-400" not in files or "amiri-400" not in files:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    from PIL import Image, ImageDraw, ImageFont
+    text = "حديقة الورد"
+    logo = fonts.load(str(files["aref-ruqaa-400"]))          # a free hand, not a reference
+    truth, _ = ref_labels(logo, text, 120)
+    H, W = truth.shape
+    pic = np.zeros((H + 260, W + 120), int)
+    pic[60:60 + H, 60:60 + W] = truth
+    lat = Image.new("L", (W, 90), 0)
+    ImageDraw.Draw(lat).text((0, 0), "GARDEN", fill=255, font=ImageFont.load_default(size=80))
+    pic[60 + H + 60:60 + H + 150, 60:60 + W][np.asarray(lat) > 127] = -1
+    img = Image.fromarray(np.where(pic != 0, 0, 255).astype(np.uint8))
+    buf = io.BytesIO(); img.save(buf, "PNG")
+    faces = [fonts.load(str(files[n])) for n in ("amiri-400", "vazirmatn-400", "cairo-400") if n in files]
+    got = locate(buf.getvalue(), text, faces)
+    rows = np.flatnonzero(got["line"].any(axis=1))
+    assert rows[-1] / got["scale"] < 60 + H + 30              # the Arabic line, not GARDEN
+    # the ink given to its own letter (on the word's own ink, where the truth is exact)
+    from khatt.match import match
+    word = np.pad(truth, 40)
+    ink = word > 0
+    m = match(ink, text, faces)
+    assert (m["owner"][ink] == word[ink]).mean() > 0.75

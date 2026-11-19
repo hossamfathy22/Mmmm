@@ -296,6 +296,35 @@ def place_texts(lines: List[Line], texts: List[str], k: float) -> List[str]:
     return out
 
 
+MATCH_FACES = ("amiri-400", "noto-naskh-arabic-400", "vazirmatn-400", "cairo-400", "reem-kufi-400",
+               "noto-kufi-arabic-400", "aref-ruqaa-400")
+
+
+def line_by_match(image: bytes, text: str, lines: List[Line]) -> Optional[int]:
+    """The engine's line the typed word is written on, as match.locate finds it (None where no typeface is
+    at hand or it finds nothing): the line whose rows hold most of the ink locate gave the word."""
+    try:
+        from .bench import fonts
+        from .match import locate
+    except Exception:
+        return None
+    files = {f.stem: f for f in fonts.font_files()}
+    faces = [fonts.load(str(files[n])) for n in MATCH_FACES if n in files]
+    if not faces:
+        return None
+    got = locate(image, text, faces)
+    if got is None:
+        return None
+    rows = np.flatnonzero(got["line"].any(axis=1))
+    lo, hi = int(rows[0]), int(rows[-1])
+    best, at = 0, None
+    for i, L in enumerate(lines):
+        ov = min(hi, L.bot) - max(lo, L.top)
+        if ov > best:
+            best, at = ov, i
+    return at
+
+
 def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
             overrides: Optional[Dict[str, Any]] = None, read: bool = True) -> Dict[str, Any]:
     """Stages 1-4 alone: guard the picture, measure and read every line, and turn the chosen line
@@ -315,7 +344,15 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
             lines.append(L)
     if not lines:
         raise ValueError("لم أجد في الصورة كتابة يمكن قياسها. استعمل صورة أوضح بخلفية سادة.")
-    given = place_texts(lines, [(t or "").strip() for t in (texts or [])], k)
+    typed = [(t or "").strip() for t in (texts or [])]
+    given = place_texts(lines, typed, k)
+    if len(lines) > 1 and len([t for t in typed if t]) == 1:
+        # one word typed for a logo of several lines: the line the word, set in real typefaces, warps
+        # onto best (match.locate) is its line; the redrawing above is the engine's, and fails on a line
+        # it draws badly (الإسكندرية's Arabic: it took ALEXANDRIA)
+        at = line_by_match(image, [t for t in typed if t][0], lines)
+        if at is not None:
+            given = [""] * len(lines); given[at] = [t for t in typed if t][0]
     readings = [read_line(L, given[i] or None) for i, L in enumerate(lines)]
     src = pick_line(lines, readings, line)
     health = assess(lines, readings, src, notes)
