@@ -88,6 +88,32 @@ def descends(text: str) -> bool:
     return any(c in DESCENDING.get(f, ()) for c, f in shape_forms(text or ""))
 
 
+NIB_UPRIGHT = 15.0    # degrees from 0 within which the nib is the stem and the hairline the engine measures
+
+
+def measure_nib(L: Line, style: Style, k: float) -> None:
+    """The logo's pen as a flat nib (qalam.fit_nib), on the line's own strokes in the upright frame the
+    letters are drawn in (dots and dashes left out), into the style's nib_* fields."""
+    from scipy import ndimage as _ndi
+    from .qalam import fit_nib
+    B = np.asarray(L.B, bool)
+    lab, n = _ndi.label(B, structure=np.ones((3, 3)))
+    if not n:
+        return
+    sizes = _ndi.sum(B, lab, range(1, n + 1))
+    body = np.isin(lab, 1 + np.flatnonzero(sizes > 0.05 * sizes.max()))
+    try:
+        nib = fit_nib(body, 1)
+    except Exception:                                   # too few strokes to tell a nib
+        return
+    style.nib_width, style.nib_thick = nib["width"] * k, nib["thick"] * k
+    style.nib_angle, style.nib_error, style.nib_power = nib["angle"], nib["error"] * k, nib["power"]
+    # a nib held near 0 degrees draws the stems upright: the widths measured across the stems and along
+    # the joins (from the runs of ink, finer than a fit) are its width and its thickness
+    if min(style.nib_angle, 180 - style.nib_angle) <= NIB_UPRIGHT and style.stem > 0:
+        style.nib_width, style.nib_thick = style.stem, min(style.hair, style.stem)
+
+
 def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None, text: str = "") -> Style:
     X = L.x_height * k
     asc = L.ascender * k
@@ -298,6 +324,7 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
     lib = build_library(L, R, k)
     feats = measure_features(lines, readings, src, k)
     style = style_from(L, lib, k, feats, R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else ""))
+    measure_nib(L, style, k)
     for key, v in (overrides or {}).items():
         if hasattr(style, key) and v is not None:
             setattr(style, key, type(getattr(style, key))(v))

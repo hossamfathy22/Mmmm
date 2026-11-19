@@ -6,7 +6,7 @@ so a ring is [outer, inner].
 from __future__ import annotations
 
 import math
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from .style import Style
 
@@ -350,8 +350,27 @@ def path(*segments: Sequence[Sample]) -> List[Sample]:
     return pts
 
 
+def _nib_stroke(st: Style, pts: List[Sample]) -> Optional[Shape]:
+    """The logo's nib moved along the centre line (qalam.stroke), or None where there is no nib."""
+    nib = st.nib_pen()
+    if nib is None or len(pts) < 2:
+        return None
+    from .qalam import stroke as sweep
+    body = sweep([(x, y) for x, y, _, _ in pts], nib)
+    out: Shape = []
+    for poly in getattr(body, "geoms", [body]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            out.append(list(poly.exterior.coords)[:-1])
+            out += [list(r.coords)[:-1] for r in poly.interiors]
+    return out or None
+
+
 def stroke(st: Style, pts: List[Sample]) -> Shape:
-    """Offset a centreline by the pen rule: width depends on direction only."""
+    """Offset a centreline by the pen rule: width depends on direction only. Where the logo's pen is
+    measured as a flat nib, the nib moved along the line instead (exact, and it never folds)."""
+    got = _nib_stroke(st, pts)
+    if got is not None:
+        return got
     L, R = [], []
     for x, y, tx, ty in pts:
         w = st.width_at(ty) / 2
@@ -364,6 +383,9 @@ def solid_stroke(st: Style, pts: List[Sample]) -> Shape:
     """The same pen stroke, built piece by piece and merged: where the path turns more tightly than
     half the pen (the inside of a sharp turn) the offset edge would fold over itself and leave a notch;
     the merged pieces fill it, as ink does."""
+    got = _nib_stroke(st, pts)
+    if got is not None:
+        return got
     from shapely.geometry import MultiPoint
     from shapely.ops import unary_union
     L, R = [], []
@@ -395,7 +417,8 @@ def open_arc(st: Style, cx: float, cy: float, a: float, b: float, a0: float, a1:
         pts.append((x, y, dx / L, dy / L))
     if scale == 1.0:
         return stroke(st, pts)
-    small = Style(**{**st.__dict__, "stem": st.stem * scale, "hair": max(1.0, st.hair * scale)})
+    small = Style(**{**st.__dict__, "stem": st.stem * scale, "hair": max(1.0, st.hair * scale),
+                     "nib_width": st.nib_width * scale, "nib_thick": max(0.5, st.nib_thick * scale)})
     return stroke(small, pts)
 
 

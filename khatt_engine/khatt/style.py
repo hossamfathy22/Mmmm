@@ -6,6 +6,13 @@ from dataclasses import asdict, dataclass, field
 from typing import Dict
 
 
+NIB_UPRIGHT = 15.0    # degrees from 0 within which a nib is the engine's own pen rule
+NIB_FIT = 0.15        # a nib whose strokes stray from it by more than this share of its width does not draw
+# the measured nib draws the centre-line strokes (KHATT_NIB=0 turns it off): on twelve real logos it lost
+# nowhere and the held-out letter rose 0.387 -> 0.390 (موتنرو's own word 0.401 -> 0.419)
+NIB_DEFAULT = "1"
+
+
 @dataclass
 class Style:
     stem: float = 23.0          # thick pen: width of every vertical stem (U)
@@ -18,6 +25,15 @@ class Style:
     dot: float = 25.0           # diameter of a dot
     dash_marks: bool = True     # two dots become one hairline dash
     contrast_power: float = 2.0 # how fast a curve thins from stem to hairline
+    # the logo's pen as a flat nib (qalam.fit_nib on its strokes): width, thickness, angle (degrees, 0 =
+    # thick on the verticals and thin on the horizontals, ~70 a diwani reed) and how far the strokes
+    # stray from it (median, in pixels). 0 width: not measured. Strokes drawn along a centre line are
+    # the nib moved along it where it explains the logo (nib_pen)
+    nib_width: float = 0.0
+    nib_thick: float = 0.0
+    nib_angle: float = 0.0
+    nib_power: float = 0.0      # how the thickness goes from thin to full with the direction (0: a reed's)
+    nib_error: float = 0.0
     # ---- shape parameters (measured from the logo by features.py; defaults = the hand-built بيدوناق)
     top_angle: float = 0.0      # degrees: how the top of a stem is cut
     top_round: float = 0.0      # 0 = square corners, 1 = half circle
@@ -133,6 +149,21 @@ class Style:
     @property
     def tan(self) -> float:
         return math.tan(math.radians(self.slant))
+
+    def nib_pen(self):
+        """The nib the logo's strokes are drawn with, or None where it is not measured or does not explain
+        them well (its error over NIB_FIT of its width), or the pen is turned off (KHATT_NIB=0)."""
+        import os
+        if os.environ.get("KHATT_NIB", NIB_DEFAULT) != "1" or self.nib_width <= 0:
+            return None
+        if self.nib_error > NIB_FIT * self.nib_width:
+            return None
+        # a nib held upright is the pen rule the engine draws with (width_at, from its own measures of the
+        # stems and the joins): it stays (the sweep lost on بيدوناق 0.944 -> 0.936, its ends cut slanted)
+        if min(self.nib_angle, 180 - self.nib_angle) <= NIB_UPRIGHT:
+            return None
+        from .qalam import Nib
+        return Nib(self.nib_width, max(0.5, self.nib_thick), self.nib_angle, self.nib_power or None)
 
     def width_at(self, ty: float) -> float:
         """Pen rule: vertical strokes get the stem, horizontal ones the hairline."""

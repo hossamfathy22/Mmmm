@@ -15,8 +15,30 @@ from shapely import affinity
 
 
 class Nib:
-    def __init__(self, width, thick, angle_deg):
-        self.w, self.t, self.a = width, thick, math.radians(angle_deg)
+    """A flat nib, `width` long and `thick` thick, held at `angle_deg`. `power`: how the thickness of a
+    stroke goes from thin (along the nib) to full (across it): t + (w - t) * |sin(dir - angle)| ** power,
+    measured from the logo with the rest (a reed of fixed shape is about 1; the engine's pen rule, at
+    angle 0, about 2). The print of the nib is lengthened or shortened at every point of a stroke so the
+    stroke takes exactly that thickness, and stays a sweep: it never folds, and its ends are cut slanted
+    as a reed cuts them."""
+
+    def __init__(self, width, thick, angle_deg, power=None):
+        self.w, self.t, self.a, self.p = width, thick, math.radians(angle_deg), power
+
+    def thickness(self, direction):
+        s = abs(math.sin(direction - self.a))
+        if self.p is None:
+            return self.w * s + self.t * abs(math.cos(direction - self.a))
+        return self.t + (self.w - self.t) * s ** self.p
+
+    def scale_for(self, direction):
+        """How long the print must be, as a share of the width, for the stroke to take its thickness."""
+        if self.p is None:
+            return 1.0
+        s, c = abs(math.sin(direction - self.a)), abs(math.cos(direction - self.a))
+        if s < 0.05:
+            return 1.0                               # along the nib the length does not show
+        return max(0.05, min(1.0, (self.thickness(direction) - self.t * c) / (self.w * s)))
 
     def poly(self, x, y, scale=1.0):
         c, s = math.cos(self.a), math.sin(self.a)
@@ -54,6 +76,9 @@ def stroke(points, nib, taper=(0.0, 0.0), pressure=None):
             sc = min(sc, 0.35 + 0.65 * ((1 - f) / taper[1]))
         if pressure is not None:
             sc *= pressure(f)
+        if nib.p is not None:
+            a_, b_ = P[max(0, i - 1)], P[min(n - 1, i + 1)]
+            sc *= nib.scale_for(math.atan2(b_[1] - a_[1], b_[0] - a_[0]))
         q = nib.poly(x, y, sc)
         if prev is not None:
             hulls.append(Polygon(prev + q).convex_hull)
@@ -122,7 +147,11 @@ def fit_nib(mask, Z=1):
     from skimage.morphology import medial_axis
     from scipy.spatial import cKDTree
     from scipy.optimize import least_squares
-    sk, dist = medial_axis(mask, return_distance=True)
+    # medial_axis breaks ties at random: a fixed seed gives the same nib for the same picture every time
+    try:
+        sk, dist = medial_axis(mask, return_distance=True, rng=0)
+    except TypeError:                                    # older scikit-image
+        sk, dist = medial_axis(mask, return_distance=True, random_state=0)
     ys, xs = np.nonzero(sk); pts = np.c_[xs, ys].astype(float); tree = cKDTree(pts)
     deg = ndi.convolve(sk.astype(int), np.ones((3, 3)), mode="constant")[ys, xs] - 1
     phi, w = [], []
@@ -135,17 +164,17 @@ def fit_nib(mask, Z=1):
         v = vec[:, 1]; phi.append(math.atan2(-v[1], v[0]) % math.pi); w.append(2 * dist[ys[k], xs[k]] / Z)
     phi, w = np.array(phi), np.array(w)
     def res(p):
-        W, h, th = p; return np.sqrt((W * np.sin(phi - th)) ** 2 + (h * np.cos(phi - th)) ** 2) - w
+        W, h, th, pw = p; return h + (W - h) * np.abs(np.sin(phi - th)) ** pw - w
     best = None
     for th0 in np.linspace(0, math.pi, 12, endpoint=False):
-        r = least_squares(res, [np.percentile(w, 90), np.percentile(w, 10), th0], loss="soft_l1", f_scale=1.0,
-                          bounds=([1, 0.3, -1], [200, 100, 4.5]))
+        r = least_squares(res, [np.percentile(w, 90), np.percentile(w, 10), th0, 1.5], loss="soft_l1", f_scale=1.0,
+                          bounds=([1, 0.3, -1, 0.4], [200, 100, 4.5, 6.0]))
         if best is None or r.cost < best.cost: best = r
-    W, h, th = best.x
+    W, h, th, pw = best.x
     a = math.degrees(th) % 180
     if h > W:                                        # the fit found the nib turned a quarter: the same nib
         W, h, a = h, W, (a + 90) % 180
-    return {"width": float(W), "thick": float(h), "angle": float(a),
+    return {"width": float(W), "thick": float(h), "angle": float(a), "power": float(pw),
             "error": float(np.median(np.abs(best.fun))), "samples": int(len(w))}
 
 

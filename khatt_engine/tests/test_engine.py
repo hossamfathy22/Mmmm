@@ -1434,3 +1434,22 @@ def test_the_pen_of_a_logo_is_measured_as_a_flat_nib():
         got = fit_nib(np.asarray(im, bool), 1)
         assert abs(got["width"] - 14) < 2.5 and got["thick"] < 7
         assert min(abs(got["angle"] - angle), 180 - abs(got["angle"] - angle)) < 8
+
+
+def test_a_slanted_nib_draws_the_strokes_and_an_upright_one_keeps_the_pen_rule():
+    """The pen is measured with its angle and the power of its thinning. Held near 0 degrees it is the
+    engine's pen rule, which stays (بيدوناق: its stem and hairline); held at an angle (یشم 154, a diwani
+    reed 70) the strokes drawn along a centre line are the nib moved along them."""
+    from khatt.pipeline import analyse
+    st = analyse(EXAMPLE.read_bytes(), texts=["بيدوناق"])["style"]
+    assert st.nib_width > 0 and min(st.nib_angle, 180 - st.nib_angle) < 15
+    assert abs(st.nib_width - st.stem) < 1e-6 and st.nib_pen() is None
+    slanted = Style(**{**st.__dict__, "nib_angle": 70.0})
+    nib = slanted.nib_pen()
+    assert nib is not None
+    import math
+    from khatt import geometry as g
+    pts = g.line((0, 0), (40, 0))                         # a horizontal stroke: across a 70-degree nib
+    shape = g.stroke(slanted, pts)
+    ys = [y for ring in shape for _, y in ring]
+    assert abs((max(ys) - min(ys)) - nib.thickness(0.0)) < 0.15 * st.nib_width
