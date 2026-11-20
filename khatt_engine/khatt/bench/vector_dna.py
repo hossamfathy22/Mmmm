@@ -68,8 +68,31 @@ def one(path: str, out: str) -> None:
             e = {"x_height": st.x_height / scale, "stem": st.stem / scale, "hair": st.hair / scale, "slant": st.slant}
         except Exception as ex:
             e = {"error": str(ex)[:80]}
+        # the same picture traced back to a drawing (trace.py), then read as one
+        tr_ = {}
+        try:
+            from ..match import locate
+            from ..pipeline import MATCH_FACES
+            from ..trace import trace
+            files = {f.stem: f for f in fonts.font_files()}
+            faces = [fonts.load(str(files[n])) for n in MATCH_FACES if n in files]
+            from ..guard import prepare
+            from ..trace import measure
+            work, _, pscale, inverted, _ = prepare(buf.getvalue())
+            gw = np.asarray(work, float) / 255.0
+            grey = gw if inverted else 1.0 - gw
+            got = locate(buf.getvalue(), w, faces)
+            owner = np.asarray(got["owner"]) if got is not None else None
+            if owner is not None and owner.shape != grey.shape:
+                owner = None
+            dt = measure(grey, owner, w)
+            f_ = scale * pscale
+            tr_ = {k: (dt.get(k) / f_ if dt.get(k) is not None and k != "slant" else dt.get(k)) for k in ("x_height", "stem", "hair", "slant")}
+            tr_["owner"] = owner is not None
+        except Exception as ex:
+            tr_ = {"error": str(ex)[:80]}
         rows.append({"word": w, "vector": {k: d.get(k) for k in ("x_height", "stem", "hair", "slant", "baseline", "x_from", "stem_from")},
-                     "engine": e})
+                     "engine": e, "traced": tr_})
     Path(out).write_text(json.dumps({"font": Path(path).stem, "truth": tr, "rows": rows}, ensure_ascii=False), encoding="utf-8")
 
 
@@ -96,7 +119,7 @@ def main() -> int:
             print(f.stem, "ok", flush=True)
         else:
             print(f.stem, "failed", (r.stderr.strip().splitlines() or ["?"])[-1][:120], flush=True)
-    err = {k: {"vector": [], "engine": []} for k in ("x_height", "stem", "hair")}
+    err = {k: {"vector": [], "engine": [], "traced": []} for k in ("x_height", "stem", "hair")}
     for r in res:
         X = r["truth"].get("x_height")
         if not X:
@@ -106,14 +129,14 @@ def main() -> int:
                 tv = r["truth"].get(k)
                 if tv is None:
                     continue
-                for who in ("vector", "engine"):
-                    v = row[who].get(k)
+                for who in ("vector", "engine", "traced"):
+                    v = row.get(who, {}).get(k)
                     if v is not None and v == v:
                         err[k][who].append(abs(v - tv) / X * 100)
     print("\\nmedian error, hundredths of the x-height (and the share within 5):")
     for k, d in err.items():
         line = f"  {k:9s}"
-        for who in ("vector", "engine"):
+        for who in ("vector", "engine", "traced"):
             v = np.array(d[who])
             line += f"   {who}: {np.median(v):5.1f} ({(v <= 5).mean() * 100:3.0f}% within 5, n={len(v)})" if len(v) else f"   {who}: —"
         print(line)
