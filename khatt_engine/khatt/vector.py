@@ -296,15 +296,19 @@ def raster(shapes: Sequence[VShape], scale: float, pad: int = 10, box=None):
     W, H = int((x1 - x0) * scale) + 2 * pad + 1, int((y1 - y0) * scale) + 2 * pad + 1
     out = np.zeros((H, W), bool)
     for s in shapes:
-        acc = np.zeros((H, W), bool)
-        for c in s.contours:
-            p = flatten(c, 0.35 / scale)
-            if len(p) < 3:
-                continue
+        polys = [p for p in (flatten(c, 0.35 / scale) for c in s.contours) if len(p) >= 3]
+        if not polys:
+            continue
+        sign = np.sign(area(max(polys, key=lambda p: abs(area(p))))) or 1.0
+        fill = np.zeros((H, W), bool); hole = np.zeros((H, W), bool)
+        for p in polys:
             im = Image.new("L", (W, H), 0)
             ImageDraw.Draw(im).polygon([((x - x0) * scale + pad, (y1 - y) * scale + pad) for x, y in p], fill=1)
-            acc ^= np.asarray(im, bool)
-        out |= acc
+            if np.sign(area(p)) == sign:
+                fill |= np.asarray(im, bool)
+            else:
+                hole |= np.asarray(im, bool)
+        out |= fill & ~hole
     return out, (x0 - pad / scale, y1 + pad / scale, scale)
 
 
@@ -339,16 +343,19 @@ def _is_line(s: Seg, tol: float) -> bool:
 
 
 def geometry(s: VShape, tol: float = 0.5):
-    """A shape as a shapely geometry (its contours filled even-odd)."""
+    """A shape as a shapely geometry, filled as typefaces and Illustrator fill (the non-zero rule):
+    contours turning the same way as the largest are filled and joined where they overlap, those
+    turning the other way are holes."""
     from shapely.geometry import Polygon
-    g = None
-    for c in s.contours:
-        p = flatten(c, tol)
-        if len(p) < 3:
-            continue
-        q = Polygon(p).buffer(0)
-        g = q if g is None else g.symmetric_difference(q)
-    return g
+    from shapely.ops import unary_union
+    polys = [(area(p), Polygon(p).buffer(0)) for p in (flatten(c, tol) for c in s.contours) if len(p) >= 3]
+    polys = [(a, q) for a, q in polys if not q.is_empty]
+    if not polys:
+        return None
+    sign = np.sign(max(polys, key=lambda t: abs(t[0]))[0]) or 1.0
+    fill = unary_union([q for a, q in polys if np.sign(a) == sign])
+    holes = [q for a, q in polys if np.sign(a) != sign]
+    return fill.difference(unary_union(holes)) if holes else fill
 
 
 def _turns(body: Sequence[np.ndarray]):

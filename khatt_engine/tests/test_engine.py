@@ -1635,3 +1635,37 @@ def test_a_vector_logo_is_drawn_again_from_its_strokes_with_their_own_widths():
     assert set(r["letters"]) == set(range(len(w)))
     assert r["whole"] > 0.85
     assert all(len(st) >= 2 and all(p[2] > 0 for p in st) for sts in r["strokes"].values() for st in sts)
+
+
+def test_a_vector_letter_is_cut_into_parts_that_tile_it_and_stretched_as_in_illustrator():
+    """vparts: a letter's own outline cut into parts at its joints (they tile it exactly), then made wider
+    and taller as a designer does it: a line across the letter where it crosses only strokes running
+    across it, one side dragged, every crossing bridged. Only the width (or the height) changes, by the
+    amount asked; a closed loop (ط) is pulled from both its sides; the result is written back as a path of
+    lines and Beziers with about as many segments as the typeface's own."""
+    from khatt.bench import fonts
+    files = {f.stem: f for f in fonts.font_files()}
+    if "cairo-400" not in files:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    from shapely.ops import unary_union
+    from khatt.vector import word_shapes, dna
+    from khatt.vparts import parts_of, stretch_letter, to_shapes, Part
+    face = fonts.load(str(files["cairo-400"]))
+    for letter in ("ب", "ط"):
+        sh = word_shapes(face, letter)
+        X = dna(sh, letter)["x_height"]
+        ps, cover = parts_of(sh, letter)
+        assert min(cover.values()) > 0.999
+        g = unary_union([p.geom for p in ps])
+        x0, y0, x1, y1 = g.bounds
+        wide, _ = stretch_letter(g, "x", 0.6 * X, X)
+        tall, _ = stretch_letter(g, "y", 0.4 * X, X, keep="low")
+        assert wide is not None and tall is not None
+        a0, b0, a1, b1 = wide.bounds
+        assert abs((a1 - a0) - (x1 - x0 + 0.6 * X)) < 0.01 * X and abs((b1 - b0) - (y1 - y0)) < 0.01 * X
+        a0, b0, a1, b1 = tall.bounds
+        assert abs((b1 - b0) - (y1 - y0 + 0.4 * X)) < 0.01 * X and abs(b0 - y0) < 0.01 * X
+        assert len(getattr(wide, "geoms", [wide])) == len(getattr(g, "geoms", [g]))   # nothing torn off
+        segs = sum(len(c) for s in to_shapes([Part(0, "stroke", wide)]) for c in s.contours)
+        own = sum(len(c) for s in sh for c in s.contours)
+        assert segs <= 2 * own
