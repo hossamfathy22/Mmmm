@@ -1129,7 +1129,21 @@ def family_names(letter: str, form: str, glyph: Glyph) -> Glyph:
 
 
 def _with_family_names(letter: str, build: Builder) -> Builder:
-    return lambda s, f: family_names(letter, f, build(s, f))
+    def drawn(s, f):
+        # the logo's own shape numbers (numbers.py), whoever asks for the letter: typeset, the kit, the
+        # reference, the readers (built outside typeset, ن of the self-check took Sirang's numbers)
+        from .numbers import NUMBERS
+        tok = NUMBERS.set(s.numbers or None)
+        try:
+            return family_names(letter, f, build(s, f))
+        finally:
+            NUMBERS.reset(tok)
+    return drawn
 
 
 LETTERS = {c: (j, _with_family_names(c, b)) for c, (j, b) in LETTERS.items()}
+
+
+# every decimal number in the builders above is read by name, so that each logo has its own (numbers.py)
+from . import numbers as _numbers  # noqa: E402
+_numbers.install()

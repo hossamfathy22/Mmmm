@@ -816,6 +816,11 @@ def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -
             r["parts"] = {q: v["from"] for q, v in st.parts.items()}
             r["notes"].append("قُصّت من حروف الشعار قطعها لتُبنى بها الحروف التي لا يحويها: "
                               + "، ".join(f"{q} (من «{v['from'].split('.')[0]}»)" for q, v in st.parts.items()) + ".")
+    # the shape numbers from the typefaces nearest the logo, checked again on the rules now read off it
+    from .numbers import prune
+    back = prune(st)
+    if r is not None and back:
+        r["notes"].append("أُعيدت أرقام بيدوناق إلى أدوات لم ترسم حروفها سليمة بأرقام الخطوط القريبة: " + "، ".join(back) + ".")
     return r
 
 

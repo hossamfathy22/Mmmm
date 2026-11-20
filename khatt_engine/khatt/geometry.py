@@ -347,6 +347,8 @@ def path(*segments: Sequence[Sample]) -> List[Sample]:
     pts: List[Sample] = []
     for s in segments:
         pts += list(s) if not pts else list(s)[1:]
+    from .numbers import note_path
+    note_path(pts)
     return pts
 
 

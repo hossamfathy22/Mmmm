@@ -235,6 +235,15 @@ def from_logo(built: Glyph, cut: dict, form: str = "M", borrowed: Optional[str] 
     # a cut read from the logo's pieces is as wide as it is (the engine's ر is twice the logo's, and its
     # width put a gap after the logo's ر that the logo does not have)
     left = min(xs) if cut.get("piece") else min(min(xs), built.left)
+    if built.tail is not None:
+        # a letter with a tail (ر ز و) spaces by its body, as the engine's own does (Glyph.left): the tail
+        # runs under the next letter. Measured by its full ink, بيدوناق's و cut from the logo put ن and ا
+        # a third of the x-height too far left
+        from shapely.geometry import Polygon, box
+        from shapely.ops import unary_union
+        above = unary_union([Polygon(r).buffer(0) for r in polys if len(r) >= 3]).intersection(box(-1e6, 0.0, 1e6, 1e6))
+        if not above.is_empty:
+            left = max(left, min(above.bounds[0], built.left))
     return Glyph([body] + list(marks or []), left=left, entry_x=built.entry_x,
                  entry_edge=built.entry_edge, exit_x=exit_x, exit_edge=exit_edge, stems=built.stems,
                  tail=built.tail)
@@ -777,6 +786,15 @@ def _library(st: Style):
 def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
     """Lay out `word`; with the logo's part library (st.library) every letter is built of the logo's
     own stems, feet, tails, heads, dots and dashes (see library.py), unless a library is active already."""
+    from .numbers import NUMBERS
+    ntok = NUMBERS.set(st.numbers or None)
+    try:
+        return _typeset_with_library(word, st, cache)
+    finally:
+        NUMBERS.reset(ntok)
+
+
+def _typeset_with_library(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
     from .library import ACTIVE
     if st.library and st.library.get("parts") and ACTIVE.get() is None:
         tok = ACTIVE.set(_library(st))

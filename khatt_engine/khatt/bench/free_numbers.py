@@ -9,66 +9,43 @@ Here every fixed number (a decimal literal in a builder's body) is made a handle
 multiplier the fit may change (the code is rewritten in memory, nothing in the package changes). Then each
 of the 18 skeletons is fitted to the same letter of a typeface twice: its named rules only, and its named
 rules with all its fixed numbers. The difference is what the fixed numbers cost."""
-import ast, inspect, math, sys, json, warnings; warnings.filterwarnings('ignore')
+import math, sys, json, warnings; warnings.filterwarnings('ignore')
 import numpy as np
 
-FREE: dict = {}          # handle -> multiplier
-USED: set = set()        # handles read since cleared
-
-
-def _K(key, v):
-    USED.add(key)
-    return v * FREE.get(key, 1.0)
-
-
-# number crunching, not drawing: Bezier arithmetic, polygon cleanup, marks (dots are kept as drawn), names
-SKIP = {'cubic', 'line', 'arc', '_pts', 'soften', 'fuse', 'clear_marks', '_split_at_baseline', 'family_names',
-        'top_joins', 'marks', '_rings', '_named', '_lib', 'circle', 'hamza', 'tatweel', 'dot', 'dash', 'rect',
-        'path', 'translate', 'box', 'flat', '_draw', '_e', '_x', 'clip_x', 'Point'}
-
-
-class _Free(ast.NodeTransformer):
-    def __init__(self, fname):
-        self.f, self.i = fname, 0
-
-    def visit_Compare(self, node):            # thresholds choose between variants: left as they are
-        return node
-
-    def visit_Constant(self, node):
-        if isinstance(node.value, float) and node.value != 0.0:
-            key = f"{self.f}#{self.i}"; self.i += 1
-            return ast.copy_location(ast.Call(ast.Name('_K', ast.Load()), [ast.Constant(key), ast.Constant(node.value)], []), node)
-        return node
+# the engine names its numbers itself now (khatt/numbers.py): an examination sets its factors here
+from khatt import numbers as _N
+FREE = _N.OVERRIDE       # handle -> multiplier
+USED = _N.USED           # handles read since cleared
+_K = _N._K
+SKIP = _N.SKIP
 
 
 def free_all():
-    """Rewrite every builder of letters.py and geometry.py so that its decimal numbers read _K."""
-    from khatt import letters, geometry
-    count = {}
-    for mod in (geometry, letters):
-        mod._K = _K
-        tree = ast.parse(inspect.getsource(mod))
-        for node in tree.body:
-            if not isinstance(node, ast.FunctionDef) or node.name in SKIP:
-                continue
-            fn = getattr(mod, node.name, None)
-            if not callable(fn) or not hasattr(fn, '__code__') or fn.__code__.co_freevars:
-                continue
-            node.decorator_list = []
-            t = _Free(node.name)
-            node.body = [t.visit(b) for b in node.body]
-            if not t.i:
-                continue
-            m = ast.fix_missing_locations(ast.Module([node], []))
-            code = compile(m, inspect.getsourcefile(mod), 'exec')
-            new = [c for c in code.co_consts if hasattr(c, 'co_name') and c.co_name == node.name][0]
-            fn.__code__ = new
-            count[node.name] = t.i
-    return count
+    """Every builder of letters.py and geometry.py reads its decimal numbers through _K (numbers.install)."""
+    return dict(_N.install())
+
+
+def coord(f, x0, idx, rounds=((-0.5, -0.22, 0.22, 0.47), (-0.1, 0.1))):
+    """Coordinate search in log space over the entries `idx` of x (maximises f); a cheap stand-in for
+    Powell when a table over every typeface is wanted (KHATT_FAST=1)."""
+    x = np.array(x0, float); now = f(x)
+    for steps in rounds:
+        for i in idx:
+            best = (now, x[i])
+            for d in steps:
+                y = x.copy(); y[i] = np.clip(x[i] + d, -1.2, 1.2)
+                v = f(y)
+                if v > best[0] + 0.002:
+                    best = (v, y[i])
+            if best[1] != x[i]:
+                x[i], now = best[1], best[0]
+    return x
 
 
 if __name__ == '__main__':
+    import os
     from scipy.optimize import minimize
+    FAST = os.environ.get('KHATT_FAST') == '1'
     from khatt.bench import fonts
     from khatt.bench import bidonaq_fit as E
     from khatt.bench.letter_rules import measured, reads_of
@@ -96,14 +73,20 @@ if __name__ == '__main__':
             except Exception:
                 return 0.0
         start = score(np.zeros(len(names) + len(keys)), False)
-        row = {'start': round(start, 3), 'rules': len(names), 'numbers': len(keys)}
+        row = {'start': round(start, 3), 'rules': len(names), 'numbers': len(keys), 'keys': keys}
         x_rules = np.zeros(len(names))
-        if names:
+        if names and FAST:
+            x_rules = coord(lambda x: score(x, False), np.zeros(len(names) + len(keys)), range(len(names)))[:len(names)]
+        elif names:
             r = minimize(lambda x: -score(np.clip(np.r_[x, np.zeros(len(keys))], -1.2, 1.2), False), x_rules, method='Powell',
                          options={'maxfev': 60 * len(names) + 60, 'xtol': 0.03, 'ftol': 1e-4})
             x_rules = np.clip(r.x, -1.2, 1.2)
         row['named_rules'] = round(score(np.r_[x_rules, np.zeros(len(keys))], False), 3)
-        if keys:
+        if keys and FAST:
+            xb = coord(lambda x: score(x, True), np.r_[x_rules, np.zeros(len(keys))], range(len(names) + len(keys)))
+            row['with_numbers'] = round(max(row['named_rules'], score(xb, True)), 3)
+            row['numbers_fit'] = {k: round(math.exp(v), 3) for k, v in zip(keys, xb[len(names):]) if abs(v) > 0.01}
+        elif keys:
             x0 = np.r_[x_rules, np.zeros(len(keys))]
             r = minimize(lambda x: -score(np.clip(x, -1.2, 1.2), True), x0, method='Powell',
                          options={'maxfev': 25 * (len(names) + len(keys)) + 200, 'xtol': 0.03, 'ftol': 1e-4})

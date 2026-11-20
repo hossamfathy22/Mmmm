@@ -326,6 +326,31 @@ def line_by_match(image: bytes, text: str, lines: List[Line]) -> Tuple[Optional[
     return at, got
 
 
+def _tails_by_match(L: Line, text: str, owner: np.ndarray, k: float, feats: Dict[str, Dict]) -> None:
+    """How far the tails of ر ز و drop, where the stem reader did not find the letter (it reads the head
+    of بيدوناق's و as two stems, so its tail was never measured and the drawing kept the default drop,
+    which is بيدوناق's own answer): the lowest ink the word's matching (match.locate) gives the letter."""
+    X = L.x_height
+    D = max(L.descender, 0.45 * X)
+    drops = []
+    for i, c in enumerate(text):
+        if c not in "رزژو":
+            continue
+        rows = np.flatnonzero((owner == i + 1).any(axis=1))
+        if not len(rows):
+            continue
+        low = L.y_of_row(rows.max() - L.top)
+        if low > 0.5 * X:                         # the matching gave the letter nothing near the baseline
+            continue
+        drops.append(float(np.clip(-low / D, 0.0, 1.0)))
+    if drops:
+        v = float(np.median(drops))
+        note = "نزول ذيل الراء والزاي والواو تحت السطر ÷ النزول (من مطابقة الكلمة)"
+        feats["tail_drop"] = {"value": round(v, 3), "samples": len(drops), "note": note, "unit": ""}
+        feats["tail_depth"] = {"value": round(v * D * k, 3), "samples": len(drops),
+                               "note": "عمق ذيل الراء والزاي والواو تحت السطر (من مطابقة الكلمة)", "unit": "px"}
+
+
 PEN_STEMS = 3      # fewer stems than this do not measure a line (guard.assess): its pen does
 
 
@@ -395,6 +420,7 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
     typed = [(t or "").strip() for t in (texts or [])]
     given = place_texts(lines, typed, k)
     one = [t for t in typed if t]
+    got, at = None, None
     if len(one) == 1:
         # one word typed: the line the word, set in real typefaces, warps onto best (match.locate) is its
         # line; the redrawing above is the engine's, and fails on a line it draws badly (الإسكندرية's
@@ -415,8 +441,14 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
     # 4. parts
     lib = build_library(L, R, k)
     feats = measure_features(lines, readings, src, k)
+    if "tail_drop" not in feats and got is not None and at == src:
+        _tails_by_match(L, one[0], got["owner"], k, feats)
     style = style_from(L, lib, k, feats, R.text_given or (R.text_guess if R.text_guess and not any(c in "ٮ?" for c in R.text_guess) else ""))
     measure_nib(L, style, k)
+    # the shape numbers of the letters, from the typefaces nearest the logo's measures, not Sirang's
+    from .numbers import for_logo, prune
+    style.numbers = for_logo(style)
+    prune(style)                    # each builder was tried alone: all of them together, on every letter
     for key, v in (overrides or {}).items():
         if hasattr(style, key) and v is not None:
             setattr(style, key, type(getattr(style, key))(v))

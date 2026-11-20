@@ -58,6 +58,9 @@ class Style:
     # ---- the designer's hand (recipes.py): a named parameter set here replaces its rule, and a letter
     # form named here is drawn in the chosen variant
     params: Dict[str, float] = field(default_factory=dict)
+    # each logo's own factors on the shape numbers of the builders (numbers.py: where a curve's control
+    # point sits, how deep a bowl turns), from the typefaces nearest it; empty: Sirang's numbers
+    numbers: Dict[str, float] = field(default_factory=dict)
     variants: Dict[str, str] = field(default_factory=dict)
     # letters the logo draws its own way, cut out of it by the self-check: "letter.form" -> outlines
     taken: Dict[str, Dict] = field(default_factory=dict)
