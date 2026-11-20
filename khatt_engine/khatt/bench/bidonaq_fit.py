@@ -59,6 +59,45 @@ LEN = ['stem', 'hair', 'x_height', 'ascender', 'descender', 'white', 'dot', 'ove
 RATIO = ['join_in', 'join_out', 'ring_n', 'contrast_power', 'tail_reach', 'top_round', 'corner_r', 'angular']
 SK18 = "ا ب ح د ر س ص ط ع ف ق ك ل م ن ه و ى".split()
 
+MEASURED = ['stem', 'hair', 'x_height', 'ascender', 'descender']   # read from the vector: within BAND
+BAND = 0.15
+
+
+def fit_word(meas, score, reads):
+    """Coordinate search, two rounds, over the style's lengths and ratios and the rules the word reads.
+    What the vector measures exactly stays within BAND of its measure; a value that is 0 (a switch that is
+    off, a corner not rounded) stays 0: multiplying it does nothing, and a jump from 0 to a length turned
+    every letter square (angular is a switch, not a length)."""
+    st = Style(**meas.__dict__); st.params = {}
+    now = score(st)
+    for rnd in range(2):
+        for f in LEN + RATIO + reads:
+            cur = (st.params.get(f, rule_value(st, f)) if f in PARAMS else getattr(st, f))
+            if f not in PARAMS and not isinstance(cur, (int, float)): continue
+            if not cur: continue
+            best = (now, cur)
+            if f in MEASURED:
+                steps = (0.87, 0.93, 1.07, 1.15) if rnd == 0 else (0.96, 1.04)
+            else:
+                steps = (0.6, 0.75, 0.9, 1.1, 1.25, 1.5) if rnd == 0 else (0.85, 0.95, 1.05, 1.15)
+            for m in steps:
+                v = cur * m
+                if f in MEASURED:
+                    m0 = getattr(meas, f)
+                    v = min(max(v, (1 - BAND) * m0), (1 + BAND) * m0)
+                trial = Style(**{**st.__dict__, 'params': dict(st.params)})
+                if f in PARAMS: trial.params[f] = v
+                else: setattr(trial, f, v)
+                try: s = score(trial)
+                except Exception: continue
+                if s > best[0] + 0.002: best = (s, v)
+            if best[1] != cur:
+                if f in PARAMS: st.params[f] = best[1]
+                else: setattr(st, f, best[1])
+                now = best[0]
+    return st, now
+
+
 def run(name, word):
     face = fonts.load(str({f.stem: f for f in fonts.font_files()}[name]))
     sh = word_shapes(face, word)
@@ -80,26 +119,8 @@ def run(name, word):
     cache = {}
     typeset(word, meas, cache=cache)
     reads = sorted({dname for _, deps in cache.values() for dname in deps if dname in PARAMS})
-    st = Style(**meas.__dict__); st.params = {}
-    now = score(st); t0 = time.time()
-    for rnd in range(2):
-        for f in LEN + RATIO + reads:
-            cur = (st.params.get(f, rule_value(st, f)) if f in PARAMS else getattr(st, f))
-            if f not in PARAMS and not isinstance(cur, (int, float)): continue
-            best = (now, cur)
-            steps = (0.6, 0.75, 0.9, 1.1, 1.25, 1.5) if rnd == 0 else (0.85, 0.95, 1.05, 1.15)
-            for m in steps:
-                v = cur * m if cur else (0.1 * X * m)
-                trial = Style(**{**st.__dict__, 'params': dict(st.params)})
-                if f in PARAMS: trial.params[f] = v
-                else: setattr(trial, f, v)
-                try: s = score(trial)
-                except Exception: continue
-                if s > best[0] + 0.002: best = (s, v)
-            if best[1] != cur:
-                if f in PARAMS: st.params[f] = best[1]
-                else: setattr(st, f, best[1])
-                now = best[0]
+    t0 = time.time()
+    st, now = fit_word(meas, score, reads)
     fit_t = time.time() - t0
     # the letters the word does not have (by skeleton), isolated, against the typeface's own
     have = {SKELETON.get(c, c) for c in word} | set(word)

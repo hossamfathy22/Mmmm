@@ -938,6 +938,8 @@ param("heh.lower_w", lambda st: 0.62, "عرض العين السفلى للهاء
 param("heh.lower_side", lambda st: 0.63 * st.stem, "سمك جانب العين السفلى = 0.63 جذع", BY_EYE, "الهاء")
 param("heh.cut_top", lambda st: 0.3, "رأس قاطع الهاء الأولى على 0.3 من عرضها من اليمين", BY_EYE, "الهاء")
 param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى على 0.62 من عرضها من اليمين", BY_EYE, "الهاء")
+param("heh.width", lambda st: 2 * st.stem + st.white, "عرض رأس الهاء المنفصلة والأخيرة = جذعان + بياض", DERIVED, "الهاء")
+param("heh.height", lambda st: st.x_height, "ارتفاع رأس الهاء المنفصلة والأخيرة = ارتفاع الحروف", DERIVED, "الهاء")
 
 
 def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -966,21 +968,27 @@ def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
         shapes = [_ring(st, xl, 0, 0, X),
                   _named(g.ring(st, cx - wl / 2, cx + wl / 2, -st.descender, h, side=side), "عين سفلى")]
     else:
-        shapes = [_ring(st, xl, 0, 0, X)]
+        w = val(st, "heh.width")
+        xl = -w
+        shapes = [_ring(st, xl, 0, 0, val(st, "heh.height"))]
     shapes += marks(st, mark, xl / 2)
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0,
                  exit_x=(xl + U) if _x(form) else None, exit_edge=xl if _x(form) else None)
 
 
+param("waw.width", lambda st: 2 * st.stem + st.white, "عرض رأس الواو = جذعان + بياض", DERIVED, "الواو")
+param("waw.height", lambda st: st.x_height, "ارتفاع رأس الواو = ارتفاع الحروف", DERIVED, "الواو")
+
+
 def waw(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X = st.stem, st.stem / 2, st.x_height
-    xl, w = head_box(st)
+    xl, top = -val(st, "waw.width"), val(st, "waw.height")
     if st.tail_drop < 0.3:
         # the tail rests on the baseline: the head rises above it, or it would read as ه with a foot
         hb = 0.4 * X
-        shapes = [_ring(st, xl, 0, hb, X), tail(st, -u, hb + st.hair)]
+        shapes = [_ring(st, xl, 0, hb, top), tail(st, -u, hb + st.hair)]
     else:
-        shapes = [_ring(st, xl, 0, 0, X), tail(st, -u, X / 2)]
+        shapes = [_ring(st, xl, 0, 0, top), tail(st, -u, top / 2)]
     shapes += marks(st, mark, xl / 2)
     return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, tail=-u - 3.05 * U - st.hair)
 
