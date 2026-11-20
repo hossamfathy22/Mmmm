@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>analyze test</title>
+<style>body{margin:12px;font:13px sans-serif;background:#fff} pre{direction:ltr;white-space:pre-wrap;font:12px monospace} canvas{border:1px solid #ddd;margin:4px;vertical-align:top}</style></head>
+<body><pre id="log"></pre><div id="out"></div>
+<script src="../vendor/opentype.min.js"></script>
+<script src="../src/core.js"></script><script src="../src/slots.js"></script><script src="../src/recipes.js"></script>
+<script src="../src/trace.js"></script><script src="../src/font.js"></script><script src="../src/analyze.js"></script>
+<script>
+(async () => {
+  const log = (t) => document.getElementById('log').textContent += t + '\n';
+  const out = document.getElementById('out');
+  try {
+    const R = window.Rasm; const q = new URLSearchParams(location.search);
+    let canvas;
+    if (q.get('img')) { const blob = await (await fetch(q.get('img'))).blob(); canvas = await R.analyze.loadFile(new File([blob], q.get('img'), { type: blob.type })); }
+    else canvas = R.analyze.sampleLogo(q.get('word') || 'نور فلك');
+    const t0 = performance.now();
+    const an = R.analyze.run(canvas);
+    log('analysis ms ' + Math.round(performance.now() - t0) + ' mode ' + an.mode + ' size ' + an.w + 'x' + an.h);
+    log('Wpx ' + an.Wpx.toFixed(1) + ' Apx ' + an.Apx.toFixed(0) + ' Xpx ' + an.Xpx.toFixed(0) + ' Dpx ' + an.Dpx.toFixed(0) + ' asc? ' + an.hasAscender + ' baseline ' + an.baseline.toFixed(0));
+    log('roundness ' + an.roundness.toFixed(2) + ' curvedFrac ' + an.curvedFrac.toFixed(2) + ' cap ' + an.cap + ' flatEnds ' + an.flatEnds + ' roundEnds ' + an.roundEnds + ' sharp ' + an.sharp + ' contrast ' + an.contrast.toFixed(2) + ' nib ' + an.nibAngle);
+    log('dots ' + an.dots.length + ' ' + an.dots.map(d => d.shape + ':' + d.fill.toFixed(2)).join(',') + ' holes ' + (an.goodHoles || []).length + ' runs ' + an.runs.length);
+    log('DNA ' + JSON.stringify(an.dna));
+    const ov = document.createElement('canvas'); const s = Math.min(1, 560 / an.w);
+    ov.width = an.w * s; ov.height = an.h * s; const x = ov.getContext('2d');
+    x.drawImage(canvas, 0, 0, ov.width, ov.height); R.analyze.overlay(an, x, s); out.appendChild(ov);
+    const pieces = R.analyze.autoPieces(an);
+    log('pieces ' + Object.keys(pieces).map(k => k + ' ' + pieces[k].wu.toFixed(0) + 'x' + pieces[k].hu.toFixed(0) + ' y0 ' + pieces[k].y0.toFixed(0)).join(' | '));
+    for (const k in pieces) { const c = pieces[k].img; const v = document.createElement('canvas'); v.width = c.width; v.height = c.height; v.getContext('2d').drawImage(c, 0, 0); v.title = k; out.appendChild(v); }
+    // apply and render a word
+    const dna = R.clampDNA(Object.assign(R.defaultDNA(), an.dna));
+    if (!q.get('nopieces')) for (const k in pieces) R.slots.overrides[k] = pieces[k];
+    const m = R.metrics(dna);
+    const res = await R.font.build({ dna, m }, { family: 'T' });
+    const svg = R.textToSVG(res, q.get('test') || 'نور فلك محمد سلام', { size: 120 });
+    const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    img.style.cssText = 'display:block;max-width:1100px;border:1px solid #eee;margin-top:6px';
+    out.appendChild(img);
+    img.onload = () => { document.title = 'done'; };
+  } catch (e) { log('ERROR ' + e.stack); document.title = 'ERR'; }
+})();
+</script></body></html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>font test</title>
+<style>
+body{margin:16px;background:#fff;color:#111;font:14px sans-serif}
+.t{font-family:RasmTest;font-size:72px;line-height:1.6;direction:rtl}
+.s{font-family:RasmTest;font-size:28px;line-height:1.8;direction:rtl}
+pre{direction:ltr;font:12px monospace;white-space:pre-wrap}
+</style></head>
+<body>
+<pre id="log">building…</pre>
+<div class="t">بسم الله الرحمن الرحيم</div>
+<div class="t">محمد سلام لا إله إلا</div>
+<div class="s">أبجد هوز حطي كلمن سعفص قرشت ثخذ ضظغ — ء آ أ إ ؤ ئ ة ى ي ـ ٠١٢٣٤٥٦٧٨٩ ، ؛ ؟ !</div>
+<div class="s">ﺑﺴﻢ (presentation forms) — الخطوط العربية تُصمَّم من أشكال مفتاحية</div>
+<canvas id="cv" width="1200" height="380" style="border:1px solid #eee;margin-top:8px"></canvas>
+<script src="../vendor/opentype.min.js"></script>
+<script src="../src/core.js"></script>
+<script src="../src/slots.js"></script>
+<script src="../src/recipes.js"></script>
+<script src="../src/trace.js"></script>
+<script src="../src/font.js"></script>
+<script>
+(async () => {
+  const log = (t) => document.getElementById('log').textContent += '\n' + t;
+  try {
+    const R = window.Rasm;
+    const q = new URLSearchParams(location.search);
+    const dna = R.clampDNA(Object.assign(R.defaultDNA(), JSON.parse(q.get('dna') || '{}')));
+    const engine = { dna, m: R.metrics(dna) };
+    const t0 = performance.now();
+    const res = await R.font.build(engine, { family: 'RasmTest' });
+    const t1 = performance.now();
+    const buf = res.font.toArrayBuffer();
+    log('glyphs: ' + res.font.glyphs.length + '  bytes: ' + buf.byteLength + '  build ms: ' + Math.round(t1 - t0));
+    let nseg = 0; for (const k in res.outlines) for (const c of res.outlines[k]) nseg += c.segs.length;
+    log('total segments: ' + nseg);
+    // round-trip parse
+    const parsed = opentype.parse(buf);
+    log('parsed ok, gsub features: ' + (parsed.tables.gsub ? parsed.tables.gsub.features.map(f => f.tag).join(',') : 'none'));
+    const ff = new FontFace('RasmTest', buf);
+    await ff.load(); document.fonts.add(ff);
+    log('FontFace loaded: ' + ff.status);
+    // draw traced outlines of one word with opentype path vs engine render
+    const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+    const svg = R.textToSVG(res, 'رسم الخط', { size: 240, kashida: 1 });
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 10, 10); document.title = 'done'; };
+    img.onerror = () => { log('svg image error'); document.title = 'done'; };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    window.__res = res;
+  } catch (e) { log('ERROR ' + e.stack); document.title = 'ERR'; }
+})();
+</script>
+</body></html>

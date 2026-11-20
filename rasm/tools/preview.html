@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>Rasm preview</title>
+<style>body{margin:0;background:#fff;font:12px sans-serif} canvas{display:block}</style></head>
+<body>
+<canvas id="c"></canvas>
+<script src="../src/core.js"></script>
+<script src="../src/slots.js"></script>
+<script src="../src/recipes.js"></script>
+<script>
+const R = window.Rasm;
+const q = new URLSearchParams(location.search);
+const dna = R.clampDNA(Object.assign(R.defaultDNA(), JSON.parse(q.get('dna') || '{}')));
+const m = R.metrics(dna);
+const mode = q.get('mode') || 'rasm';
+const s = +(q.get('s') || 0.13);
+const colors = { stem:'#d9572b', tooth:'#2b7bd9', basin:'#1a9e5c', cup:'#8e44ad', head:'#e0a100', loop:'#c0392b', arc:'#16a085', nose:'#e67e22', ain:'#2c3e50', tail:'#b0306a', kaf:'#7f8c8d', heh:'#3d5afe', dot:'#111', hamza:'#555', madda:'#555', conn:'#9a9a9a' };
+const colorOf = (p) => q.get('mono') ? '#000' : (colors[p.slot] || '#000');
+function draw(ctx, g, x, base) {
+  const view = { s, map: (u, y) => [x + (g.adv - u) * s, base - y * s] };
+  ctx.save();
+  const xl = g.clip && g.clip.left != null ? x + (g.adv - g.clip.left) * s : -1e5;
+  const xr = g.clip && g.clip.right != null ? x + (g.adv - g.clip.right) * s : 1e5;
+  ctx.beginPath(); ctx.rect(xl, -1e5, xr - xl, 2e5); ctx.clip();
+  R.pen.drawParts(ctx, g.parts, dna, view, colorOf);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,0,80,.25)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x, base - 0.5); ctx.lineTo(x + g.adv * s, base - 0.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, base - 6); ctx.lineTo(x, base + 6); ctx.moveTo(x + g.adv * s, base - 6); ctx.lineTo(x + g.adv * s, base + 6); ctx.stroke();
+}
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+const rowH = Math.round(1500 * s), W = 1300;
+let rows = [];
+if (mode === 'rasm') {
+  for (const [key, ch] of R.rasm18) {
+    const l = R.letters.find(x => x.rasm === key);
+    const forms = R.formsOf(l.join);
+    rows.push({ label: ch + ' ' + key, glyphs: forms.slice().reverse().map(f => R.buildLetter(m, key, f, null)) });
+  }
+} else if (mode === 'letters') {
+  for (const l of R.letters) rows.push({ label: String.fromCodePoint(l.uni) + ' ' + l.name, glyphs: R.formsOf(l.join).slice().reverse().map(f => R.buildLetter(m, l.rasm, f, l.marks)) });
+  for (const lg of R.ligatures) rows.push({ label: lg.name, glyphs: ['fina', 'isol'].map(f => R.buildLigature(m, lg, f)) });
+  rows.push({ label: 'digits', glyphs: R.extras.filter(e => e.kind === 'digit').reverse().map(e => R.buildExtra(m, e)) });
+  rows.push({ label: 'punct', glyphs: R.extras.filter(e => e.kind === 'punct').map(e => R.buildExtra(m, e)) });
+} else if (mode === 'words') {
+  // naive joined words using forms directly
+  const words = (q.get('w') || 'بسم|محمد|سلام|عين|فوق|كتب|ليل|نهر|حجر|صبر|طعم|هلال|يد|لا').split('|');
+  const L = (ch) => R.letterByUni[ch.codePointAt(0)];
+  for (const w of words) {
+    const chars = [...w];
+    const gl = [];
+    for (let i = 0; i < chars.length; i++) {
+      const l = L(chars[i]); if (!l) continue;
+      const prev = i > 0 ? L(chars[i-1]) : null, next = i < chars.length - 1 ? L(chars[i+1]) : null;
+      const jp = prev && prev.join === 'D' && l.join !== 'U';
+      const jn = next && l.join === 'D' && next.join !== 'U';
+      const f = jp && jn ? 'medi' : jp ? 'fina' : jn ? 'init' : 'isol';
+      if (l.name === 'lam' && next && next.name === 'alef') { gl.push(R.buildLigature(m, R.ligatures[0], jp ? 'fina' : 'isol')); i++; continue; }
+      gl.push(R.buildLetter(m, l.rasm, f, l.marks));
+    }
+    rows.push({ label: w, glyphs: gl.reverse(), joined: true });
+  }
+}
+c.width = W; c.height = rows.length * rowH + 20;
+ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+rows.forEach((r, i) => {
+  const base = i * rowH + Math.round(950 * s) + 10;
+  ctx.fillStyle = '#999'; ctx.font = '12px sans-serif'; ctx.fillText(r.label, W - 110, base);
+  let x = 20;
+  for (const g of r.glyphs) { draw(ctx, g, x, base); x += g.adv * s + (r.joined ? 0 : 30); }
+  ctx.strokeStyle = '#eee'; ctx.beginPath(); ctx.moveTo(0, (i + 1) * rowH + 10); ctx.lineTo(W, (i + 1) * rowH + 10); ctx.stroke();
+});
+document.title = 'done';
+</script>
+</body></html>
