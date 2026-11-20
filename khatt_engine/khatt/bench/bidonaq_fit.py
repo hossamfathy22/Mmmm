@@ -28,6 +28,8 @@ def ras_engine(glyph_shapes, dx, sc):
     xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
     x0, y1 = min(xs), max(ys)
     W = int((max(xs) - x0) * sc) + 6; H = int((y1 - min(ys)) * sc) + 6
+    if W * H > 4_000_000:            # a trial that flung a point far away (a fit tries wild values): no letter
+        return np.zeros((1, 1), bool)
     out = np.zeros((H, W), bool)
     for sh in glyph_shapes:
         acc = np.zeros((H, W), bool)
