@@ -1578,3 +1578,60 @@ def test_two_single_teeth_cut_from_the_logo_do_not_share_one_stroke():
                         "logo", "من الشعار")], left=-3 * U)
     assert _uprights(tooth, st) == 1
     assert _uprights(cup, st) == 2
+
+
+def test_an_svg_is_read_as_its_drawn_objects_with_every_transform():
+    """vector.read_svg: one shape per drawn element, curves kept, y up, the transforms of the element and
+    of its groups applied (matrix, translate, scale, rotate), hidden and defined elements left out."""
+    from khatt.vector import read_svg, to_svg
+    svg = b'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+      <defs><rect id="nope" width="5" height="5"/></defs>
+      <g transform="translate(100,50)">
+        <rect id="stem" x="0" y="0" width="23" height="66"/>
+        <g transform="scale(2)"><circle id="dot" cx="40" cy="10" r="5"/></g>
+        <path id="cup" d="M0,66 C0,80 40,80 40,66 Z" transform="rotate(90, 20, 66)"/>
+      </g>
+      <rect style="display:none" width="9" height="9"/>
+    </svg>'''
+    sh = read_svg(svg)
+    assert [s.source for s in sh] == ["stem", "dot", "cup"]
+    x0, y0, x1, y1 = sh[0].bounds()
+    assert (round(x0), round(x1), round(y0), round(y1)) == (100, 123, -116, -50)
+    cx = 0.5 * (sh[1].bounds()[0] + sh[1].bounds()[2]); cy = 0.5 * (sh[1].bounds()[1] + sh[1].bounds()[3])
+    assert abs(cx - 180) < 1e-6 and abs(cy + 70) < 1e-6
+    assert any(seg[0] == "C" for c in sh[2].contours for seg in c)        # the curve is a curve
+    again = read_svg(to_svg(sh).encode())
+    assert all(abs(a - b) < 0.05 for s, t in zip(sh, again) for a, b in zip(s.bounds(), t.bounds()))
+
+
+def test_the_style_of_a_vector_logo_is_read_from_its_geometry():
+    """vector.dna on a word set in a typeface (a vector drawing whose measures are known): the baseline,
+    the x-height from the teeth the typed word names, and the stem from straight edges facing across ink."""
+    from khatt.bench import fonts
+    files = {f.stem: f for f in fonts.font_files()}
+    if "cairo-400" not in files:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    from khatt.vector import word_shapes, dna
+    face = fonts.load(str(files["cairo-400"]))
+    d = dna(word_shapes(face, "مستقبل"), "مستقبل")
+    tooth = max(x.bounds()[3] for x in word_shapes(face, "ـبـ") if x.index == 1)
+    assert abs(d["baseline"]) < 0.05 * tooth
+    assert abs(d["x_height"] - tooth) < 0.05 * tooth
+    assert abs(d["stem"] - 77) < 0.05 * tooth
+    assert d["slant"] == 0.0
+
+
+def test_a_vector_logo_is_drawn_again_from_its_strokes_with_their_own_widths():
+    """vparts.rebuild: each letter taken apart into strokes (a centre line and the width of the designer's
+    shape at every point, no pen assumed), and the word drawn again from them covers itself."""
+    from khatt.bench import fonts
+    files = {f.stem: f for f in fonts.font_files()}
+    if "amiri-400" not in files:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    from khatt.vector import word_shapes
+    from khatt.vparts import rebuild
+    w = "مستقبل"
+    r = rebuild(word_shapes(fonts.load(str(files["amiri-400"])), w), w)
+    assert set(r["letters"]) == set(range(len(w)))
+    assert r["whole"] > 0.85
+    assert all(len(st) >= 2 and all(p[2] > 0 for p in st) for sts in r["strokes"].values() for st in sts)
