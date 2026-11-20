@@ -710,6 +710,9 @@ def fit_stretch(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
 
 FIT_GRID = (0.5, 0.65, 0.8, 0.9, 1.1, 1.25, 1.5, 1.75, 2.0)
 FIT_MIN = 0.003           # a measured rule must earn this much of the score: smaller gains are noise
+# The constructions' other numbers (recipes.N) are measured on the word too, as factors on Bidonaq's.
+NUM_GRID = (0.6, 0.8, 0.9, 1.1, 1.25, 1.6)
+NUM_RANGE = (0.3, 3.0)
 
 
 def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial] = None, own: bool = True
@@ -772,6 +775,27 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
                     best = (sc, v)
             if best is not None and best[0] > now + FIT_MIN:
                 now, fitted, grew = best[0], {**fitted, name: round(best[1], 3)}, True
+        if not grew:
+            break
+    # then every other number of their constructions (recipes.N: where a curve's control point sits, how
+    # far a tail drops, how a bowl turns), on the same word: Bidonaq's numbers were Sirang's hand; this
+    # logo's hand replaces them. A number of a part several letters share (the cup of ن ل ق س ص ي, the
+    # tail of ر و, the bowl of ح ع) is measured on those the logo has and serves those it lacks.
+    numbers = [d for d in reads if d.startswith("n:")]
+    for _ in range(2 if own else 0):
+        grew = False
+        for name in numbers:
+            cur = fitted.get(name, 1.0)
+            best = None
+            for m in NUM_GRID:
+                v = round(min(max(cur * m, NUM_RANGE[0]), NUM_RANGE[1]), 3)
+                if abs(v - cur) < 1e-9:
+                    continue
+                sc = t.score(fitted={**fitted, name: v}, chosen=chosen)
+                if best is None or sc > best[0]:
+                    best = (sc, v)
+            if best is not None and best[0] > now + FIT_MIN:
+                now, fitted, grew = best[0], {**fitted, name: best[1]}, True
         if not grew:
             break
     # then, apart, the general manner on all the letters at once (with their constructions, not their
@@ -1261,21 +1285,37 @@ def _measure_rules(L: Line, text: str, st: Style, k: float, first: Dict[str, Any
     from .recipes import SKELETON
     from .typeset import shape_forms
     on = " ".join(sorted({f"{SKELETON.get(c, c)}.{f}" for c, f in shape_forms(text) if c in LETTERS and f in "iIMF"}))
-    trial = Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on})
-    r = self_check(L, text, trial, k)
-    if not r or r["overall"] < first["overall"] + 0.01:
+    # The numbers of the constructions are measured on a quick trial (half the resolution, upright); the
+    # self-check judges them on the logo itself. Where they do not hold there, the named rules alone may:
+    # Yashm's word fitted with its numbers matched worse, and lost the four rules that had served it.
+    options = [fitted]
+    if any(n.startswith("n:") for n in fitted):
+        options.append({n: v for n, v in fitted.items() if not n.startswith("n:")})
+    best = None
+    for f in options:
+        if not f and not chosen and not traits:
+            continue
+        trial = Style(**{**st.__dict__, "fitted": f, "chosen": chosen, "traits": traits, "measured_on": on})
+        r = self_check(L, text, trial, k)
+        if r and r["overall"] >= first["overall"] + 0.01 and (best is None or r["overall"] > best[1]["overall"]):
+            best = (f, r, trial)
+    if best is None:
         return first
+    fitted, r, trial = best
     st.fitted, st.chosen, st.traits, st.measured_on = fitted, chosen, traits, on
     r["overall_rules"] = first["overall"]           # before the rules were measured on the logo
     r["fitted"], r["chosen"], r["traits"] = dict(fitted), dict(chosen), dict(traits)
-    from .recipes import general_rule
-    changed = sorted(fitted, key=lambda n: -abs(fitted[n] / max(1e-9, general_rule(trial, n)) - 1))[:6]
+    from .recipes import PARAMS, general_rule
+    nums = [n for n in fitted if n.startswith("n:")]
+    named = {n: v for n, v in fitted.items() if n in PARAMS}
+    changed = sorted(named, key=lambda n: -abs(named[n] / max(1e-9, general_rule(trial, n)) - 1))[:6]
     if traits:
         r["notes"].insert(0, "أسلوب المصمم العام كما قيس من حروف الشعار كلها، ويُطبَّق على كل حرف ولو لم يكن في الشعار: "
                           + "، ".join(f"{q} × {f:.2f}" for q, f in traits.items()) + ".")
-    r["notes"].insert(0, f"قيس من حروف الشعار {len(fitted)} معاملًا" + (f" و{len(chosen)} صيغة" if chosen else "")
+    r["notes"].insert(0, f"قيس من حروف الشعار {len(named)} معاملًا" + (f" و{len(nums)} رقمًا من أرقام البناء" if nums else "")
+                      + (f" و{len(chosen)} صيغة" if chosen else "")
                       + f" بدل قواعد المحرك العامة، فارتفع التطابق من {first['overall'] * 100:.0f}% إلى {r['overall'] * 100:.0f}%. أبرزها: "
-                      + "، ".join(f"{n} × {fitted[n] / max(1e-9, general_rule(trial, n)):.2f}" for n in changed)
+                      + "، ".join(f"{n} × {named[n] / max(1e-9, general_rule(trial, n)):.2f}" for n in changed)
                       + (" — " + "، ".join(f"«{q}» {v}" for q, v in chosen.items()) if chosen else "") + ".")
     return r
 

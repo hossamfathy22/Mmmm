@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 from typing import List, Optional, Sequence, Tuple
 
+from .recipes import N
 from .style import Style
 
 Pt = Tuple[float, float]
@@ -81,11 +82,11 @@ def bowl(st: Style, xr: float, xl: float) -> Shape:
     hin, hout, ov = st.join_in * X, st.join_out * X, st.overshoot
     xm = (xr + xl) / 2
     pts: Poly = []
-    for seg in (cubic((xr + u, hout), (xr + u, 0.3 * hout - ov), (xr + 0.087 * U, -ov), (xm, -ov)),
-                cubic((xm, -ov), (xl - 0.087 * U, -ov), (xl - u, 0.3 * hout - ov), (xl - u, hout)),
+    for seg in (cubic((xr + u, hout), (xr + u, N("bowl.0", 0.3) * hout - ov), (xr + N("bowl.1", 0.087) * U, -ov), (xm, -ov)),
+                cubic((xm, -ov), (xl - N("bowl.2", 0.087) * U, -ov), (xl - u, N("bowl.3", 0.3) * hout - ov), (xl - u, hout)),
                 line((xl - u, hout), (xl + u, hin), 2),
-                cubic((xl + u, hin), (xl + u, 0.43 * hin), (xl + u + 0.174 * U, h), (xm, h)),
-                cubic((xm, h), (xr - u - 0.174 * U, h), (xr - u, 0.43 * hin), (xr - u, hin)),
+                cubic((xl + u, hin), (xl + u, N("bowl.4", 0.43) * hin), (xl + u + N("bowl.5", 0.174) * U, h), (xm, h)),
+                cubic((xm, h), (xr - u - N("bowl.6", 0.174) * U, h), (xr - u, N("bowl.7", 0.43) * hin), (xr - u, hin)),
                 line((xr - u, hin), (xr + u, hout), 2)):
         pts += [(p[0], p[1]) for p in seg]
     return [pts]
@@ -98,15 +99,15 @@ def _engine_stem(st: Style, xc: float, top: float, bottom: float, entry: bool, e
     u = st.stem / 2
     on_base = abs(bottom) < 1e-6
     if on_base and (entry or exit) and top > bowl_top(st) + 0.2 * st.stem:
-        cut = min(st.join_in, st.join_out) * st.x_height - 0.1 * st.stem   # the stem reaches into the bowl
+        cut = min(st.join_in, st.join_out) * st.x_height - N("_engine_stem.0", 0.1) * st.stem   # the stem reaches into the bowl
         polys: Shape = [top_edge(st, xc, top) + [(xc + u, cut), (xc - u, cut)]]
         P = st.pitch
         if exit:                      # joined on the left: right half of bowl(xc, xc - P)
             b = bowl(st, xc, xc - P)[0]
-            polys.append(clip_x(b, xc - P / 2 - 0.04 * P, True))
+            polys.append(clip_x(b, xc - P / 2 - N("_engine_stem.1", 0.04) * P, True))
         if entry:                     # joined on the right: left half of bowl(xc + P, xc)
             b = bowl(st, xc + P, xc)[0]
-            polys.append(clip_x(b, xc + P / 2 + 0.04 * P, False))
+            polys.append(clip_x(b, xc + P / 2 + N("_engine_stem.2", 0.04) * P, False))
         from .library import Compound, Tagged
         names = ["جذع"] + ["كأس الوصل"] * (len(polys) - 1)
         return Compound([Tagged([p], "engine", n) for p, n in zip(polys, names) if len(p) >= 3])   # unioned
@@ -192,37 +193,37 @@ def teardrop(st: Style, x0: float, xr: float) -> Shape:
     width of a leaning stroke on the slope."""
     U, h, X = st.stem, st.hair, st.x_height
     L = xr - x0
-    ax = xr - 1.35 * U                                   # top of the round end
-    S = max(ax - x0, 0.3 * L)                            # horizontal run of the slope
-    th = math.atan2(0.8 * (X - 2 * h), max(S - 0.22 * U, 1e-6))
+    ax = xr - N("teardrop.0", 1.35) * U                                   # top of the round end
+    S = max(ax - x0, N("teardrop.1", 0.3) * L)                            # horizontal run of the slope
+    th = math.atan2(N("teardrop.2", 0.8) * (X - 2 * h), max(S - N("teardrop.3", 0.22) * U, 1e-6))
     w = st.width_at(math.sin(th))
-    taper = 1.0 - 0.39 * (1.0 - h / U) / (1.0 - 4.5 / 23.0) if U > h else 1.0   # a contrast pen thins at the foot
-    yf = min(h + taper * w / math.cos(th), 0.6 * X)       # where the slope meets the stem
-    outer = ([(x0 - U / 2, 0.0)] + _pts(cubic((xr - 1.3 * U, 0), (xr - 0.565 * U, 0), (xr, 0.2 * X), (xr, 0.5 * X)))
-             + _pts(cubic((xr, 0.5 * X), (xr, 0.8 * X), (xr - 0.565 * U, X), (ax, X)))[1:]
-             + _pts(cubic((ax, X), (ax - 0.34 * S, X), (x0 + 0.45 * S, yf + 0.47 * S * math.tan(th)), (x0, yf)))[1:]
+    taper = N("teardrop.4", 1.0) - N("teardrop.5", 0.39) * (N("teardrop.6", 1.0) - h / U) / (N("teardrop.7", 1.0) - N("teardrop.8", 4.5) / N("teardrop.9", 23.0)) if U > h else N("teardrop.10", 1.0)   # a contrast pen thins at the foot
+    yf = min(h + taper * w / math.cos(th), N("teardrop.11", 0.6) * X)       # where the slope meets the stem
+    outer = ([(x0 - U / 2, 0.0)] + _pts(cubic((xr - N("teardrop.12", 1.3) * U, 0), (xr - N("teardrop.13", 0.565) * U, 0), (xr, N("teardrop.14", 0.2) * X), (xr, N("teardrop.15", 0.5) * X)))
+             + _pts(cubic((xr, N("teardrop.16", 0.5) * X), (xr, N("teardrop.17", 0.8) * X), (xr - N("teardrop.18", 0.565) * U, X), (ax, X)))[1:]
+             + _pts(cubic((ax, X), (ax - N("teardrop.19", 0.34) * S, X), (x0 + N("teardrop.20", 0.45) * S, yf + N("teardrop.21", 0.47) * S * math.tan(th)), (x0, yf)))[1:]
              + [(x0 - U / 2, yf)])
-    tip = (x0 + 0.09 * U, h)
+    tip = (x0 + N("teardrop.22", 0.09) * U, h)
     full = (X - 2 * h) / math.sin(th)                    # the counter's slope, if it ran straight to the top
     d = (math.cos(th), math.sin(th))
-    e = (tip[0] + d[0] * 0.47 * full, tip[1] + d[1] * 0.47 * full)
-    c = (tip[0] + d[0] * 0.64 * full, tip[1] + d[1] * 0.64 * full)
-    top_in = (ax - 0.13 * U, X - h)
+    e = (tip[0] + d[0] * N("teardrop.23", 0.47) * full, tip[1] + d[1] * N("teardrop.24", 0.47) * full)
+    c = (tip[0] + d[0] * N("teardrop.25", 0.64) * full, tip[1] + d[1] * N("teardrop.26", 0.64) * full)
+    top_in = (ax - N("teardrop.27", 0.13) * U, X - h)
     if xr - U - 0.3 * U <= tip[0] or X - 2 * h < 0.15 * U:
         return [outer]                                   # too heavy for a counter
-    inner = ([tip] + _pts(cubic((xr - 1.48 * U, h), (xr - 1.13 * U, h), (xr - U, 0.21 * X), (xr - U, 0.455 * X)))
-             + _pts(cubic((xr - U, 0.455 * X), (xr - U, 0.7 * X), (xr - 1.13 * U, X - h), top_in))[1:]
-             + _pts(cubic(top_in, (top_in[0] - 0.19 * S, X - h), c, e))[1:])
+    inner = ([tip] + _pts(cubic((xr - N("teardrop.28", 1.48) * U, h), (xr - N("teardrop.29", 1.13) * U, h), (xr - U, N("teardrop.30", 0.21) * X), (xr - U, N("teardrop.31", 0.455) * X)))
+             + _pts(cubic((xr - U, N("teardrop.32", 0.455) * X), (xr - U, N("teardrop.33", 0.7) * X), (xr - N("teardrop.34", 1.13) * U, X - h), top_in))[1:]
+             + _pts(cubic(top_in, (top_in[0] - N("teardrop.35", 0.19) * S, X - h), c, e))[1:])
     from shapely.geometry import Polygon, box
     o, i = Polygon(outer).buffer(0), Polygon(inner).buffer(0)
     # the white between the slope and the stem ends in a sharp wedge at the foot: with the stem's
     # right half in place its tip is filled, as ink fills it (the part under the stem is hidden by it)
-    r = 0.45 * min(h, 0.3 * U)
-    blunt = o.union(box(x0 - U / 2, 0.0, x0, 0.75 * X)).buffer(r, 8).buffer(-r, 8)
+    r = N("teardrop.36", 0.45) * min(h, N("teardrop.37", 0.3) * U)
+    blunt = o.union(box(x0 - U / 2, 0.0, x0, N("teardrop.38", 0.75) * X)).buffer(r, 8).buffer(-r, 8)
     if blunt.geom_type == "Polygon" and not blunt.is_empty:
         o = blunt
         outer = list(o.exterior.coords)[:-1]
-    i = i.intersection(o.buffer(-0.5 * h))               # the counter never breaks the outer edge
+    i = i.intersection(o.buffer(-N("teardrop.39", 0.5) * h))               # the counter never breaks the outer edge
     if i.is_empty or i.area < 0.2 * U * U:
         return [outer]
     big = max(getattr(i, "geoms", [i]), key=lambda q: q.area)
@@ -230,7 +231,7 @@ def teardrop(st: Style, x0: float, xr: float) -> Shape:
     # sliver of white, which a pen does not leave: the tip is rounded to the width a seam is judged by
     # (a pen with thin hairlines keeps its point: there the slope is steep and the point is short)
     if h >= 0.5 * U:
-        r2 = 0.38 * min(h, 0.3 * U)
+        r2 = N("teardrop.40", 0.38) * min(h, N("teardrop.41", 0.3) * U)
         opened = big.buffer(-r2, 8).buffer(r2, 8)
         if not opened.is_empty:
             big = max(getattr(opened, "geoms", [opened]), key=lambda q: q.area)
@@ -244,9 +245,9 @@ def nose_top(st: Style, d0: float, xa: float) -> Poly:
     whose right end is `d0`. It stops where the pen is upright (0.636 of the x-height): the lower arm
     takes over from that cut, d0 - stem .. d0."""
     U, h, X = st.stem, st.hair, st.x_height
-    yn = 0.636 * X
-    return ([(xa, X)] + _pts(cubic((d0 - 1.13 * U, X), (d0 - 0.435 * U, X), (d0, 0.864 * X), (d0, yn)))
-            + _pts(cubic((d0 - U, yn), (d0 - U, 0.803 * X), (d0 - 1.3 * U, X - h), (d0 - 1.65 * U, X - h)))
+    yn = N("nose_top.0", 0.636) * X
+    return ([(xa, X)] + _pts(cubic((d0 - N("nose_top.1", 1.13) * U, X), (d0 - N("nose_top.2", 0.435) * U, X), (d0, N("nose_top.3", 0.864) * X), (d0, yn)))
+            + _pts(cubic((d0 - U, yn), (d0 - U, N("nose_top.4", 0.803) * X), (d0 - N("nose_top.5", 1.3) * U, X - h), (d0 - N("nose_top.6", 1.65) * U, X - h)))
             + [(xa, X - h)])
 
 
@@ -254,12 +255,12 @@ def nose_arm(st: Style, d0: float, xj: float, ex: float) -> Poly:
     """The lower arm of حـ ـحـ: from the nose it sweeps back down to the baseline at `xj`, thinning as it
     leans, and leaves as a hairline to `ex`."""
     U, h, X = st.stem, st.hair, st.x_height
-    yn = 0.636 * X
+    yn = N("nose_arm.0", 0.636) * X
     run = d0 - xj
-    return ([(d0, yn + 0.01)] + _pts(cubic((d0, yn), (d0, 0.303 * X), (d0 - 0.387 * run, 0), (xj, 0)))
+    return ([(d0, yn + N("nose_arm.1", 0.01))] + _pts(cubic((d0, yn), (d0, N("nose_arm.2", 0.303) * X), (d0 - N("nose_arm.3", 0.387) * run, 0), (xj, 0)))
             + [(ex, 0), (ex, h)]
-            + _pts(cubic((xj + 0.065 * run, h), (d0 - 0.6 * run, h), (d0 - U, 0.333 * X), (d0 - U, yn)))
-            + [(d0 - U, yn + 0.01)])
+            + _pts(cubic((xj + N("nose_arm.4", 0.065) * run, h), (d0 - N("nose_arm.5", 0.6) * run, h), (d0 - U, N("nose_arm.6", 0.333) * X), (d0 - U, yn)))
+            + [(d0 - U, yn + N("nose_arm.7", 0.01))])
 
 
 def nose_turn(st: Style, d0: float, m: Pt, beta: float) -> Poly:
@@ -269,7 +270,7 @@ def nose_turn(st: Style, d0: float, m: Pt, beta: float) -> Poly:
     inner edge drops straight and then turns, so the white between bar and arm ends round, not in a
     sharp wedge."""
     U, X = st.stem, st.x_height
-    yn = 0.636 * X
+    yn = N("nose_turn.0", 0.636) * X
     b = math.radians(beta)
     t = (-math.cos(b), -math.sin(b))
     n = (math.sin(b), -math.cos(b))                      # towards the outer (lower right) edge
@@ -277,9 +278,9 @@ def nose_turn(st: Style, d0: float, m: Pt, beta: float) -> Poly:
     lo = (m[0] + n[0] * w / 2, m[1] + n[1] * w / 2)
     hi = (m[0] - n[0] * w / 2, m[1] - n[1] * w / 2)
     run = d0 - m[0]
-    return ([(d0, yn + 0.01)] + _pts(cubic((d0, yn), (d0, yn - 0.3 * X), (lo[0] - t[0] * 0.7 * run, lo[1] - t[1] * 0.7 * run), lo))
-            + _pts(cubic(hi, (hi[0] - t[0] * 0.5 * run, hi[1] - t[1] * 0.5 * run), (d0 - U, yn - 0.16 * X), (d0 - U, yn)))
-            + [(d0 - U, yn + 0.01)])
+    return ([(d0, yn + N("nose_turn.1", 0.01))] + _pts(cubic((d0, yn), (d0, yn - N("nose_turn.2", 0.3) * X), (lo[0] - t[0] * N("nose_turn.3", 0.7) * run, lo[1] - t[1] * N("nose_turn.4", 0.7) * run), lo))
+            + _pts(cubic(hi, (hi[0] - t[0] * N("nose_turn.5", 0.5) * run, hi[1] - t[1] * N("nose_turn.6", 0.5) * run), (d0 - U, yn - N("nose_turn.7", 0.16) * X), (d0 - U, yn)))
+            + [(d0 - U, yn + N("nose_turn.8", 0.01))])
 
 
 def soften(shape: Shape, r: float) -> Shape:
@@ -474,7 +475,7 @@ def angular_stroke(st: Style, pts: Sequence[Pt], r_out: float = 0.0) -> Shape:
     shape = unary_union(polys)
     for i in range(1, len(segs)):
         (_, b, u1, w1), (_, _, u2, w2) = segs[i - 1], segs[i]
-        r = min(r_out, w1 + 0.5 * w2, w2 + 0.5 * w1)
+        r = min(r_out, w1 + N("angular_stroke.0", 0.5) * w2, w2 + N("angular_stroke.1", 0.5) * w1)
         if r <= 0.5:
             continue
         # the outer corner: past the turn along the incoming stroke, behind it along the outgoing one

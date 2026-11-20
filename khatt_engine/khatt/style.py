@@ -136,6 +136,9 @@ class Style:
     # the designer's general manner, measured on all the logo's letters at once, applied to every
     # letter (also those the logo does not contain): trait -> factor on the rules of that kind
     traits: Dict[str, float] = field(default_factory=dict)
+    # every other number of the constructions, as measured on this logo (recipes.N): "function.i" -> a
+    # factor on the number Bidonaq was written with (1 where the logo said nothing about it)
+    numbers: Dict[str, float] = field(default_factory=dict)
     chosen: Dict[str, str] = field(default_factory=dict)
 
     @property

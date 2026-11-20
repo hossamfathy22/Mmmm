@@ -79,6 +79,21 @@ def _read(key: str) -> None:
         r.add(key)
 
 
+# Every other number in a construction (where a curve's control point sits, how far a tail drops, how a
+# bowl turns: Sirang's hand as hadar_word.py measured it) is a handle too: N("bowl_down.3", 0.72) is that
+# number times the logo's own measure of it (style.numbers, fitted on the logo's letters by
+# selfcheck.fit_letters), 1 where nothing was measured. A number in a part several letters share (the
+# cup of ن ل ق س ص ي, the tail of ر و, the bowl of ح ع) measured on one of them serves them all.
+# Set by letters.LETTERS around every letter it builds.
+NUMBERS: ContextVar = ContextVar("khatt_numbers", default=None)
+
+
+def N(key: str, v: float) -> float:
+    _read("n:" + key)
+    d = NUMBERS.get()
+    return v * d.get(key, 1.0) if d else v
+
+
 def general_rule(st: Style, name: str) -> float:
     """The rule as written, with what has been learned from the designer's edits (no logo's measure)."""
     return float(PARAMS[name].rule(st)) * LEARNED.get(name, 1.0)

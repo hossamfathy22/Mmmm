@@ -754,6 +754,8 @@ def _dep_value(st: Style, dep: str):
     if dep.startswith("v:"):
         k = dep[2:]
         return st.variants.get(k) or st.chosen.get(k)
+    if dep.startswith("n:"):
+        return st.numbers.get(dep[2:], st.fitted.get(dep, 1.0))
     return value(st, dep) if dep in PARAMS else None
 
 

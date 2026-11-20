@@ -18,6 +18,7 @@ from khatt.bench.letter_rules import REF
 
 DNA_KEYS = ['stem', 'hair', 'ascender', 'descender', 'slant', 'tension', 'corners']
 NEAREST = 5
+NUMBERS = os.environ.get('KHATT_FIT_NUMBERS', '1') == '1'   # fit the constructions' numbers on the word too
 
 
 def dna_vec(face, text):
@@ -30,6 +31,26 @@ def load_rules(folder):
     for f in glob.glob(os.path.join(folder, '*.json')):
         r = json.load(open(f))
         out[r['font']] = {n: v for L in r['letters'].values() for n, v in L['ratios'].items()}
+    return out
+
+
+def load_numbers(folder):
+    """The constructions' numbers each typeface's letters took (free_numbers), where a folder has them."""
+    out = {}
+    for f in glob.glob(os.path.join(folder, '*.json')):
+        r = json.load(open(f))
+        nums = {k: v for L in r['letters'].values() for k, v in L.get('numbers_fit', {}).items()}
+        if nums:
+            out[r['font']] = nums
+    return out
+
+
+def with_numbers(st, numbers, names):
+    """The numbers the word did not measure, from the given typefaces (their median)."""
+    out = Style(**{**st.__dict__, 'params': dict(st.params), 'numbers': dict(st.numbers)})
+    for k in set().union(*(numbers.get(f, {}) for f in names)):
+        if k not in st.numbers:
+            out.numbers[k] = float(np.median([numbers[f][k] for f in names if k in numbers.get(f, {})]))
     return out
 
 
@@ -79,18 +100,21 @@ def run(rules_dir, name, word):
         v = [E.iou(truth[i], got[i]) for i in truth if i in got]
         return float(np.mean(v)) if v else 0.0
     cache = {}; typeset(word, meas, cache=cache)
-    reads = sorted({n for _, deps in cache.values() for n in deps if n in PARAMS})
+    reads = sorted({n for _, deps in cache.values() for n in deps if n in PARAMS or (NUMBERS and n.startswith('n:'))})
     st, own = E.fit_word(meas, score, reads)
     rules = load_rules(rules_dir)
     near = nearest(face, word, rules, files, name.rsplit('-', 1)[0])
     written, learned = hidden(face, word, st, sc), hidden(face, word, with_rules(st, rules, near), sc)
-    return {'font': name, 'word': word, 'own_word': own, 'nearest': near,
+    numbers = load_numbers(rules_dir)
+    both = hidden(face, word, with_numbers(with_rules(st, rules, near), numbers, near), sc) if numbers else learned
+    return {'font': name, 'word': word, 'own_word': own, 'nearest': near, 'numbers_fitted': len(st.numbers),
             'hidden_written': float(np.mean(list(written.values()))), 'hidden_nearest': float(np.mean(list(learned.values()))),
-            'per_letter': {c: [round(written[c], 3), round(learned[c], 3)] for c in written}}
+            'hidden_nearest_numbers': float(np.mean(list(both.values()))),
+            'per_letter': {c: [round(written[c], 3), round(learned[c], 3), round(both[c], 3)] for c in written}}
 
 
 if __name__ == '__main__':
     r = run(*sys.argv[1:4])
     json.dump(r, open(sys.argv[4], 'w'), ensure_ascii=False)
     print(f"{r['font']:22s} {r['word']:12s} own {r['own_word']:.3f} | lacks: rules as written {r['hidden_written']:.3f}, "
-          f"nearest typefaces' rules {r['hidden_nearest']:.3f} {r['nearest'][:3]}")
+          f"nearest typefaces' rules {r['hidden_nearest']:.3f}, and their numbers {r['hidden_nearest_numbers']:.3f} {r['nearest'][:3]}")

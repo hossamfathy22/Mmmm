@@ -98,11 +98,15 @@ def examine_one(path: str, text: str, line, held_out: bool) -> Dict:
         base = self_check(L, own, st, k)
         if base:
             got = []
+            # measured on the engine's own letters: with the logo's letters cut out and pasted in, the
+            # rules would be tried on pasted pixels, and nothing would be measured at all (Mootanroo
+            # pastes all six of its letters, so its hidden letter scored the same under any change)
+            plain = Style(**{**st.__dict__, "taken": {}, "parts": {}, "fitted": {}, "chosen": {}, "traits": {}})
             for i, x in enumerate(base["letters"]):
-                t = _Trial(L, own, st, k, hide=i)
+                t = _Trial(L, own, plain, k, hide=i)
                 if not t.ok:
                     continue
-                fitted, chosen, traits = fit_letters(L, own, st, k, trial=t)
+                fitted, chosen, traits = fit_letters(L, own, plain, k, trial=t)
                 on = " ".join(sorted({f"{SKELETON.get(y['letter'], y['letter'])}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i}))
                 rr = self_check(L, own, Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits,
                                                  "measured_on": on, "taken": {}, "parts": {}}), k)
