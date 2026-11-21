@@ -151,7 +151,7 @@
   };
 
   /* ------------------------------------------------------------------ metrics */
-  R.metrics = function (dna) {
+  R.metrics = function (dna, pp) {
     const W = dna.weight, h = W / 2, wf = dna.width;
     const capExt = dna.cap === 'butt' ? 0 : h;
     const m = { dna, W, h, wf, capExt, rho: dna.roundness, cap: dna.cap };
@@ -186,6 +186,18 @@
     m.mg = Math.round(0.5 * W + 0.35 * m.ds + 14);               // gap letter → mark
     m.mw = Math.max(18, W * 0.66);                               // pen for hamza / madda
     m.r = (rmax) => Math.max(0, m.rho * rmax);
+    // per-piece roundness (the 12 key shapes carry their own)
+    m.rr = (id, rmax) => Math.max(0, ((m.pc && m.pc[id] && m.pc[id].r != null) ? m.pc[id].r : m.rho) * rmax);
+    // the 12 pieces: explicit values or declared rules → aliases used by the recipes
+    if (R.slots && R.slots.resolve) {
+      const res = R.slots.resolve(m, pp);
+      m.pc = res.pc; m.pcSrc = res.src;
+      const pc = m.pc;
+      m.Bl = pc.basin.len; m.Cw = pc.cup.w; m.Lw = pc.head.w; m.L = pc.head.h;
+      m.Ow = pc.loop.w; m.Oh = pc.loop.h; m.Aw = pc.arc.w; m.Nw = pc.nose.w; m.Hw = pc.ain.w;
+      m.Tw = pc.tail.reach; m.Kw = pc.kaf.w; m.Dw = Math.round(Math.max(pc.kaf.w * 1.04, 3 * W));
+      m.Ew = pc.heh.w; m.Eh = pc.heh.h; m.Yw = Math.round(Math.max(pc.cup.w * 1.58, 5 * W)); m.sg = pc.tooth.gap;
+    }
     return m;
   };
 
@@ -354,7 +366,9 @@
 
   R.shiftPart = function (p, du, dy) {
     if (p.type === 'image') return Object.assign({}, p, { u0: p.u0 + du, y0: p.y0 + dy });
-    return Object.assign({}, p, { pts: p.pts.map(q => [q[0] + du, q[1] + dy]) });
+    const out = Object.assign({}, p, { pts: p.pts.map(q => [q[0] + du, q[1] + dy]) });
+    if (p.ctrl) out.ctrl = p.ctrl.map(q => [q[0] + du, q[1] + dy]);
+    return out;
   };
   R.scalePart = function (p, k, cu, cy) {
     if (p.type === 'image') return Object.assign({}, p, { u0: cu + (p.u0 - cu) * k, y0: cy + (p.y0 - cy) * k, w: p.w * k, h: p.h * k });

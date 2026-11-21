@@ -120,7 +120,7 @@
 
   function tooth(b, m, f) {
     const t = b.P('tooth', 0, 0);
-    const dir = m.dna.toothStyle === 'stub' && !t.image ? 'up' : 'flat';
+    const dir = m.pc.tooth.style === 'stub' && !t.image ? 'up' : 'flat';
     b.exit = { u: t.cx, dir };
     if (f === 'medi') b.entry = { u: t.cx, dir };
     b.anc.above = [t.cx, m.X + m.mg];
@@ -160,7 +160,7 @@
   RX.yeh = (b, m, f) => {
     if (joinsL(f)) return tooth(b, m, f);
     const fin = f === 'fina';
-    const y = b.P('yeh', 0, 0, { top: fin ? m.b + (m.t - m.b) * 0.55 : m.t, topCap: m.cap });
+    const y = b.P('cup', 0, 0, { variant: 'yeh', top: fin ? m.b + (m.t - m.b) * 0.55 : m.t, topCap: m.cap });
     if (fin) b.entry = { u: m.h, dir: 'up' };
     b.anc.above = [m.h + m.W * 0.3, m.X + m.mg * 0.6];
     b.anc.below = [y.cx, m.d - m.h - m.mg * 0.8];
@@ -171,7 +171,7 @@
     const t0 = b.P('tooth', 0, 0);
     const c0 = t0.cx, c1 = c0 + sg, c2 = c0 + 2 * sg;
     b.P('tooth', c1 - t0.cx, 0);
-    b.base(c0, c2, !joinsR(f) && m.dna.toothStyle === 'stub' && !t0.image);
+    b.base(c0, c2, !joinsR(f) && m.pc.tooth.style === 'stub' && !t0.image);
     if (f === 'isol' || f === 'fina') cupArm(b, m, c2 - m.h, m.t);
     else { b.P('tooth', c2 - t0.cx, 0); b.exit = { u: c2, dir: 'flat' }; }
     if (joinsR(f)) b.entry = { u: c0, dir: 'flat' };
@@ -208,22 +208,16 @@
       const a = b.P('ain', 0, 0, { closed: true });
       b.entry = { u: a.cx, dir: 'flat' };
       if (f === 'medi') b.exit = { u: a.cx, dir: 'flat' };
-      else {
-        const w = m.Aw;
-        b.S([[a.cx, m.b], [w - m.h, m.b - (m.b - m.dd) * 0.32], [w - m.h, m.dd], [m.h + w * 0.04, m.dd]],
-          [0, m.r(m.W * 1.2), m.r((w - m.W) / 2), 0], { slot: 'arc', caps: ['butt', m.cap] });
-      }
+      else b.P('arc', 0, 0, { from: 'vertex', vx: a.cx, endU: m.h + m.Aw * 0.04 });
       b.anc.above = [a.cx, m.X + m.mg];
       return;
     }
     // isolated: the head (a small c) and, growing out of its left side, the big arc under the line (ε-like)
     const hw = m.Hw, w = Math.max(m.Aw, hw + m.W * 1.2), top = m.t;
-    const mid = m.b - (m.b - m.dd) * 0.42;
-    const rh = m.r((top - m.b) / 2);
+    const rh = m.rr('ain', (top - m.b) / 2);
     const a = b.P('ain', 0, 0, { botEnd: m.h + hw * 0.22, botCap: m.cap });
     const leg = Math.max(m.W * 0.9, rh * 0.6 + m.W * 0.5);
-    b.S([[a.w - m.h, m.b + leg], [a.w - m.h, m.b], [w - m.h, mid], [w - m.h, m.dd], [m.h + w * 0.04, m.dd]],
-      [0, m.r(m.W * 1.1), m.r(m.W * 1.6), m.r((w - m.W) / 2), 0], { slot: 'arc', caps: ['butt', m.cap] });
+    b.P('arc', 0, 0, { from: 'side', su: a.w - m.h, leg, w, endU: m.h + w * 0.04 });
     b.anc.above = [a.w * 0.5, m.X + m.mg];
   };
 
@@ -242,19 +236,19 @@
       b.anc.inside = [n.w * 0.5, -m.mg];
       return;
     }
-    const w = m.Aw, top = m.t;
-    const rc = m.r(Math.min((top - m.b) * 0.45, m.W * 2));
-    b.S([[m.h, m.b], [m.h, top], [w - m.h, top], [w - m.h, m.dd], [m.h + w * 0.04, m.dd]],
-      [0, rc, m.r(Math.min(w * 0.3, (top - m.dd) * 0.22)), m.r((w - m.W) / 2), 0],
-      { tags: ['nose', 'arc', 'arc', 'arc'], caps: ['butt', m.cap] });
+    // final: the nose rises from the line into the top bar, the arc takes over from there
+    const w = m.Aw, su = Math.max(m.W * 1.8, w * 0.42);
+    b.P('nose', 0, 0, { variant: 'up', to: su + 1 });
+    b.P('arc', 0, 0, { startU: su, startCap: 'butt', endU: m.h + w * 0.04 });
     b.entry = { u: m.h, dir: 'flat' };
     b.anc.above = [w * 0.5, m.X + m.mg];
     b.anc.inside = [w * 0.55, m.b - m.ds * 0.15];
   };
 
   RX.dal = (b, m, f) => {
+    // declared rule: الدال = خط الكاف على السطر
     const w = m.Dw;
-    b.S([[w * 0.44, m.t], [m.h, m.b], [w - m.h, m.b]], [0, m.r(m.W * 1.4), 0], { slot: 'kaf', caps: [m.cap, m.cap] });
+    b.P('kaf', 0, 0, { variant: 'dal' });
     if (f === 'fina') b.entry = { u: m.h, dir: 'flat' };
     b.anc.above = [w * 0.46, m.X + m.mg];
   };
@@ -343,9 +337,11 @@
   };
 
   RX.lamalef = (b, m, f) => {
+    // لام ألف = ساقان ووصلة: the lam stands, the alef leans out from the shared foot
     const La = Math.max(0.46 * m.A * m.wf, 3.8 * m.W);
     const foot = La * 0.42;
-    b.S([[m.h, m.a], [m.h, m.b], [foot, m.b], [La - m.h, m.a]], [0, m.r(m.W * 1.4), m.r(m.W * 1.1), 0],
+    const lean = Math.tan(m.pc.stem.lean * Math.PI / 180) * (m.a - m.b);
+    b.S([[m.h + lean, m.a], [m.h, m.b], [foot, m.b], [La - m.h + lean, m.a]], [0, m.rr('stem', m.W * 1.4), m.rr('stem', m.W * 1.1), 0],
       { tags: ['stem', 'conn', 'stem'], caps: [m.cap, m.cap] });
     if (f === 'fina') b.entry = { u: m.h, dir: 'flat' };
     b.anc.above = [La - m.h, m.A + m.mg * 0.7];
@@ -598,6 +594,26 @@
     }
     for (const ex of R.extras) out.push({ name: ex.name, kind: 'extra', extra: ex, uni: ex.uni, form: 'isol' });
     return out;
+  };
+
+  /* the recipe of a built glyph: the key shapes it is made of, in reading order (right → left).
+   * Connections are written as tatweel on the joined sides: "ـ سنّ ـ" */
+  R.recipeOf = function (built) {
+    const items = [];
+    for (const p of built.parts) {
+      if (!p.slot || p.slot === 'conn' || p.slot === 'dot') continue;
+      let u0 = Infinity;
+      if (p.type === 'image') u0 = p.u0; else for (const q of p.pts) u0 = Math.min(u0, q[0]);
+      items.push({ slot: p.slot, u0 });
+    }
+    items.sort((a, b) => a.u0 - b.u0);
+    const order = [], count = {};
+    for (const it of items) { if (!count[it.slot]) order.push(it.slot); count[it.slot] = (count[it.slot] || 0) + 1; }
+    // a closed loop drawn as two strokes, a split stroke… count each piece once per placement run
+    const runs = {};
+    let prev = null;
+    for (const it of items) { if (it.slot !== prev) runs[it.slot] = (runs[it.slot] || 0) + 1; prev = it.slot; }
+    return order.map((id) => ({ id, n: id === 'tooth' ? count[id] : runs[id] }));
   };
 
   R.buildSpec = function (m, spec) {
