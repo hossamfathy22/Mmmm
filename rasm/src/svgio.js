@@ -166,6 +166,10 @@
 
   IO.contoursD = contoursD;
   IO.cmdsD = cmdsD;
+  IO.esc = esc;
+  IO.rtl = rtl;
+  IO.wrap = wrap;
+  IO.f1 = f1;
 
   /* ---------------------------------------------------------------- SVG reading */
   const NAMED = { black: '#000000', white: '#ffffff', red: '#ff0000', none: 'none', transparent: 'none' };
@@ -445,6 +449,29 @@
     return { pieces, report };
   };
 
+  IO.lum = lum;
+  IO.xcmds = xcmds;
+  IO.bboxOf = bboxOf;
+  // the dark shapes of a parsed file, each with its closed sub-paths in template coordinates (toT maps file → template)
+  IO.inkShapes = function (parsed, toT, report) {
+    const out = [];
+    for (const sh of parsed.shapes) {
+      const darkFill = sh.fill !== 'none' && lum(sh.fill) < 0.45 && sh.opacity > 0.4;
+      const darkStroke = sh.stroke !== 'none' && lum(sh.stroke) < 0.45 && sh.opacity > 0.4;
+      if (!darkFill && !darkStroke) { report.ignored++; continue; }
+      const subs = [];
+      for (const sub of sh.subs) {
+        if (!sub.closed) { report.open++; if (!darkFill) continue; }
+        if (!darkFill) report.outlineOnly++;
+        const cmds = xcmds(sub.cmds, toT);
+        if (!sub.closed) cmds.push(['Z']);
+        const bb = bboxOf(G.flattenCmds(cmds, 8));
+        subs.push({ cmds, cx: (bb.u0 + bb.u1) / 2, cy: (bb.y0 + bb.y1) / 2 });
+      }
+      if (subs.length) out.push({ subs, rule: sh.rule });
+    }
+    return out;
+  };
   IO.makePiece = function (id, shapes, polys, placeU) {
     polys = polys || shapes.reduce((a, s) => a.concat(G.flattenCmds(s.cmds, 10)), []);
     const bb = bboxOf(polys);

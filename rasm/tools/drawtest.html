@@ -6,7 +6,7 @@
 <div class="t">بسم الله الرحمن الرحيم</div><div class="t">محمد سلام لا إله إلا هلال</div>
 <script src="../vendor/opentype.min.js"></script>
 <script src="../src/core.js"></script><script src="../src/slots.js"></script><script src="../src/recipes.js"></script>
-<script src="../src/trace.js"></script><script src="../src/font.js"></script><script src="../src/analyze.js"></script><script src="../src/svgio.js"></script>
+<script src="../src/trace.js"></script><script src="../src/font.js"></script><script src="../src/analyze.js"></script><script src="../src/svgio.js"></script><script src="../src/forms.js"></script>
 <script>
 (async () => {
   const log = (t) => document.getElementById('log').textContent += t + '\n';
@@ -65,7 +65,7 @@
     for (const id of IO.ORDER) if (pieces[id]) { const it = IO.check(id, pieces[id], ctx); log(id.padEnd(6) + ' ' + (it.length ? it.map(x => x.level + ': ' + x.msg).join(' | ') : 'ok')); }
     // 4) words drawn from the pieces
     const res = await R.font.build({ dna, m }, { family: 'DrawnTest' });
-    const buf = res.font.toArrayBuffer();
+    const buf = res.toArrayBuffer ? res.toArrayBuffer() : res.font.toArrayBuffer();
     log('font glyphs ' + res.font.glyphs.length + ' bytes ' + buf.byteLength);
     const ff = new FontFace('DrawnTest', buf); await ff.load(); document.fonts.add(ff);
     const svg = R.textToSVG(res, q.get('w') || 'بسم الله ضحك فوق كتب ليل نهر عين محمد سلام', { size: 110 });

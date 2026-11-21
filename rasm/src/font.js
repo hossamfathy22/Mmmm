@@ -142,7 +142,149 @@
       if (index['lam.init'] != null && alF != null) sub.addLigature('rlig', { sub: [index['lam.init'], alF], by: index[lg.name] }, 'arab', 'dflt');
       if (index['lam.medi'] != null && alF != null) sub.addLigature('rlig', { sub: [index['lam.medi'], alF], by: index[lg.name + '.fina'] }, 'arab', 'dflt');
     }
-    return { font, outlines, index, built: builtMap, family };
+    // mark positioning: where each harakah sits on each letter (GDEF + GPOS mark, mkmk)
+    const layout = F.markLayout(inv, builtMap, index, dna, m, glyphs.length);
+    const res = { font, outlines, index, built: builtMap, family, layout };
+    res.toArrayBuffer = () => F.withTables(font.toArrayBuffer(), { GDEF: F.gdef(layout), GPOS: F.gpos(layout) });
+    return res;
+  };
+
+  /* ---------------------------------------------------------------- GDEF / GPOS (written here: opentype.js does not) */
+  F.markLayout = function (inv, built, index, dna, m, nGlyphs) {
+    const marks = [], bases = [], anchors = {}, markAnchor = {};
+    const classes = new Array(nGlyphs).fill(1); classes[0] = 0;
+    for (const spec of inv) {
+      const gid = index[spec.name], g = built[spec.name];
+      if (gid == null || !g) continue;
+      if (spec.kind === 'mark') {
+        classes[gid] = 3;
+        const side = spec.mark.side === 'below' ? 1 : 0;
+        marks.push({ gid, cls: side, x: g.markAnchor[0], y: Math.round(g.markAnchor[1]), name: spec.name, top: Math.round(g.markTop) });
+        markAnchor[spec.name] = { cls: side, x: g.markAnchor[0], y: Math.round(g.markAnchor[1]) };
+        continue;
+      }
+      if (spec.kind === 'letter' || spec.kind === 'lig') {
+        const a = R.forms.anchorsFor(g, dna, m);
+        if (a && (a.top || a.bottom)) { bases.push({ gid, top: a.top, bottom: a.bottom }); anchors[spec.name] = a; }
+      }
+    }
+    // a harakah over a shadda sits on the shadda's top
+    const gap = Math.round(R.forms.markGap(m) * 0.5);
+    const shadda = marks.find((mk) => mk.name === 'shadda');
+    const mkmk = shadda ? { mark1: marks.filter((mk) => mk.cls === 0 && mk.name !== 'shadda'), mark2: [{ gid: shadda.gid, top: [0, shadda.top + gap] }] } : null;
+    return { marks, bases, mkmk, classes, anchors, markAnchor };
+  };
+
+  const B = {
+    u16: (a, v) => { a.push((v >> 8) & 255, v & 255); return a; },
+    s16: (a, v) => B.u16(a, (Math.round(v) + 65536) & 0xFFFF),
+    tag: (a, t) => { for (let i = 0; i < 4; i++) a.push(t.charCodeAt(i)); return a; }
+  };
+  // a structure whose children are laid out after its header; offsets are written from its own start
+  function withChildren(head, kids) {
+    // head: byte array with 0-placeholders; kids: [{at: index in head, bytes}] (null bytes → offset 0)
+    const out = head.slice();
+    for (const k of kids) {
+      if (!k.bytes) continue;
+      const off = out.length;
+      out[k.at] = (off >> 8) & 255; out[k.at + 1] = off & 255;
+      for (const b of k.bytes) out.push(b);
+    }
+    return out;
+  }
+  const coverage = (gids) => { const a = []; B.u16(a, 1); B.u16(a, gids.length); gids.forEach((g) => B.u16(a, g)); return a; };
+  const anchor = (x, y) => { const a = []; B.u16(a, 1); B.s16(a, x); B.s16(a, y); return a; };
+  function markArray(marks) {
+    const head = []; B.u16(head, marks.length);
+    const kids = [];
+    marks.forEach((mk) => { B.u16(head, mk.cls); kids.push({ at: head.length, bytes: anchor(mk.x, mk.y) }); B.u16(head, 0); });
+    return withChildren(head, kids);
+  }
+  function anchorRows(rows, nCls) {
+    // BaseArray / Mark2Array: per row nCls anchors (null → offset 0)
+    const head = []; B.u16(head, rows.length);
+    const kids = [];
+    rows.forEach((row) => { for (let c = 0; c < nCls; c++) { kids.push({ at: head.length, bytes: row[c] ? anchor(row[c][0], row[c][1]) : null }); B.u16(head, 0); } });
+    return withChildren(head, kids);
+  }
+  function markAttach(fmtMarks, fmtBases, nCls, baseRows) {
+    // MarkBasePos / MarkMarkPos format 1 (same layout)
+    const ms = fmtMarks.slice().sort((p, q) => p.gid - q.gid);
+    const order = baseRows.map((r, i) => i).sort((p, q) => fmtBases[p] - fmtBases[q]);
+    const head = []; B.u16(head, 1); B.u16(head, 0); B.u16(head, 0); B.u16(head, nCls); B.u16(head, 0); B.u16(head, 0);
+    return withChildren(head, [
+      { at: 2, bytes: coverage(ms.map((x) => x.gid)) },
+      { at: 4, bytes: coverage(order.map((i) => fmtBases[i])) },
+      { at: 8, bytes: markArray(ms) },
+      { at: 10, bytes: anchorRows(order.map((i) => baseRows[i]), nCls) }
+    ]);
+  }
+  function lookup(type, subtable) {
+    const head = []; B.u16(head, type); B.u16(head, 0); B.u16(head, 1); B.u16(head, 0);
+    return withChildren(head, [{ at: 6, bytes: subtable }]);
+  }
+  F.gpos = function (L) {
+    if (!L.marks.length || !L.bases.length) return null;
+    const lookups = [lookup(4, markAttach(L.marks, L.bases.map((b) => b.gid), 2, L.bases.map((b) => [b.top, b.bottom])))];
+    const feats = [['mark', [0]]];
+    if (L.mkmk && L.mkmk.mark1.length) {
+      lookups.push(lookup(6, markAttach(L.mkmk.mark1, L.mkmk.mark2.map((x) => x.gid), 1, L.mkmk.mark2.map((x) => [x.top]))));
+      feats.push(['mkmk', [1]]);
+    }
+    const lookupList = (() => { const h = []; B.u16(h, lookups.length); const kids = []; lookups.forEach((lk) => { kids.push({ at: h.length, bytes: lk }); B.u16(h, 0); }); return withChildren(h, kids); })();
+    const featureList = (() => {
+      const h = []; B.u16(h, feats.length); const kids = [];
+      feats.forEach(([tag, idx]) => { B.tag(h, tag); const f = []; B.u16(f, 0); B.u16(f, idx.length); idx.forEach((i) => B.u16(f, i)); kids.push({ at: h.length, bytes: f }); B.u16(h, 0); });
+      return withChildren(h, kids);
+    })();
+    const langSys = (() => { const a = []; B.u16(a, 0); B.u16(a, 0xFFFF); B.u16(a, feats.length); feats.forEach((f, i) => B.u16(a, i)); return a; })();
+    const script = () => { const h = []; B.u16(h, 0); B.u16(h, 0); return withChildren(h, [{ at: 0, bytes: langSys }]); };
+    const scriptList = (() => {
+      const h = []; B.u16(h, 2); const kids = [];
+      ['DFLT', 'arab'].forEach((t) => { B.tag(h, t); kids.push({ at: h.length, bytes: script() }); B.u16(h, 0); });
+      return withChildren(h, kids);
+    })();
+    const head = []; B.u16(head, 1); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0);
+    return new Uint8Array(withChildren(head, [{ at: 4, bytes: scriptList }, { at: 6, bytes: featureList }, { at: 8, bytes: lookupList }]));
+  };
+  F.gdef = function (L) {
+    const cd = []; B.u16(cd, 1); B.u16(cd, 1); B.u16(cd, L.classes.length - 1);
+    for (let g = 1; g < L.classes.length; g++) B.u16(cd, L.classes[g]);
+    const head = []; B.u16(head, 1); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0);
+    return new Uint8Array(withChildren(head, [{ at: 4, bytes: cd }]));
+  };
+
+  /* add or replace tables in an sfnt (recomputing offsets and checksums) */
+  F.withTables = function (buf, add) {
+    const src = new DataView(buf);
+    const n = src.getUint16(4);
+    const tables = {};
+    for (let i = 0; i < n; i++) {
+      const o = 12 + i * 16;
+      const tag = String.fromCharCode(src.getUint8(o), src.getUint8(o + 1), src.getUint8(o + 2), src.getUint8(o + 3));
+      const off = src.getUint32(o + 8), len = src.getUint32(o + 12);
+      tables[tag] = new Uint8Array(buf, off, len).slice();
+    }
+    for (const tag in add) if (add[tag]) tables[tag] = add[tag];
+    const tags = Object.keys(tables).sort();
+    const num = tags.length;
+    let es = 0; while ((1 << (es + 1)) <= num) es++;
+    const sr = (1 << es) * 16;
+    let size = 12 + num * 16;
+    const offs = {};
+    for (const t of tags) { offs[t] = size; size += (tables[t].length + 3) & ~3; }
+    const out = new Uint8Array(size), dv = new DataView(out.buffer);
+    dv.setUint32(0, src.getUint32(0)); dv.setUint16(4, num); dv.setUint16(6, sr); dv.setUint16(8, es); dv.setUint16(10, num * 16 - sr);
+    const sum = (bytes) => { let s = 0; for (let i = 0; i < bytes.length; i += 4) s = (s + (((bytes[i] << 24) | ((bytes[i + 1] || 0) << 16) | ((bytes[i + 2] || 0) << 8) | (bytes[i + 3] || 0)) >>> 0)) >>> 0; return s; };
+    if (tables.head) { tables.head = tables.head.slice(); tables.head[8] = tables.head[9] = tables.head[10] = tables.head[11] = 0; }
+    tags.forEach((t, i) => {
+      const o = 12 + i * 16;
+      for (let k = 0; k < 4; k++) out[o + k] = t.charCodeAt(k);
+      dv.setUint32(o + 4, sum(tables[t])); dv.setUint32(o + 8, offs[t]); dv.setUint32(o + 12, tables[t].length);
+      out.set(tables[t], offs[t]);
+    });
+    if (tables.head) dv.setUint32(offs.head + 8, (0xB1B0AFBA - sum(out)) >>> 0);
+    return out.buffer;
   };
 
   /* ---------------------------------------------------------------- shaper */
@@ -159,8 +301,18 @@
   (R.extras || []).forEach(e => { extraByUni[e.uni] = e.name; });
 
   /* text → glyph names in logical order (kashida: number of tatweels inserted inside joins) */
-  R.shapeText = function (text, kashida) {
-    const cps = Array.from(text || '').map(c => c.codePointAt(0)).filter(cp => !isTransparent(cp));
+  R.shapeText = function (text, kashida, opts) {
+    const withMarks = !!(opts && opts.marks);
+    const all = Array.from(text || '').map(c => c.codePointAt(0));
+    const cps = [], marksAfter = [];
+    for (const cp of all) {
+      if (isTransparent(cp)) {
+        const mk = R.forms && R.forms.markByUni[cp];
+        if (withMarks && mk && cps.length) marksAfter[cps.length - 1].push(mk.id);
+        continue;
+      }
+      cps.push(cp); marksAfter.push([]);
+    }
     const jt = cps.map(R.joinType);
     const forms = cps.map(() => 'isol');
     for (let i = 0; i < cps.length; i++) {
@@ -170,10 +322,12 @@
       forms[i] = jp && jn ? 'medi' : jp ? 'fina' : jn ? 'init' : 'isol';
     }
     const out = [];
+    const pushMarks = (...idx) => { for (const i of idx) for (const id of (marksAfter[i] || [])) out.push({ name: id, mark: true, joinsNext: false }); };
     for (let i = 0; i < cps.length; i++) {
       const cp = cps[i];
       if (cp === 0x644 && ALEFS[cps[i + 1]]) {
         out.push({ name: ALEFS[cps[i + 1]] + (forms[i] === 'medi' || forms[i] === 'fina' ? '.fina' : ''), joinsNext: false });
+        pushMarks(i, i + 1);
         i++; continue;
       }
       const l = R.letterByUni[cp];
@@ -188,7 +342,9 @@
       else if (cp === 0x3F) out.push({ name: 'questionArabic', joinsNext: false });
       else if (cp === 0x3B) out.push({ name: 'semicolonArabic', joinsNext: false });
       else out.push({ name: 'space', joinsNext: false });
-      if (kashida > 0 && out[out.length - 1].joinsNext && i < cps.length - 1) for (let k = 0; k < kashida; k++) out.push({ name: 'tatweel', joinsNext: true });
+      const base = out[out.length - 1];
+      pushMarks(i);
+      if (kashida > 0 && base.joinsNext && i < cps.length - 1) for (let k = 0; k < kashida; k++) out.push({ name: 'tatweel', joinsNext: true });
     }
     return out;
   };
@@ -196,19 +352,27 @@
   /* SVG of a word using built outlines (right-to-left layout) */
   R.textToSVG = function (result, text, opts) {
     opts = opts || {};
-    const seq = R.shapeText(text, opts.kashida || 0);
+    const seq = R.shapeText(text, opts.kashida || 0, { marks: true });
     const k = (opts.size || 200) / 1000;
     const advOf = (n) => result.built[n] ? result.built[n].adv : 0;
-    const total = seq.reduce((a, g) => a + advOf(g.name), 0);
+    const total = seq.reduce((a, g) => a + (g.mark ? 0 : advOf(g.name)), 0);
     const pad = opts.pad != null ? opts.pad : 0.12;
     const asc = result.font.ascender, desc = result.font.descender;
     const W = total * k, H = (asc - desc) * k;
     const px = W * pad + 4, py = H * pad + 4;
-    let x = px + W, d = '';
+    let x = px + W, d = '', baseX = x, baseName = null;
+    const L = result.layout || {};
     for (const g of seq) {
+      const c = result.outlines[g.name];
+      if (g.mark) {
+        const ma = L.markAnchor && L.markAnchor[g.name], ba = baseName && L.anchors && L.anchors[baseName];
+        const at = ma && ba ? (ma.cls === 1 ? ba.bottom : ba.top) : null;
+        if (c && at) d += R.font.svgPathData(c, baseX + (at[0] - ma.x) * k, py + asc * k - (at[1] - ma.y) * k, k);
+        continue;
+      }
       const a = advOf(g.name) * k;
       x -= a;
-      const c = result.outlines[g.name];
+      baseX = x; baseName = g.name;
       if (c) d += R.font.svgPathData(c, x, py + asc * k, k);
     }
     const w = W + px * 2, h = H + py * 2;

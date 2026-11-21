@@ -30,7 +30,7 @@ pre{direction:ltr;font:12px monospace;white-space:pre-wrap}
     const t0 = performance.now();
     const res = await R.font.build(engine, { family: 'RasmTest' });
     const t1 = performance.now();
-    const buf = res.font.toArrayBuffer();
+    const buf = res.toArrayBuffer ? res.toArrayBuffer() : res.font.toArrayBuffer();
     log('glyphs: ' + res.font.glyphs.length + '  bytes: ' + buf.byteLength + '  build ms: ' + Math.round(t1 - t0));
     let nseg = 0; for (const k in res.outlines) for (const c of res.outlines[k]) nseg += c.segs.length;
     log('total segments: ' + nseg);

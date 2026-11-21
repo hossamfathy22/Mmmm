@@ -17,8 +17,10 @@
     font: null, fontVer: -1, fontFace: null, fontBuf: null, stat: 'idle',
     file: null, checks: {}, report: null, collisions: [],
     ov: { sk: true, lines: true, det: true }, crop: null, sel: 'beh.init',
-    mkColor: 'ink', feat: { ctx: true, rlig: true, kash: true, rasm: true }
+    mkColor: 'ink', feat: { ctx: true, rlig: true, kash: true, rasm: true },
+    tpl: 'forms', draftKash: 'thin', formsFile: null, formChecks: {}
   };
+  const FM = R.forms;
   let M = R.metrics(S.dna, S.pp);
   const INV = R.inventory();
   const SPEC = {}; INV.forEach((s) => { SPEC[s.name] = s; });
@@ -64,7 +66,12 @@
     const x = (cx != null ? cx : w / 2) - (g.adv - uc) * ss;
     R.drawGlyph(ctx, g, S.dna, { x, base: baseAt(h, ss), s: ss, colorOf });
   }
-  const wordGlyphs = (text, kashida) => R.shapeText(text, kashida || 0).map((x) => G(x.name)).filter(Boolean);
+  const wordGlyphs = (text, kashida) => R.shapeText(text, kashida || 0, { marks: true }).map((x) => {
+    const g = G(x.name);
+    return g ? (x.mark ? { markOf: g, adv: 0 } : g) : null;
+  }).filter(Boolean);
+  let ancCache = new WeakMap();
+  const anchorsOf = (g) => { let a = ancCache.get(g); if (a === undefined) { a = FM.anchorsFor(g, S.dna, M); ancCache.set(g, a); } return a; };
   function drawRun(ctx, glyphs, box, color, align, sMax) {
     const total = glyphs.reduce((a, g) => a + g.adv, 0) || 1;
     let s = Math.min(box.h * 0.94 / VSPAN(), box.w * 0.96 / total);
@@ -72,7 +79,18 @@
     const base = box.y + baseAt(box.h, s);
     let x = align === 'right' ? box.x + box.w : box.x + (box.w + total * s) / 2;
     const colorOf = typeof color === 'function' ? color : () => color;
-    for (const g of glyphs) { x -= g.adv * s; R.drawGlyph(ctx, g, S.dna, { x, base, s, colorOf }); }
+    let prev = null, prevX = 0;
+    for (const g of glyphs) {
+      if (g.markOf) {
+        // a harakah: its anchor on the anchor of the letter before it
+        const mk = g.markOf, a = prev && anchorsOf(prev);
+        const at = a && (FM.markById[mk.mark].side === 'below' ? a.bottom : a.top);
+        if (at) R.drawGlyph(ctx, mk, S.dna, { x: prevX + (at[0] - mk.markAnchor[0]) * s, base: base - (at[1] - mk.markAnchor[1]) * s, s, colorOf });
+        continue;
+      }
+      x -= g.adv * s; R.drawGlyph(ctx, g, S.dna, { x, base, s, colorOf });
+      prev = g; prevX = x;
+    }
     return s;
   }
 
@@ -176,7 +194,7 @@
         setStat('building', p); return true;
       });
       if (seq !== buildSeq || ver !== S.ver) return null;
-      const buf = res.font.toArrayBuffer();
+      const buf = res.toArrayBuffer();
       const fam = 'RasmLive' + seq;
       const ff = new FontFace(fam, buf.slice(0));
       await ff.load();
@@ -205,7 +223,7 @@
     S.ver++;
     R.clampDNA(S.dna);
     M = R.metrics(S.dna, S.pp);
-    cache = new Map(); rcache = new Map(); usageVer = -1;
+    cache = new Map(); rcache = new Map(); usageVer = -1; ancCache = new WeakMap();
     requestRender();
     scheduleBuild(now ? 40 : 900);
   }
@@ -239,6 +257,13 @@
   /* ---------------------------------------------------------------- 01 template & upload */
   let thumbURL = null, thumbVer = -1;
   function renderThumb() {
+    const forms = S.tpl === 'forms';
+    $('#tplThumb').hidden = forms; $('#tplCanvas').hidden = !forms;
+    for (const ol of $$('#start .steps')) ol.hidden = ol.dataset.k !== S.tpl;
+    $('#draftKash').hidden = !forms;
+    for (const b of $$('#tplSeg button')) b.setAttribute('aria-pressed', String(b.dataset.k === S.tpl));
+    for (const b of $$('#draftKash button')) b.setAttribute('aria-pressed', String(b.dataset.k === S.draftKash));
+    if (forms) { renderFormsThumb(); return; }
     if (thumbVer === S.ver) return;
     thumbVer = S.ver;
     try {
@@ -248,7 +273,43 @@
       $('#tplThumb').src = thumbURL;
     } catch (e) { console.error(e); }
   }
+  // the forms template, drawn on a canvas: what you drew in ink, the draft from the pieces in grey
+  function renderFormsThumb() {
+    const cv = $('#tplCanvas');
+    const ratio = FM.SIZE.H / FM.SIZE.W, avail = Math.max(10, cv.parentNode.clientWidth - 36);
+    const h = Math.round(Math.min(560, avail * ratio)), w = Math.round(h / ratio);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    sizeCanvas(cv, h);
+    const ctx = cv.getContext('2d');
+    const k = w / FM.SIZE.W, s = FM.SC * k;
+    ctx.fillStyle = '#f4f2ef'; ctx.fillRect(0, 0, w, h);
+    for (const fr of FM.frames()) {
+      if (fr.kind === 'none') continue;
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(fr.x0 * k, fr.y0 * k, (fr.x1 - fr.x0) * k, (fr.y1 - fr.y0) * k);
+      let g = null;
+      if (fr.kind === 'form') g = RG(fr.rasm, fr.form);
+      else if (fr.kind === 'lig') g = G(fr.form === 'fina' ? 'lamAlef.fina' : 'lamAlef');
+      else if (fr.kind === 'mark') g = G(fr.key);
+      else if (fr.kind === 'small') { const pc = R.slots.piece(fr.key, M, fr.key === 'hamza' ? { scale: 0.9 } : {}); g = { adv: pc.w, parts: pc.parts, clip: {} }; }
+      if (!g) continue;
+      const drawnHere = FM.has(fr.key) || (fr.kind === 'small' && R.slots.hasDrawn(fr.key));
+      const col = drawnHere ? '#191919' : '#9a948d';
+      if (fr.kind === 'mark' || fr.kind === 'small') {
+        // small things: centred in their frame, a little larger so they read
+        const b = R.partBounds(g.parts, S.dna), ss = s * 1.6;
+        const cxu = (b.u0 + b.u1) / 2, cyu = (b.y0 + b.y1) / 2;
+        R.drawGlyph(ctx, g, S.dna, { x: (fr.x0 + fr.x1) / 2 * k - (g.adv - cxu) * ss, base: (fr.y0 + fr.y1) / 2 * k + cyu * ss, s: ss, colorOf: () => col });
+      } else R.drawGlyph(ctx, g, S.dna, { x: fr.ref * k - g.adv * s, base: fr.base * k, s, colorOf: () => col });
+    }
+  }
   async function downloadTemplate() {
+    if (S.tpl === 'forms') {
+      toast('يُجهَّز قالب الأشكال…');
+      await new Promise((r) => setTimeout(r, 40));
+      const opts = (!FM.kash && S.draftKash === 'thin') ? { kash: [0, Math.round(M.W * 0.45)] } : {};
+      await saveFile('rasm-forms.svg', FM.template(M, opts), 'image/svg+xml');
+      return;
+    }
     const svg = IO.template(M, R.slots.drawn);
     await saveFile('rasm-template.svg', svg, 'image/svg+xml');
   }
@@ -264,6 +325,7 @@
   function importSVG(text, name, isDemo) {
     let parsed;
     try { parsed = IO.parse(text); } catch (e) { toast(e.message || 'تعذّرت قراءة الملف'); return; }
+    if (FM.isForms(parsed)) { importForms(parsed, name); return; }
     const { pieces, report } = IO.toPieces(parsed);
     const n = Object.keys(pieces).length;
     S.file = { name, report, count: n, demo: !!isDemo };
@@ -291,6 +353,41 @@
     if (fit.roundness != null) S.dna.roundness = fit.roundness;
     S.measured = Object.assign({}, S.dna);
   }
+  /* the forms file: every glyph drawn whole. It does not touch the pieces: they fill what is not drawn */
+  function importForms(parsed, name) {
+    const { forms, report } = FM.read(parsed);
+    const n = Object.keys(forms).length;
+    S.formsFile = { name, report, count: n };
+    if (!n) { renderImport(); toast('لم أجد أشكالاً سوداء داخل الإطارات.'); return; }
+    for (const id of ['dot', 'hamza', 'madda']) {
+      if (!forms[id]) continue;
+      R.slots.drawn[id] = IO.makePiece(id, forms[id].shapes, null, 0);
+      delete forms[id];
+    }
+    FM.adopt(forms, M);
+    Object.assign(S.dna, FM.dnaFrom());
+    if (R.slots.drawn.dot) S.dna.dotSize = +(Math.max(R.slots.drawn.dot.w, R.slots.drawn.dot.h) / S.dna.weight).toFixed(2);
+    R.clampDNA(S.dna); S.measured = Object.assign({}, S.dna);
+    FM.remeasure(R.metrics(S.dna, S.pp));
+    changed(true);
+    runFormChecks();
+    toast('وصل ' + AR(FM.count()) + ' شكلاً من ٦٤. الحروف الآن من رسمك مباشرة.');
+  }
+  function runFormChecks() {
+    S.formChecks = {};
+    for (const key in FM.drawn) {
+      try { const it = FM.check(key, FM.drawn[key], M); if (it.length) S.formChecks[key] = it; } catch (e) { S.formChecks[key] = [{ level: 'warn', msg: 'تعذّر الفحص: ' + e.message }]; }
+    }
+    requestRender();
+  }
+  const formLabel = (key) => {
+    const fr = FM.frameByKey(key);
+    if (!fr) return key;
+    if (fr.kind === 'form') return (fr.form === 'isol' ? fr.ch : fr.form === 'init' ? fr.ch + 'ـ' : fr.form === 'medi' ? 'ـ' + fr.ch + 'ـ' : 'ـ' + fr.ch) + ' ' + FM.FORM_AR[fr.form];
+    if (fr.kind === 'lig') return 'لام ألف ' + FM.FORM_AR[fr.form];
+    if (fr.kind === 'mark') return FM.markById[key].ar;
+    return key;
+  };
   // a file made from our template (exported again by Illustrator or not)
   const isTemplate = (text) => /id="frame-(stem|tooth|basin)"/.test(text) || /viewBox="0 0 8220 6820"/.test(text);
   function runPieceChecks() {
@@ -305,6 +402,7 @@
   function renderImport() {
     const box = $('#importSummary');
     const chip = $('#svgName');
+    if (S.formsFile && Object.keys(FM.drawn).length) { renderFormsImport(box, chip); return; }
     if (!S.file) { chip.textContent = 'لم يُرفع ملف'; chip.className = 'chip'; box.innerHTML = ''; return; }
     chip.textContent = S.file.demo ? 'ملف تجريبي رسمه المحرك' : S.file.name;
     chip.className = 'chip ' + (S.file.demo ? '' : 'drawn');
@@ -335,6 +433,33 @@
     box.appendChild(ul);
   }
 
+  function renderFormsImport(box, chip) {
+    const f = S.formsFile, r = f.report;
+    chip.textContent = f.name; chip.className = 'chip drawn';
+    const nForms = FM.count(), nLig = ['lamAlef.isol', 'lamAlef.fina'].filter(FM.has).length, nMarks = FM.MARKS.filter((mk) => FM.has(mk.id)).length;
+    const rows = [];
+    rows.push(['ok', 'وصل ' + AR(nForms) + ' شكلاً من ٦٤' + (nLig ? '، ولام ألف' + (nLig === 2 ? ' بشكليه' : '') : '') + (nMarks ? '، و' + AR(nMarks) + ' من الحركات الثماني' : '')]);
+    if (nForms < 64) rows.push(['info', 'ما لم تُرسم من الأشكال تكملها القطع.']);
+    if (FM.kash) rows.push(['info', 'الكشيدة: سماكتها ' + AR(FM.kash[1] - FM.kash[0]) + ' وحدة، من ' + AR(FM.kash[0]) + ' إلى ' + AR(FM.kash[1]) + ' فوق السطر.']);
+    const probs = Object.keys(S.formChecks);
+    for (const key of probs.slice(0, 8)) for (const it of S.formChecks[key]) rows.push([it.level, formLabel(key) + ': ' + it.msg]);
+    if (probs.length > 8) rows.push(['warn', 'وأشكال أخرى عليها ملاحظات: ' + AR(probs.length - 8)]);
+    if (r.open) rows.push(['warn', AR(r.open) + ' مسار مفتوح لم يُقرأ. أغلقه أو حوّل الخط إلى شكل (Outline Stroke).']);
+    if (r.outside) rows.push(['warn', AR(r.outside) + ' شكل خارج الإطارات تُرك.']);
+    if (r.issues.includes('size')) rows.push(['error', 'حجم اللوحة تغيّر عن القالب، فقد تقع الأشكال في غير إطاراتها.']);
+    box.innerHTML = '';
+    const done = el('div', 'done');
+    const t = el('span');
+    t.append(el('b', '', 'رسومك مستعملة: '), document.createTextNode(AR(nForms) + ' شكلاً كاملاً، والخط مبني منها مباشرة.'));
+    const go = el('button', 'btn small', 'اذهب إلى الوصفات'); go.type = 'button';
+    go.addEventListener('click', () => $('#recipes').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    done.append(t, go);
+    box.appendChild(done);
+    const ul = el('ul', 'checks');
+    for (const [lv, tx] of rows) ul.appendChild(el('li', lv, tx));
+    box.appendChild(ul);
+  }
+
   /* demo: a designer's export, simulated so the whole flow can be tried without Illustrator */
   function demoSVG() {
     const style = R.clampDNA(Object.assign(R.defaultDNA(), { weight: 96, roundness: 0.85, cap: 'round', dotShape: 'circle', xh: 450, loop: 410, desc: 260 }));
@@ -360,6 +485,8 @@
 
   function initStart() {
     $('#tplBtn').addEventListener('click', downloadTemplate);
+    for (const b of $$('#tplSeg button')) b.addEventListener('click', () => { S.tpl = b.dataset.k; thumbVer = -1; renderThumb(); });
+    for (const b of $$('#draftKash button')) b.addEventListener('click', () => { S.draftKash = b.dataset.k; renderThumb(); });
     $('#svgFile').addEventListener('change', async (e) => {
       const f = e.target.files[0]; e.target.value = '';
       if (f) importSVG(await f.text(), f.name, false);
@@ -383,7 +510,8 @@
     $('#demoBtn').addEventListener('click', () => { importSVG(demoSVG(), 'demo', true); toast('حُمّل ملف تجريبي'); });
     $('#clearDrawn').addEventListener('click', () => {
       for (const k in R.slots.drawn) delete R.slots.drawn[k];
-      clearPP('drawn'); S.file = null; S.checks = {}; S.drawnDNA = {};
+      FM.clear();
+      clearPP('drawn'); S.file = null; S.formsFile = null; S.checks = {}; S.formChecks = {}; S.drawnDNA = {};
       changed(true); toast('مُسحت الرسوم. كل القطع يولّدها القلم الآن.');
     });
   }
@@ -620,6 +748,9 @@
     toast('أُنزلت «' + META(id).ar + '» إلى السطر');
   }
   function renderPieces() {
+    const nd = FM.count(), note = $('#piecesNote');
+    note.hidden = !nd;
+    if (nd) note.textContent = 'رسمت ' + AR(nd) + ' شكلاً كاملاً في قالب الأشكال. القطع هنا تملأ ما لم ترسمه فقط، وهي مصدر المسودة في القالب.';
     const ink = T('--ink'), accent = T('--accent'), rest = T('--rest'), line = T('--line'), band = T('--band');
     for (const card of $$('#slots .slot')) {
       const id = card.dataset.slot, meta = META(id);
@@ -681,6 +812,7 @@
   const FORMS = ['isol', 'init', 'medi', 'fina'];
   const FORM_AR = { isol: 'منفصل', init: 'أوّل', medi: 'وسط', fina: 'آخر' };
   function formulaOf(built) {
+    if (built.drawnForm) return 'مرسوم كاملاً';
     return R.recipeOf(built).map((it) => (META(it.id) ? META(it.id).short : it.id) + (it.n > 1 ? '×' + AR(it.n) : '')).join(' + ');
   }
   // the recipe as text with a joint mark on each side that connects (right = to the letter before)
@@ -734,15 +866,18 @@
         const cv = c.querySelector('canvas');
         const { ctx, w, h } = sizeCanvas(cv);
         drawCentered(ctx, g, w, h, h * 0.98 / VSPAN(), colorOf);
-        const items = g ? R.recipeOf(g) : [];
+        const items = g && !g.drawnForm ? R.recipeOf(g) : [];
         const has = !!S.hl && items.some((it) => it.id === S.hl);
         if (has) uses++;
         c.classList.toggle('uses', has);
+        c.classList.toggle('drawn', !!(g && g.drawnForm));
         setFormula(c.querySelector('.mx-f'), g, f);
       }
     }
+    const nd = FM.count();
     $('#coverage').textContent = S.hl ? '«' + META(S.hl).ar + '» في ' + AR(uses) + ' وصفة من ' + AR(total) + '.'
-      : AR(total) + ' وصفة، كلها من القطع الاثنتي عشرة والوصلة. الشَّرطة على جانب الوصفة تعني أن الحرف يتصل من تلك الجهة.';
+      : nd ? AR(nd) + ' شكلاً من ' + AR(total) + ' مرسوم كاملاً في قالب الأشكال، والباقي من القطع. الشَّرطة على جانب الوصفة تعني أن الحرف يتصل من تلك الجهة.'
+        : AR(total) + ' وصفة، كلها من القطع الاثنتي عشرة والوصلة. الشَّرطة على جانب الوصفة تعني أن الحرف يتصل من تلك الجهة.';
   }
 
   /* ---------------------------------------------------------------- 04 tests */
@@ -762,13 +897,15 @@
   function joinCheck(res, m) {
     const bad = [];
     const W = m.W;
+    // the band a joint must fill: the drawn kashida when there is one
+    const k = FM.kashFor(), lo = k ? k[0] + (k[1] - k[0]) * 0.2 : W * 0.2, hi = k ? k[1] - (k[1] - k[0]) * 0.2 : W * 0.8;
     for (const spec of INV) {
       const name = spec.name, f = spec.form;
       const jr = f === 'fina' || f === 'medi', jl = f === 'init' || f === 'medi';
       if (!jr && !jl && name !== 'tatweel') continue;
       const built = res.built[name], polys = contoursToPolys(res.outlines[name] || []);
       if (!built || !polys.length) continue;
-      const covered = (x) => R.geom.spanAt(polys, x, true).some((s) => s[0] <= W * 0.2 && s[1] >= W * 0.8);
+      const covered = (x) => R.geom.spanAt(polys, x, true).some((s) => s[0] <= lo && s[1] >= hi);
       if ((jr || name === 'tatweel') && !covered(built.adv - 3)) bad.push(name);
       else if ((jl || name === 'tatweel') && !covered(3)) bad.push(name);
     }
@@ -843,6 +980,14 @@
       const bad = joinCheck(res, m);
       items.push(bad.length ? ['warn', 'وصل غير مكتمل عند الحافة: ' + bad.slice(0, 6).join('، ')] : ['ok', 'الوصل: كل شكل متصل يغطي الشريط عند حافته']);
       items.push(shapingCheck(fam, res));
+      const L = res.layout || {};
+      items.push(L.marks && L.marks.length === FM.MARKS.length && L.bases.length > 100
+        ? ['ok', 'الحركات: ' + AR(L.marks.length) + ' حركات، مواضعها محسوبة على ' + AR(L.bases.length) + ' شكلاً، والشدّة تحمل الحركة فوقها (mark · mkmk)']
+        : ['warn', 'الحركات غير مكتملة في جدول المواضع']);
+      if (FM.count()) {
+        const off = Object.keys(S.formChecks).filter((k) => S.formChecks[k].some((x) => /الكشيدة|درجة/.test(x.msg))).length;
+        items.push(off ? ['warn', 'الكشيدة: ' + AR(off) + ' شكلاً وصلاتها بسماكة مختلفة'] : ['ok', 'الكشيدة: الوصلات كلها بسماكة واحدة' + (FM.kash ? ' (' + AR(FM.kash[1] - FM.kash[0]) + ' وحدة)' : '')]);
+      }
       const hits = collisionCheck(res, m);
       S.collisions = hits.list;
       items.push(hits.list.length ? ['warn', 'تداخل في ' + AR(hits.list.length) + ' زوجاً من ' + AR(hits.pairs)] : ['ok', 'التداخل: لا يتداخل أي حرفين متجاورين (' + AR(hits.pairs) + ' زوجاً)']);
@@ -873,6 +1018,7 @@
   function charOf(spec) {
     if (spec.kind === 'letter') return String.fromCodePoint(spec.letter.uni);
     if (spec.kind === 'lig') return 'لا';
+    if (spec.kind === 'mark') return '\u25CC' + String.fromCodePoint(spec.uni);
     if (spec.kind === 'extra') return spec.extra.uni === 0x20 ? '␣' : spec.extra.uni === 0xA0 ? '⍽' : String.fromCodePoint(spec.extra.uni);
     return '';
   }
@@ -1024,7 +1170,7 @@
     for (const id in R.slots.drawn) drawn[id] = { shapes: R.slots.drawn[id].shapes, placeU: R.slots.drawn[id].placeU };
     const slots = {};
     for (const id in R.slots.overrides) { const o = R.slots.overrides[id]; try { slots[id] = { png: o.img.toDataURL('image/png'), wu: o.wu, hu: o.hu, y0: o.y0, source: S.src[id] || 'upload' }; } catch (e) { /* skip */ } }
-    const data = JSON.stringify({ app: 'rasm', v: 2, family: famName(), dna: S.dna, measured: S.measured, drawnDNA: S.drawnDNA, pp: S.pp, ppSrc: S.ppSrc, useDrawn: R.slots.useDrawn, drawn, slots });
+    const data = JSON.stringify({ app: 'rasm', v: 3, family: famName(), dna: S.dna, measured: S.measured, drawnDNA: S.drawnDNA, pp: S.pp, ppSrc: S.ppSrc, useDrawn: R.slots.useDrawn, drawn, slots, forms: FM.save() });
     await saveFile(fileBase() + '-rasm.json', data, 'application/json');
   }
   async function loadProject(file) {
@@ -1046,7 +1192,9 @@
         img.onerror = () => res(); img.src = o.png;
       })));
       S.file = Object.keys(R.slots.drawn).length ? { name: file.name, report: { open: 0, outlineOnly: 0, outside: 0, issues: [] }, count: Object.keys(R.slots.drawn).length } : null;
-      buildAxes(); changed(true); runPieceChecks();
+      FM.load(j.forms, R.metrics(S.dna, S.pp));
+      S.formsFile = Object.keys(FM.drawn).length ? { name: file.name, report: { open: 0, outlineOnly: 0, outside: 0, issues: [] }, count: Object.keys(FM.drawn).length } : null;
+      buildAxes(); changed(true); runPieceChecks(); runFormChecks();
       toast('فُتح المشروع');
     } catch (e) { toast(e.message || 'تعذّر فتح الملف'); }
   }

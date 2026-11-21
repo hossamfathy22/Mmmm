@@ -70,6 +70,13 @@
     }
     conn(at, toU) {
       const m = this.m;
+      const k = R.forms && R.forms.kashFor();
+      if (k) {
+        // the kashida the drawn forms share: a straight join of that section
+        const u0 = Math.min(at.u, toU), u1 = Math.max(at.u, toU);
+        this.parts.push({ type: 'poly', pts: [[u0, k[0]], [u1, k[0]], [u1, k[1]], [u0, k[1]]], slot: 'conn' });
+        return;
+      }
       const pts = [], rr = [];
       if (at.dir === 'up' || at.dir === 'down') {
         const rad = Math.min(m.r(m.W * 1.6), m.jl * 0.55), leg = Math.max(m.W * 0.8, rad + m.W * 0.3);
@@ -577,24 +584,74 @@
   }
 
   R.buildLetter = function (m, rasm, form, marks, opts) {
+    opts = opts || {};
+    const df = !opts.noForms && R.forms && R.forms.get(rasm + '.' + form);
+    if (df) return fromForm(m, form, marks, df, R.buildLetter(m, rasm, form, null, { noForms: true }));
     const b = new Builder(m, form);
     RX[rasm](b, m, form);
     if (marks) applyMarks(b, marks);
-    return finalize(b, opts || {});
+    return finalize(b, opts);
   };
 
-  R.buildLigature = function (m, lig, form) {
+  R.buildLigature = function (m, lig, form, opts) {
+    const df = !(opts && opts.noForms) && R.forms && R.forms.get('lamAlef.' + form);
+    if (df) return fromForm(m, form, lig.marks, df, R.buildLigature(m, R.ligatures[0], form, { noForms: true }));
     const b = new Builder(m, form);
     RX.lamalef(b, m, form);
     applyMarks(b, lig.marks);
     return finalize(b, {});
   };
 
+  /* a glyph drawn whole in the forms template. Its joins become the kashida's section at the edges
+   * (so every joint is the same), its dots go where the recipe puts them, scaled to its width and
+   * lifted clear of its ink. ref: the same glyph built from the pieces. */
+  function fromForm(m, form, marks, df, ref) {
+    const b = new Builder(m, form);
+    const jr = joinsR(form), jl = joinsL(form);
+    for (const sh of df.shapes) b.parts.push({ type: 'shape', cmds: sh.cmds, rule: sh.rule, slot: 'form' });
+    const ms = df.meas || {}, bb = df.bbox;
+    const k = R.forms.kashFor();
+    const sec = (own) => k || own || [0, m.W];
+    const uR = jr ? 0 : bb.u0 - m.sb;
+    const uL = jl ? (ms.exitU != null ? ms.exitU : bb.u1) : bb.u1 + m.sb;
+    const rect = (u0, y0, u1, y1) => ({ type: 'poly', pts: [[u0, y0], [u1, y0], [u1, y1], [u0, y1]], slot: 'conn' });
+    if (jr) { const sct = sec(ms.entry); b.parts.push(rect(-m.ov * 2, sct[0], Math.max(0, ms.entryGap || 0) + m.ov * 2, sct[1])); }
+    if (jl) { const sct = sec(ms.exit); b.parts.push(rect(uL - m.ov * 2, sct[0], uL + m.ov * 2, sct[1])); }
+    const adv = Math.round(uL - uR);
+    // dots and marks: the recipe's place across the width, clear of the drawn ink
+    const gap = Math.round(Math.max(m.W * 0.35, m.ds * 0.3) + 18);
+    const hw = Math.max(m.ds * 0.75, m.W * 0.8);
+    const extent = (u) => {
+      let top = -Infinity, bot = Infinity;
+      for (let t = -1; t <= 1; t += 0.25) {
+        for (const sp of G.spanAt(df.polys, u + t * hw, true)) { if (sp[1] > top) top = sp[1]; if (sp[0] < bot) bot = sp[0]; }
+      }
+      return isFinite(top) ? { top, bot } : null;
+    };
+    for (const key in ref.anc) {
+      const [ru, ry] = ref.anc[key];
+      const u = uR + ru * adv / Math.max(1, ref.adv);
+      const e = (key === 'above' || key === 'below') ? extent(u) : null;
+      b.anc[key] = e ? [u, key === 'above' ? e.top + gap : e.bot - gap] : [u, ry];
+    }
+    if (marks) applyMarks(b, marks);
+    // a mark wider than the letter (the madda on alef) widens its free sides, as the recipes do
+    const ink = R.partBounds(b.parts.filter((p) => p.slot !== 'conn'), m.dna);
+    const uR2 = jr ? uR : Math.min(uR, ink.u0 - m.sb), uL2 = jl ? uL : Math.max(uL, ink.u1 + m.sb);
+    const adv2 = Math.round(uL2 - uR2);
+    const parts = b.parts.map((p) => R.shiftPart(p, -uR2, 0));
+    const anc = {};
+    for (const key in b.anc) anc[key] = [b.anc[key][0] - uR2, b.anc[key][1]];
+    return { adv: adv2, parts, clip: { right: jr ? -m.ov : null, left: jl ? adv2 + m.ov : null }, anc, form, drawnForm: true };
+  }
+
   R.buildExtra = function (m, ex) {
     const b = new Builder(m, 'isol');
     if (ex.kind === 'space') return { adv: Math.round(m.A * 0.26 + m.W * 0.4), parts: [], clip: {}, anc: {} };
     if (ex.kind === 'tatweel') {
       const adv = Math.round(Math.max(m.jl * 2, m.W * 1.6));
+      const k = R.forms && R.forms.kashFor();
+      if (k) return { adv, parts: [{ type: 'poly', pts: [[-m.ov * 3, k[0]], [adv + m.ov * 3, k[0]], [adv + m.ov * 3, k[1]], [-m.ov * 3, k[1]]], slot: 'conn' }], clip: { right: -m.ov, left: adv + m.ov }, anc: {} };
       return { adv, parts: [{ type: 'stroke', pts: [[-m.ov * 3, m.b], [adv + m.ov * 3, m.b]], caps: ['butt', 'butt'], slot: 'conn' }], clip: { right: -m.ov, left: adv + m.ov }, anc: {} };
     }
     if (ex.kind === 'digit') {
@@ -625,6 +682,7 @@
       out.push({ name: lg.name + '.fina', kind: 'lig', lig: lg, form: 'fina' });
     }
     for (const ex of R.extras) out.push({ name: ex.name, kind: 'extra', extra: ex, uni: ex.uni, form: 'isol' });
+    if (R.forms) for (const mk of R.forms.MARKS) out.push({ name: mk.id, kind: 'mark', mark: mk, uni: mk.uni, form: 'isol' });
     return out;
   };
 
@@ -652,6 +710,7 @@
   R.buildSpec = function (m, spec) {
     if (spec.kind === 'letter') return R.buildLetter(m, spec.letter.rasm, spec.form, spec.letter.marks);
     if (spec.kind === 'lig') return R.buildLigature(m, spec.lig, spec.form);
+    if (spec.kind === 'mark') return R.forms.buildMark(m, spec.mark);
     return R.buildExtra(m, spec.extra);
   };
 })(typeof window !== 'undefined' ? window : globalThis);

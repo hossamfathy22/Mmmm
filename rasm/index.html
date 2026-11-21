@@ -42,7 +42,7 @@
         </details>
         <details>
           <summary>ماذا ترسم؟ <span class="plus" aria-hidden="true">+</span></summary>
-          <p>الساق، السن، الحوض، الرأس، القوس، الذيل، ثم الكأس، العروة، الأنف، رأس العين، خط الكاف، الهاء، ومعها النقطة. ما لا ترسمه يولّده المحرك بقلم مقاس من رسمك.</p>
+          <p>إما الأشكال الأربعة والستين كاملة (كل حرف في كل موضع)، وهي الطريق إلى أعلى جودة، وتصلك مرسومة مسبقاً لتصحّحها. وإما القطع الاثنتي عشرة: الساق، السن، الحوض، الرأس، القوس، الذيل، الكأس، العروة، الأنف، رأس العين، خط الكاف، الهاء، ومعها النقطة.</p>
         </details>
         <details>
           <summary>على جهازك <span class="plus" aria-hidden="true">+</span></summary>
@@ -69,13 +69,27 @@
     <div class="logo-grid">
       <div class="card">
         <div class="card-top"><span class="label"><b>قالب Illustrator</b><span class="mono">TEMPLATE · SVG</span></span></div>
-        <img id="tplThumb" class="tpl-thumb" alt="معاينة القالب: خمسة عشر إطاراً بخطوطها الإرشادية">
-        <ol class="steps">
+        <div class="seg tpl-seg" id="tplSeg" role="group" aria-label="نوع القالب">
+          <button type="button" data-k="forms" aria-pressed="true">الأشكال الأربعة والستون</button>
+          <button type="button" data-k="pieces" aria-pressed="false">القطع الاثنتا عشرة</button>
+        </div>
+        <canvas id="tplCanvas" class="tpl-thumb tall" role="img" aria-label="معاينة قالب الأشكال: كل حرف في كل موضع، ما رسمته بالأسود والمسودة بالرمادي"></canvas>
+        <img id="tplThumb" class="tpl-thumb" alt="معاينة قالب القطع: خمسة عشر إطاراً بخطوطها الإرشادية" hidden>
+        <ol class="steps" data-k="forms">
+          <li><b>حمّل قالب الأشكال:</b> كل حرف في كل موضع، مرسوم مسبقاً من قطعك، ومعه لام ألف والنقطة والحركات.</li>
+          <li><b>صحّح بأداة القلم</b> ما لا يعجبك أو ارسمه من جديد. ما ترسمه هنا هو الحرف في الخط كما هو.</li>
+          <li><b>الوصلة تلمس الخط الأزرق</b> من اليمين، وتخرج على الشريط من اليسار، وسماكتها عند الحافة واحدة في كل الأشكال.</li>
+          <li><b>صدّر</b> بـ <span dir="ltr" class="mono" style="text-transform:none">File › Export › Export As › SVG</span> ثم ارفع الملف هنا. النقاط والحركات توضع آلياً.</li>
+        </ol>
+        <ol class="steps" data-k="pieces" hidden>
           <li><b>حمّل القالب</b> وافتحه في Illustrator: خمسة عشر إطاراً، لكل قطعة إطار.</li>
           <li><b>ارسم بأداة القلم</b> فوق الشكل الرمادي أو بخلافه: شكلاً مغلقاً مملوءاً بالأسود.</li>
           <li><b>أسفل القطعة على السطر،</b> وما يتصل منها داخل الشريط البرتقالي. لا تغيّر حجم اللوحة.</li>
           <li><b>صدّر</b> بـ <span dir="ltr" class="mono" style="text-transform:none">File › Export › Export As › SVG</span> ثم ارفع الملف هنا.</li>
         </ol>
+        <div class="choice draft" id="draftKash"><span class="nm">الوصلة في المسودة</span><div class="seg" role="group" aria-label="سماكة الوصلة في المسودة">
+          <button type="button" data-k="thin" aria-pressed="true">رفيعة كالنسخ</button><button type="button" data-k="full" aria-pressed="false">بسماكة القلم</button>
+        </div></div>
         <div class="row"><button class="btn solid" type="button" id="tplBtn">تحميل القالب</button><span class="hint" style="margin:0">ما رسمته يعود معك في القالب لتعدّله.</span></div>
       </div>
       <div class="card">
@@ -124,6 +138,7 @@
 <section class="sheet white" id="pieces">
   <div class="wrap">
     <div class="sec-head"><span class="step">02</span><h2>القطع</h2><p>كل قطعة مع فحصها: هل تجلس على السطر، وهل تدخل الشريط حيث تتصل، وهل سماكتها كسماكة الساق، وهل منطقة المطّ مستقيمة. ما لم ترسمه يولّده المحرك، والمشتقة ترث من أصلها.</p></div>
+    <p class="note" id="piecesNote" hidden></p>
     <div class="tree" id="tree" aria-label="شجرة القطع"></div>
     <div class="slots" id="slots"></div>
   </div>
@@ -172,6 +187,7 @@
       <button type="button" data-t="أ ب ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ي">الأبجدية</button>
       <button type="button" data-t="بسم الله الرحمن الرحيم">البسملة</button>
       <button type="button" data-t="لا إله إلا الله، سلام عليكم">لام ألف</button>
+      <button type="button" data-t="بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ">الحركات</button>
       <button type="button" data-t="١٢٣٤٥٦٧٨٩٠ ، ؛ ؟ !">الأرقام</button>
       <button type="button" data-t="مـحـمـد · كـتـاب · جـمـيـل">الكشيدة</button>
     </div>
@@ -220,7 +236,7 @@
       <div><canvas id="footMark" role="img" aria-label="رسم"></canvas><p style="font-size:14px;margin-top:8px">محرك خطوط عربية يعمل في المتصفح: من اثنتي عشرة قطعة إلى خط كامل.</p></div>
       <div><h3>المراحل</h3><ul><li><a href="#start">١ القالب والرفع</a></li><li><a href="#pieces">٢ القطع وفحصها</a></li><li><a href="#recipes">٣ الوصفات</a></li><li><a href="#check">٤ البناء والفحص</a></li><li><a href="#tester">٥ التجربة والتحميل</a></li></ul></div>
       <div><h3>الملفات</h3><ul><li>القالب: SVG لـ Illustrator</li><li>الخط: OpenType ‏(.otf)</li><li>الشعار: SVG و PNG</li><li>المشروع: JSON</li></ul></div>
-      <div><h3>الحدود الحالية</h3><ul><li>الحركات لم تُبرمج بعد (GPOS)</li><li>منحنيات الخط تُتتبَّع بدقة نصف وحدة</li><li>اسم الخط بالحروف اللاتينية</li></ul></div>
+      <div><h3>الحدود الحالية</h3><ul><li>الحركات على لام ألف تأخذ موضع الألف</li><li>منحنيات الخط تُتتبَّع بدقة نصف وحدة</li><li>اسم الخط بالحروف اللاتينية</li></ul></div>
     </div>
     <p class="colophon">مكتبة الكتابة: opentype.js ‏(MIT). الواجهة: IBM Plex Sans Arabic و IBM Plex Mono.</p>
   </div>
@@ -238,6 +254,7 @@
 <script src="src/font.js"></script>
 <script src="src/analyze.js"></script>
 <script src="src/svgio.js"></script>
+<script src="src/forms.js"></script>
 <script src="src/app.js"></script>
 </body>
 </html>

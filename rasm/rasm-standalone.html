@@ -192,6 +192,12 @@ button { cursor: pointer; }
 
 /* ---------- 01 template & upload */
 .tpl-thumb { display: block; width: 100%; aspect-ratio: 8220 / 6820; object-fit: contain; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
+.tpl-thumb.tall { aspect-ratio: auto; width: auto; margin-inline: auto; }
+.tpl-seg { margin-bottom: 12px; }
+.choice.draft { margin: 0 0 14px; }
+.note { background: var(--sheet); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: var(--muted); margin-bottom: 14px; }
+.mx-cell.drawn { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.mx-cell.drawn.uses { box-shadow: 0 0 0 1.5px var(--accent); }
 .steps { list-style: none; counter-reset: st; margin: 16px 0 16px; padding: 0; display: grid; gap: 10px; }
 .steps li { counter-increment: st; position: relative; padding-inline-start: 38px; min-height: 26px; font-size: 14.5px; line-height: 1.65; color: var(--muted); }
 .steps li::before { content: counter(st, arabic-indic); position: absolute; inset-inline-start: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
@@ -409,7 +415,7 @@ button { cursor: pointer; }
         </details>
         <details>
           <summary>ماذا ترسم؟ <span class="plus" aria-hidden="true">+</span></summary>
-          <p>الساق، السن، الحوض، الرأس، القوس، الذيل، ثم الكأس، العروة، الأنف، رأس العين، خط الكاف، الهاء، ومعها النقطة. ما لا ترسمه يولّده المحرك بقلم مقاس من رسمك.</p>
+          <p>إما الأشكال الأربعة والستين كاملة (كل حرف في كل موضع)، وهي الطريق إلى أعلى جودة، وتصلك مرسومة مسبقاً لتصحّحها. وإما القطع الاثنتي عشرة: الساق، السن، الحوض، الرأس، القوس، الذيل، الكأس، العروة، الأنف، رأس العين، خط الكاف، الهاء، ومعها النقطة.</p>
         </details>
         <details>
           <summary>على جهازك <span class="plus" aria-hidden="true">+</span></summary>
@@ -436,13 +442,27 @@ button { cursor: pointer; }
     <div class="logo-grid">
       <div class="card">
         <div class="card-top"><span class="label"><b>قالب Illustrator</b><span class="mono">TEMPLATE · SVG</span></span></div>
-        <img id="tplThumb" class="tpl-thumb" alt="معاينة القالب: خمسة عشر إطاراً بخطوطها الإرشادية">
-        <ol class="steps">
+        <div class="seg tpl-seg" id="tplSeg" role="group" aria-label="نوع القالب">
+          <button type="button" data-k="forms" aria-pressed="true">الأشكال الأربعة والستون</button>
+          <button type="button" data-k="pieces" aria-pressed="false">القطع الاثنتا عشرة</button>
+        </div>
+        <canvas id="tplCanvas" class="tpl-thumb tall" role="img" aria-label="معاينة قالب الأشكال: كل حرف في كل موضع، ما رسمته بالأسود والمسودة بالرمادي"></canvas>
+        <img id="tplThumb" class="tpl-thumb" alt="معاينة قالب القطع: خمسة عشر إطاراً بخطوطها الإرشادية" hidden>
+        <ol class="steps" data-k="forms">
+          <li><b>حمّل قالب الأشكال:</b> كل حرف في كل موضع، مرسوم مسبقاً من قطعك، ومعه لام ألف والنقطة والحركات.</li>
+          <li><b>صحّح بأداة القلم</b> ما لا يعجبك أو ارسمه من جديد. ما ترسمه هنا هو الحرف في الخط كما هو.</li>
+          <li><b>الوصلة تلمس الخط الأزرق</b> من اليمين، وتخرج على الشريط من اليسار، وسماكتها عند الحافة واحدة في كل الأشكال.</li>
+          <li><b>صدّر</b> بـ <span dir="ltr" class="mono" style="text-transform:none">File › Export › Export As › SVG</span> ثم ارفع الملف هنا. النقاط والحركات توضع آلياً.</li>
+        </ol>
+        <ol class="steps" data-k="pieces" hidden>
           <li><b>حمّل القالب</b> وافتحه في Illustrator: خمسة عشر إطاراً، لكل قطعة إطار.</li>
           <li><b>ارسم بأداة القلم</b> فوق الشكل الرمادي أو بخلافه: شكلاً مغلقاً مملوءاً بالأسود.</li>
           <li><b>أسفل القطعة على السطر،</b> وما يتصل منها داخل الشريط البرتقالي. لا تغيّر حجم اللوحة.</li>
           <li><b>صدّر</b> بـ <span dir="ltr" class="mono" style="text-transform:none">File › Export › Export As › SVG</span> ثم ارفع الملف هنا.</li>
         </ol>
+        <div class="choice draft" id="draftKash"><span class="nm">الوصلة في المسودة</span><div class="seg" role="group" aria-label="سماكة الوصلة في المسودة">
+          <button type="button" data-k="thin" aria-pressed="true">رفيعة كالنسخ</button><button type="button" data-k="full" aria-pressed="false">بسماكة القلم</button>
+        </div></div>
         <div class="row"><button class="btn solid" type="button" id="tplBtn">تحميل القالب</button><span class="hint" style="margin:0">ما رسمته يعود معك في القالب لتعدّله.</span></div>
       </div>
       <div class="card">
@@ -491,6 +511,7 @@ button { cursor: pointer; }
 <section class="sheet white" id="pieces">
   <div class="wrap">
     <div class="sec-head"><span class="step">02</span><h2>القطع</h2><p>كل قطعة مع فحصها: هل تجلس على السطر، وهل تدخل الشريط حيث تتصل، وهل سماكتها كسماكة الساق، وهل منطقة المطّ مستقيمة. ما لم ترسمه يولّده المحرك، والمشتقة ترث من أصلها.</p></div>
+    <p class="note" id="piecesNote" hidden></p>
     <div class="tree" id="tree" aria-label="شجرة القطع"></div>
     <div class="slots" id="slots"></div>
   </div>
@@ -539,6 +560,7 @@ button { cursor: pointer; }
       <button type="button" data-t="أ ب ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ي">الأبجدية</button>
       <button type="button" data-t="بسم الله الرحمن الرحيم">البسملة</button>
       <button type="button" data-t="لا إله إلا الله، سلام عليكم">لام ألف</button>
+      <button type="button" data-t="بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ">الحركات</button>
       <button type="button" data-t="١٢٣٤٥٦٧٨٩٠ ، ؛ ؟ !">الأرقام</button>
       <button type="button" data-t="مـحـمـد · كـتـاب · جـمـيـل">الكشيدة</button>
     </div>
@@ -587,7 +609,7 @@ button { cursor: pointer; }
       <div><canvas id="footMark" role="img" aria-label="رسم"></canvas><p style="font-size:14px;margin-top:8px">محرك خطوط عربية يعمل في المتصفح: من اثنتي عشرة قطعة إلى خط كامل.</p></div>
       <div><h3>المراحل</h3><ul><li><a href="#start">١ القالب والرفع</a></li><li><a href="#pieces">٢ القطع وفحصها</a></li><li><a href="#recipes">٣ الوصفات</a></li><li><a href="#check">٤ البناء والفحص</a></li><li><a href="#tester">٥ التجربة والتحميل</a></li></ul></div>
       <div><h3>الملفات</h3><ul><li>القالب: SVG لـ Illustrator</li><li>الخط: OpenType ‏(.otf)</li><li>الشعار: SVG و PNG</li><li>المشروع: JSON</li></ul></div>
-      <div><h3>الحدود الحالية</h3><ul><li>الحركات لم تُبرمج بعد (GPOS)</li><li>منحنيات الخط تُتتبَّع بدقة نصف وحدة</li><li>اسم الخط بالحروف اللاتينية</li></ul></div>
+      <div><h3>الحدود الحالية</h3><ul><li>الحركات على لام ألف تأخذ موضع الألف</li><li>منحنيات الخط تُتتبَّع بدقة نصف وحدة</li><li>اسم الخط بالحروف اللاتينية</li></ul></div>
     </div>
     <p class="colophon">مكتبة الكتابة: opentype.js ‏(MIT). الواجهة: IBM Plex Sans Arabic و IBM Plex Mono.</p>
   </div>
@@ -1870,6 +1892,13 @@ button { cursor: pointer; }
     }
     conn(at, toU) {
       const m = this.m;
+      const k = R.forms && R.forms.kashFor();
+      if (k) {
+        // the kashida the drawn forms share: a straight join of that section
+        const u0 = Math.min(at.u, toU), u1 = Math.max(at.u, toU);
+        this.parts.push({ type: 'poly', pts: [[u0, k[0]], [u1, k[0]], [u1, k[1]], [u0, k[1]]], slot: 'conn' });
+        return;
+      }
       const pts = [], rr = [];
       if (at.dir === 'up' || at.dir === 'down') {
         const rad = Math.min(m.r(m.W * 1.6), m.jl * 0.55), leg = Math.max(m.W * 0.8, rad + m.W * 0.3);
@@ -2377,24 +2406,74 @@ button { cursor: pointer; }
   }
 
   R.buildLetter = function (m, rasm, form, marks, opts) {
+    opts = opts || {};
+    const df = !opts.noForms && R.forms && R.forms.get(rasm + '.' + form);
+    if (df) return fromForm(m, form, marks, df, R.buildLetter(m, rasm, form, null, { noForms: true }));
     const b = new Builder(m, form);
     RX[rasm](b, m, form);
     if (marks) applyMarks(b, marks);
-    return finalize(b, opts || {});
+    return finalize(b, opts);
   };
 
-  R.buildLigature = function (m, lig, form) {
+  R.buildLigature = function (m, lig, form, opts) {
+    const df = !(opts && opts.noForms) && R.forms && R.forms.get('lamAlef.' + form);
+    if (df) return fromForm(m, form, lig.marks, df, R.buildLigature(m, R.ligatures[0], form, { noForms: true }));
     const b = new Builder(m, form);
     RX.lamalef(b, m, form);
     applyMarks(b, lig.marks);
     return finalize(b, {});
   };
 
+  /* a glyph drawn whole in the forms template. Its joins become the kashida's section at the edges
+   * (so every joint is the same), its dots go where the recipe puts them, scaled to its width and
+   * lifted clear of its ink. ref: the same glyph built from the pieces. */
+  function fromForm(m, form, marks, df, ref) {
+    const b = new Builder(m, form);
+    const jr = joinsR(form), jl = joinsL(form);
+    for (const sh of df.shapes) b.parts.push({ type: 'shape', cmds: sh.cmds, rule: sh.rule, slot: 'form' });
+    const ms = df.meas || {}, bb = df.bbox;
+    const k = R.forms.kashFor();
+    const sec = (own) => k || own || [0, m.W];
+    const uR = jr ? 0 : bb.u0 - m.sb;
+    const uL = jl ? (ms.exitU != null ? ms.exitU : bb.u1) : bb.u1 + m.sb;
+    const rect = (u0, y0, u1, y1) => ({ type: 'poly', pts: [[u0, y0], [u1, y0], [u1, y1], [u0, y1]], slot: 'conn' });
+    if (jr) { const sct = sec(ms.entry); b.parts.push(rect(-m.ov * 2, sct[0], Math.max(0, ms.entryGap || 0) + m.ov * 2, sct[1])); }
+    if (jl) { const sct = sec(ms.exit); b.parts.push(rect(uL - m.ov * 2, sct[0], uL + m.ov * 2, sct[1])); }
+    const adv = Math.round(uL - uR);
+    // dots and marks: the recipe's place across the width, clear of the drawn ink
+    const gap = Math.round(Math.max(m.W * 0.35, m.ds * 0.3) + 18);
+    const hw = Math.max(m.ds * 0.75, m.W * 0.8);
+    const extent = (u) => {
+      let top = -Infinity, bot = Infinity;
+      for (let t = -1; t <= 1; t += 0.25) {
+        for (const sp of G.spanAt(df.polys, u + t * hw, true)) { if (sp[1] > top) top = sp[1]; if (sp[0] < bot) bot = sp[0]; }
+      }
+      return isFinite(top) ? { top, bot } : null;
+    };
+    for (const key in ref.anc) {
+      const [ru, ry] = ref.anc[key];
+      const u = uR + ru * adv / Math.max(1, ref.adv);
+      const e = (key === 'above' || key === 'below') ? extent(u) : null;
+      b.anc[key] = e ? [u, key === 'above' ? e.top + gap : e.bot - gap] : [u, ry];
+    }
+    if (marks) applyMarks(b, marks);
+    // a mark wider than the letter (the madda on alef) widens its free sides, as the recipes do
+    const ink = R.partBounds(b.parts.filter((p) => p.slot !== 'conn'), m.dna);
+    const uR2 = jr ? uR : Math.min(uR, ink.u0 - m.sb), uL2 = jl ? uL : Math.max(uL, ink.u1 + m.sb);
+    const adv2 = Math.round(uL2 - uR2);
+    const parts = b.parts.map((p) => R.shiftPart(p, -uR2, 0));
+    const anc = {};
+    for (const key in b.anc) anc[key] = [b.anc[key][0] - uR2, b.anc[key][1]];
+    return { adv: adv2, parts, clip: { right: jr ? -m.ov : null, left: jl ? adv2 + m.ov : null }, anc, form, drawnForm: true };
+  }
+
   R.buildExtra = function (m, ex) {
     const b = new Builder(m, 'isol');
     if (ex.kind === 'space') return { adv: Math.round(m.A * 0.26 + m.W * 0.4), parts: [], clip: {}, anc: {} };
     if (ex.kind === 'tatweel') {
       const adv = Math.round(Math.max(m.jl * 2, m.W * 1.6));
+      const k = R.forms && R.forms.kashFor();
+      if (k) return { adv, parts: [{ type: 'poly', pts: [[-m.ov * 3, k[0]], [adv + m.ov * 3, k[0]], [adv + m.ov * 3, k[1]], [-m.ov * 3, k[1]]], slot: 'conn' }], clip: { right: -m.ov, left: adv + m.ov }, anc: {} };
       return { adv, parts: [{ type: 'stroke', pts: [[-m.ov * 3, m.b], [adv + m.ov * 3, m.b]], caps: ['butt', 'butt'], slot: 'conn' }], clip: { right: -m.ov, left: adv + m.ov }, anc: {} };
     }
     if (ex.kind === 'digit') {
@@ -2425,6 +2504,7 @@ button { cursor: pointer; }
       out.push({ name: lg.name + '.fina', kind: 'lig', lig: lg, form: 'fina' });
     }
     for (const ex of R.extras) out.push({ name: ex.name, kind: 'extra', extra: ex, uni: ex.uni, form: 'isol' });
+    if (R.forms) for (const mk of R.forms.MARKS) out.push({ name: mk.id, kind: 'mark', mark: mk, uni: mk.uni, form: 'isol' });
     return out;
   };
 
@@ -2452,6 +2532,7 @@ button { cursor: pointer; }
   R.buildSpec = function (m, spec) {
     if (spec.kind === 'letter') return R.buildLetter(m, spec.letter.rasm, spec.form, spec.letter.marks);
     if (spec.kind === 'lig') return R.buildLigature(m, spec.lig, spec.form);
+    if (spec.kind === 'mark') return R.forms.buildMark(m, spec.mark);
     return R.buildExtra(m, spec.extra);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -2903,7 +2984,149 @@ button { cursor: pointer; }
       if (index['lam.init'] != null && alF != null) sub.addLigature('rlig', { sub: [index['lam.init'], alF], by: index[lg.name] }, 'arab', 'dflt');
       if (index['lam.medi'] != null && alF != null) sub.addLigature('rlig', { sub: [index['lam.medi'], alF], by: index[lg.name + '.fina'] }, 'arab', 'dflt');
     }
-    return { font, outlines, index, built: builtMap, family };
+    // mark positioning: where each harakah sits on each letter (GDEF + GPOS mark, mkmk)
+    const layout = F.markLayout(inv, builtMap, index, dna, m, glyphs.length);
+    const res = { font, outlines, index, built: builtMap, family, layout };
+    res.toArrayBuffer = () => F.withTables(font.toArrayBuffer(), { GDEF: F.gdef(layout), GPOS: F.gpos(layout) });
+    return res;
+  };
+
+  /* ---------------------------------------------------------------- GDEF / GPOS (written here: opentype.js does not) */
+  F.markLayout = function (inv, built, index, dna, m, nGlyphs) {
+    const marks = [], bases = [], anchors = {}, markAnchor = {};
+    const classes = new Array(nGlyphs).fill(1); classes[0] = 0;
+    for (const spec of inv) {
+      const gid = index[spec.name], g = built[spec.name];
+      if (gid == null || !g) continue;
+      if (spec.kind === 'mark') {
+        classes[gid] = 3;
+        const side = spec.mark.side === 'below' ? 1 : 0;
+        marks.push({ gid, cls: side, x: g.markAnchor[0], y: Math.round(g.markAnchor[1]), name: spec.name, top: Math.round(g.markTop) });
+        markAnchor[spec.name] = { cls: side, x: g.markAnchor[0], y: Math.round(g.markAnchor[1]) };
+        continue;
+      }
+      if (spec.kind === 'letter' || spec.kind === 'lig') {
+        const a = R.forms.anchorsFor(g, dna, m);
+        if (a && (a.top || a.bottom)) { bases.push({ gid, top: a.top, bottom: a.bottom }); anchors[spec.name] = a; }
+      }
+    }
+    // a harakah over a shadda sits on the shadda's top
+    const gap = Math.round(R.forms.markGap(m) * 0.5);
+    const shadda = marks.find((mk) => mk.name === 'shadda');
+    const mkmk = shadda ? { mark1: marks.filter((mk) => mk.cls === 0 && mk.name !== 'shadda'), mark2: [{ gid: shadda.gid, top: [0, shadda.top + gap] }] } : null;
+    return { marks, bases, mkmk, classes, anchors, markAnchor };
+  };
+
+  const B = {
+    u16: (a, v) => { a.push((v >> 8) & 255, v & 255); return a; },
+    s16: (a, v) => B.u16(a, (Math.round(v) + 65536) & 0xFFFF),
+    tag: (a, t) => { for (let i = 0; i < 4; i++) a.push(t.charCodeAt(i)); return a; }
+  };
+  // a structure whose children are laid out after its header; offsets are written from its own start
+  function withChildren(head, kids) {
+    // head: byte array with 0-placeholders; kids: [{at: index in head, bytes}] (null bytes → offset 0)
+    const out = head.slice();
+    for (const k of kids) {
+      if (!k.bytes) continue;
+      const off = out.length;
+      out[k.at] = (off >> 8) & 255; out[k.at + 1] = off & 255;
+      for (const b of k.bytes) out.push(b);
+    }
+    return out;
+  }
+  const coverage = (gids) => { const a = []; B.u16(a, 1); B.u16(a, gids.length); gids.forEach((g) => B.u16(a, g)); return a; };
+  const anchor = (x, y) => { const a = []; B.u16(a, 1); B.s16(a, x); B.s16(a, y); return a; };
+  function markArray(marks) {
+    const head = []; B.u16(head, marks.length);
+    const kids = [];
+    marks.forEach((mk) => { B.u16(head, mk.cls); kids.push({ at: head.length, bytes: anchor(mk.x, mk.y) }); B.u16(head, 0); });
+    return withChildren(head, kids);
+  }
+  function anchorRows(rows, nCls) {
+    // BaseArray / Mark2Array: per row nCls anchors (null → offset 0)
+    const head = []; B.u16(head, rows.length);
+    const kids = [];
+    rows.forEach((row) => { for (let c = 0; c < nCls; c++) { kids.push({ at: head.length, bytes: row[c] ? anchor(row[c][0], row[c][1]) : null }); B.u16(head, 0); } });
+    return withChildren(head, kids);
+  }
+  function markAttach(fmtMarks, fmtBases, nCls, baseRows) {
+    // MarkBasePos / MarkMarkPos format 1 (same layout)
+    const ms = fmtMarks.slice().sort((p, q) => p.gid - q.gid);
+    const order = baseRows.map((r, i) => i).sort((p, q) => fmtBases[p] - fmtBases[q]);
+    const head = []; B.u16(head, 1); B.u16(head, 0); B.u16(head, 0); B.u16(head, nCls); B.u16(head, 0); B.u16(head, 0);
+    return withChildren(head, [
+      { at: 2, bytes: coverage(ms.map((x) => x.gid)) },
+      { at: 4, bytes: coverage(order.map((i) => fmtBases[i])) },
+      { at: 8, bytes: markArray(ms) },
+      { at: 10, bytes: anchorRows(order.map((i) => baseRows[i]), nCls) }
+    ]);
+  }
+  function lookup(type, subtable) {
+    const head = []; B.u16(head, type); B.u16(head, 0); B.u16(head, 1); B.u16(head, 0);
+    return withChildren(head, [{ at: 6, bytes: subtable }]);
+  }
+  F.gpos = function (L) {
+    if (!L.marks.length || !L.bases.length) return null;
+    const lookups = [lookup(4, markAttach(L.marks, L.bases.map((b) => b.gid), 2, L.bases.map((b) => [b.top, b.bottom])))];
+    const feats = [['mark', [0]]];
+    if (L.mkmk && L.mkmk.mark1.length) {
+      lookups.push(lookup(6, markAttach(L.mkmk.mark1, L.mkmk.mark2.map((x) => x.gid), 1, L.mkmk.mark2.map((x) => [x.top]))));
+      feats.push(['mkmk', [1]]);
+    }
+    const lookupList = (() => { const h = []; B.u16(h, lookups.length); const kids = []; lookups.forEach((lk) => { kids.push({ at: h.length, bytes: lk }); B.u16(h, 0); }); return withChildren(h, kids); })();
+    const featureList = (() => {
+      const h = []; B.u16(h, feats.length); const kids = [];
+      feats.forEach(([tag, idx]) => { B.tag(h, tag); const f = []; B.u16(f, 0); B.u16(f, idx.length); idx.forEach((i) => B.u16(f, i)); kids.push({ at: h.length, bytes: f }); B.u16(h, 0); });
+      return withChildren(h, kids);
+    })();
+    const langSys = (() => { const a = []; B.u16(a, 0); B.u16(a, 0xFFFF); B.u16(a, feats.length); feats.forEach((f, i) => B.u16(a, i)); return a; })();
+    const script = () => { const h = []; B.u16(h, 0); B.u16(h, 0); return withChildren(h, [{ at: 0, bytes: langSys }]); };
+    const scriptList = (() => {
+      const h = []; B.u16(h, 2); const kids = [];
+      ['DFLT', 'arab'].forEach((t) => { B.tag(h, t); kids.push({ at: h.length, bytes: script() }); B.u16(h, 0); });
+      return withChildren(h, kids);
+    })();
+    const head = []; B.u16(head, 1); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0);
+    return new Uint8Array(withChildren(head, [{ at: 4, bytes: scriptList }, { at: 6, bytes: featureList }, { at: 8, bytes: lookupList }]));
+  };
+  F.gdef = function (L) {
+    const cd = []; B.u16(cd, 1); B.u16(cd, 1); B.u16(cd, L.classes.length - 1);
+    for (let g = 1; g < L.classes.length; g++) B.u16(cd, L.classes[g]);
+    const head = []; B.u16(head, 1); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0); B.u16(head, 0);
+    return new Uint8Array(withChildren(head, [{ at: 4, bytes: cd }]));
+  };
+
+  /* add or replace tables in an sfnt (recomputing offsets and checksums) */
+  F.withTables = function (buf, add) {
+    const src = new DataView(buf);
+    const n = src.getUint16(4);
+    const tables = {};
+    for (let i = 0; i < n; i++) {
+      const o = 12 + i * 16;
+      const tag = String.fromCharCode(src.getUint8(o), src.getUint8(o + 1), src.getUint8(o + 2), src.getUint8(o + 3));
+      const off = src.getUint32(o + 8), len = src.getUint32(o + 12);
+      tables[tag] = new Uint8Array(buf, off, len).slice();
+    }
+    for (const tag in add) if (add[tag]) tables[tag] = add[tag];
+    const tags = Object.keys(tables).sort();
+    const num = tags.length;
+    let es = 0; while ((1 << (es + 1)) <= num) es++;
+    const sr = (1 << es) * 16;
+    let size = 12 + num * 16;
+    const offs = {};
+    for (const t of tags) { offs[t] = size; size += (tables[t].length + 3) & ~3; }
+    const out = new Uint8Array(size), dv = new DataView(out.buffer);
+    dv.setUint32(0, src.getUint32(0)); dv.setUint16(4, num); dv.setUint16(6, sr); dv.setUint16(8, es); dv.setUint16(10, num * 16 - sr);
+    const sum = (bytes) => { let s = 0; for (let i = 0; i < bytes.length; i += 4) s = (s + (((bytes[i] << 24) | ((bytes[i + 1] || 0) << 16) | ((bytes[i + 2] || 0) << 8) | (bytes[i + 3] || 0)) >>> 0)) >>> 0; return s; };
+    if (tables.head) { tables.head = tables.head.slice(); tables.head[8] = tables.head[9] = tables.head[10] = tables.head[11] = 0; }
+    tags.forEach((t, i) => {
+      const o = 12 + i * 16;
+      for (let k = 0; k < 4; k++) out[o + k] = t.charCodeAt(k);
+      dv.setUint32(o + 4, sum(tables[t])); dv.setUint32(o + 8, offs[t]); dv.setUint32(o + 12, tables[t].length);
+      out.set(tables[t], offs[t]);
+    });
+    if (tables.head) dv.setUint32(offs.head + 8, (0xB1B0AFBA - sum(out)) >>> 0);
+    return out.buffer;
   };
 
   /* ---------------------------------------------------------------- shaper */
@@ -2920,8 +3143,18 @@ button { cursor: pointer; }
   (R.extras || []).forEach(e => { extraByUni[e.uni] = e.name; });
 
   /* text → glyph names in logical order (kashida: number of tatweels inserted inside joins) */
-  R.shapeText = function (text, kashida) {
-    const cps = Array.from(text || '').map(c => c.codePointAt(0)).filter(cp => !isTransparent(cp));
+  R.shapeText = function (text, kashida, opts) {
+    const withMarks = !!(opts && opts.marks);
+    const all = Array.from(text || '').map(c => c.codePointAt(0));
+    const cps = [], marksAfter = [];
+    for (const cp of all) {
+      if (isTransparent(cp)) {
+        const mk = R.forms && R.forms.markByUni[cp];
+        if (withMarks && mk && cps.length) marksAfter[cps.length - 1].push(mk.id);
+        continue;
+      }
+      cps.push(cp); marksAfter.push([]);
+    }
     const jt = cps.map(R.joinType);
     const forms = cps.map(() => 'isol');
     for (let i = 0; i < cps.length; i++) {
@@ -2931,10 +3164,12 @@ button { cursor: pointer; }
       forms[i] = jp && jn ? 'medi' : jp ? 'fina' : jn ? 'init' : 'isol';
     }
     const out = [];
+    const pushMarks = (...idx) => { for (const i of idx) for (const id of (marksAfter[i] || [])) out.push({ name: id, mark: true, joinsNext: false }); };
     for (let i = 0; i < cps.length; i++) {
       const cp = cps[i];
       if (cp === 0x644 && ALEFS[cps[i + 1]]) {
         out.push({ name: ALEFS[cps[i + 1]] + (forms[i] === 'medi' || forms[i] === 'fina' ? '.fina' : ''), joinsNext: false });
+        pushMarks(i, i + 1);
         i++; continue;
       }
       const l = R.letterByUni[cp];
@@ -2949,7 +3184,9 @@ button { cursor: pointer; }
       else if (cp === 0x3F) out.push({ name: 'questionArabic', joinsNext: false });
       else if (cp === 0x3B) out.push({ name: 'semicolonArabic', joinsNext: false });
       else out.push({ name: 'space', joinsNext: false });
-      if (kashida > 0 && out[out.length - 1].joinsNext && i < cps.length - 1) for (let k = 0; k < kashida; k++) out.push({ name: 'tatweel', joinsNext: true });
+      const base = out[out.length - 1];
+      pushMarks(i);
+      if (kashida > 0 && base.joinsNext && i < cps.length - 1) for (let k = 0; k < kashida; k++) out.push({ name: 'tatweel', joinsNext: true });
     }
     return out;
   };
@@ -2957,19 +3194,27 @@ button { cursor: pointer; }
   /* SVG of a word using built outlines (right-to-left layout) */
   R.textToSVG = function (result, text, opts) {
     opts = opts || {};
-    const seq = R.shapeText(text, opts.kashida || 0);
+    const seq = R.shapeText(text, opts.kashida || 0, { marks: true });
     const k = (opts.size || 200) / 1000;
     const advOf = (n) => result.built[n] ? result.built[n].adv : 0;
-    const total = seq.reduce((a, g) => a + advOf(g.name), 0);
+    const total = seq.reduce((a, g) => a + (g.mark ? 0 : advOf(g.name)), 0);
     const pad = opts.pad != null ? opts.pad : 0.12;
     const asc = result.font.ascender, desc = result.font.descender;
     const W = total * k, H = (asc - desc) * k;
     const px = W * pad + 4, py = H * pad + 4;
-    let x = px + W, d = '';
+    let x = px + W, d = '', baseX = x, baseName = null;
+    const L = result.layout || {};
     for (const g of seq) {
+      const c = result.outlines[g.name];
+      if (g.mark) {
+        const ma = L.markAnchor && L.markAnchor[g.name], ba = baseName && L.anchors && L.anchors[baseName];
+        const at = ma && ba ? (ma.cls === 1 ? ba.bottom : ba.top) : null;
+        if (c && at) d += R.font.svgPathData(c, baseX + (at[0] - ma.x) * k, py + asc * k - (at[1] - ma.y) * k, k);
+        continue;
+      }
       const a = advOf(g.name) * k;
       x -= a;
-      const c = result.outlines[g.name];
+      baseX = x; baseName = g.name;
       if (c) d += R.font.svgPathData(c, x, py + asc * k, k);
     }
     const w = W + px * 2, h = H + py * 2;
@@ -3730,6 +3975,10 @@ button { cursor: pointer; }
 
   IO.contoursD = contoursD;
   IO.cmdsD = cmdsD;
+  IO.esc = esc;
+  IO.rtl = rtl;
+  IO.wrap = wrap;
+  IO.f1 = f1;
 
   /* ---------------------------------------------------------------- SVG reading */
   const NAMED = { black: '#000000', white: '#ffffff', red: '#ff0000', none: 'none', transparent: 'none' };
@@ -4009,6 +4258,29 @@ button { cursor: pointer; }
     return { pieces, report };
   };
 
+  IO.lum = lum;
+  IO.xcmds = xcmds;
+  IO.bboxOf = bboxOf;
+  // the dark shapes of a parsed file, each with its closed sub-paths in template coordinates (toT maps file → template)
+  IO.inkShapes = function (parsed, toT, report) {
+    const out = [];
+    for (const sh of parsed.shapes) {
+      const darkFill = sh.fill !== 'none' && lum(sh.fill) < 0.45 && sh.opacity > 0.4;
+      const darkStroke = sh.stroke !== 'none' && lum(sh.stroke) < 0.45 && sh.opacity > 0.4;
+      if (!darkFill && !darkStroke) { report.ignored++; continue; }
+      const subs = [];
+      for (const sub of sh.subs) {
+        if (!sub.closed) { report.open++; if (!darkFill) continue; }
+        if (!darkFill) report.outlineOnly++;
+        const cmds = xcmds(sub.cmds, toT);
+        if (!sub.closed) cmds.push(['Z']);
+        const bb = bboxOf(G.flattenCmds(cmds, 8));
+        subs.push({ cmds, cx: (bb.u0 + bb.u1) / 2, cy: (bb.y0 + bb.y1) / 2 });
+      }
+      if (subs.length) out.push({ subs, rule: sh.rule });
+    }
+    return out;
+  };
   IO.makePiece = function (id, shapes, polys, placeU) {
     polys = polys || shapes.reduce((a, s) => a.concat(G.flattenCmds(s.cmds, 10)), []);
     const bb = bboxOf(polys);
@@ -4188,6 +4460,419 @@ button { cursor: pointer; }
 
 </script>
 <script>
+/* رسم — قالب الأشكال: every skeleton in each of its positions drawn whole, with lam-alef, the dot,
+ * hamza and madda, and the harakat. What is drawn here is the glyph; the twelve pieces only fill
+ * what is not drawn, and give the first draft that fills this template. */
+(function (root) {
+  'use strict';
+  const R = root.Rasm, G = R.geom, IO = R.svg;
+  const FM = R.forms = { drawn: {}, use: {}, kash: null };
+
+  /* ---------------------------------------------------------------- template geometry */
+  const SC = 0.5;                       // template px per font unit (keeps the board under Illustrator's limit)
+  const FWU = 1900, FHU = 1700;         // a frame, in font units
+  const FW = FWU * SC, FH = FHU * SC;
+  const COLS = 8, GAP = 60, HEAD = 300, ROWS = 11;
+  const BASEU = 1080, REFU = 300;       // baseline below the frame top, join line left of the frame's right side
+  FM.SC = SC;
+  FM.SIZE = { W: COLS * FW + (COLS + 1) * GAP, H: HEAD + ROWS * FH + (ROWS + 1) * GAP };
+
+  const FORMS = ['isol', 'init', 'medi', 'fina'];
+  const FORM_AR = { isol: 'منفصل', init: 'أوّل', medi: 'وسط', fina: 'آخر' };
+  FM.FORM_AR = FORM_AR;
+  const joinsR = (f) => f === 'fina' || f === 'medi';
+  const joinsL = (f) => f === 'init' || f === 'medi';
+  FM.joinsR = joinsR; FM.joinsL = joinsL;
+
+  FM.MARKS = [
+    { id: 'fatha', uni: 0x64E, ar: 'الفتحة', side: 'above' },
+    { id: 'damma', uni: 0x64F, ar: 'الضمّة', side: 'above' },
+    { id: 'kasra', uni: 0x650, ar: 'الكسرة', side: 'below' },
+    { id: 'sukun', uni: 0x652, ar: 'السكون', side: 'above' },
+    { id: 'shadda', uni: 0x651, ar: 'الشدّة', side: 'above' },
+    { id: 'fathatan', uni: 0x64B, ar: 'تنوين الفتح', side: 'above' },
+    { id: 'dammatan', uni: 0x64C, ar: 'تنوين الضم', side: 'above' },
+    { id: 'kasratan', uni: 0x64D, ar: 'تنوين الكسر', side: 'below' }
+  ];
+  FM.markById = {}; FM.markByUni = {};
+  FM.MARKS.forEach((mk) => { FM.markById[mk.id] = mk; FM.markByUni[mk.uni] = mk; });
+
+  const joinOf = (rasm) => R.letters.some((l) => l.rasm === rasm && l.join === 'D') ? 'D' : 'R';
+  const familyOf = (rasm) => R.letters.filter((l) => l.rasm === rasm && l.uni < 0x660).map((l) => String.fromCodePoint(l.uni)).join(' ');
+  const shown = (ch, f) => f === 'isol' ? ch : f === 'init' ? ch + 'ـ' : f === 'medi' ? 'ـ' + ch + 'ـ' : 'ـ' + ch;
+
+  FM.frames = function () {
+    if (FM._frames) return FM._frames;
+    const out = [];
+    const place = (row, col, key, kind, extra) => {
+      const x0 = GAP + (COLS - 1 - col) * (FW + GAP), y0 = HEAD + GAP + row * (FH + GAP);
+      out.push(Object.assign({ key, kind, row, col, x0, y0, x1: x0 + FW, y1: y0 + FH, base: y0 + BASEU * SC, ref: x0 + FW - REFU * SC }, extra || {}));
+    };
+    R.rasm18.forEach(([rasm, ch], i) => {
+      const row = Math.floor(i / 2), half = i % 2;
+      const forms = R.formsOf(joinOf(rasm));
+      FORMS.forEach((f, fi) => place(row, half * 4 + fi, rasm + '.' + f, forms.includes(f) ? 'form' : 'none', { rasm, form: f, ch }));
+    });
+    const extras = [['lamAlef.isol', 'lig', { form: 'isol', ch: 'لا' }], ['lamAlef.fina', 'lig', { form: 'fina', ch: 'لا' }],
+      ['dot', 'small'], ['hamza', 'small'], ['madda', 'small']].concat(FM.MARKS.map((mk) => [mk.id, 'mark', { side: mk.side }]));
+    extras.forEach(([key, kind, extra], i) => place(9 + Math.floor(i / COLS), i % COLS, key, kind, extra));
+    return (FM._frames = out);
+  };
+  FM.frameByKey = (key) => FM.frames().find((f) => f.key === key);
+  FM.formKeys = () => FM.frames().filter((f) => f.kind === 'form').map((f) => f.key);
+
+  /* ---------------------------------------------------------------- the drawn store */
+  FM.has = (key) => !!FM.drawn[key] && FM.use[key] !== false;
+  FM.get = (key) => FM.has(key) ? FM.drawn[key] : null;
+  FM.count = () => FM.formKeys().filter(FM.has).length;
+  FM.kashFor = () => (FM.kash && (FM._force || Object.keys(FM.drawn).length)) ? FM.kash : null;
+
+  /* ---------------------------------------------------------------- harakat drawn by the pen (until you draw yours) */
+  FM.genMark = function (id, m) {
+    const W = m.W, ds = m.ds;
+    const wm = Math.max(24, Math.round(W * 0.42));
+    const L = Math.max(ds * 1.55, wm * 3.6), sl = 0.32;
+    const st = (pts, r, closed) => ({ type: 'stroke', pts: G.rpoly(pts, r || 0, !!closed), closed: !!closed, caps: ['round', 'round'], w: wm, slot: 'mark' });
+    const fatha = (dy) => st([[wm / 2, L * sl + wm / 2 + dy], [L, wm / 2 + dy]]);
+    const ring = (cu, cy, rr) => { const pts = []; for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; pts.push([cu + Math.cos(a) * rr, cy + Math.sin(a) * rr]); } return { type: 'stroke', pts, closed: true, caps: ['butt', 'butt'], w: wm * 0.85, slot: 'mark' }; };
+    const damma = (du) => {
+      const r = Math.max(ds * 0.3, wm * 0.9), h = r * 2 + wm + ds * 0.55;
+      return [ring(du + r + wm / 2, h - r - wm / 2, r), st([[du + r * 1.9 + wm * 0.2, h - r * 1.2], [du + r * 2.2, h * 0.3], [du + r * 1.2, wm / 2]], [0, r * 0.8, 0])];
+    };
+    let parts = [];
+    switch (id) {
+      case 'fatha': case 'kasra': parts = [fatha(0)]; break;
+      case 'fathatan': case 'kasratan': parts = [fatha(0), fatha(L * sl * 0.55 + wm * 1.2)]; break;
+      case 'damma': parts = damma(0); break;
+      case 'dammatan': parts = damma(0).concat(damma(ds * 0.95 + wm)); break;
+      case 'sukun': { const r = Math.max(ds * 0.36, wm); parts = [ring(r + wm / 2, r + wm / 2, r)]; break; }
+      case 'shadda': {
+        const w = L * 1.05, h = Math.max(ds * 0.55, wm * 2);
+        parts = [st([[wm / 2, h], [w * 0.2, wm / 2], [w * 0.5, h * 0.8], [w * 0.8, wm / 2], [w - wm / 2, h]], [0, wm * 0.6, wm * 0.6, wm * 0.6, 0])];
+        break;
+      }
+    }
+    return normPiece({ parts }, m);
+  };
+  function normPiece(p, m) {
+    const b = R.partBounds(p.parts, m.dna);
+    const parts = p.parts.map((pt) => R.shiftPart(pt, -b.u0, -b.y0));
+    return { w: b.u1 - b.u0, h: b.y1 - b.y0, parts };
+  }
+  const shapesParts = (d, slot) => d.shapes.map((sh) => ({ type: 'shape', cmds: sh.cmds, rule: sh.rule, slot }));
+  FM.markPiece = function (id, m) {
+    const d = FM.get(id);
+    if (d) return { w: d.w, h: d.h, parts: shapesParts(d, 'mark'), drawn: true };
+    return FM.genMark(id, m);
+  };
+
+  /* a mark as a glyph: zero advance, centred on x = 0, resting at a default place (GPOS moves it) */
+  FM.markGap = (m) => Math.round(m.W * 0.3 + m.ds * 0.12 + 14);
+  FM.buildMark = function (m, mk) {
+    const p = FM.markPiece(mk.id, m);
+    const gap = FM.markGap(m);
+    const yA = m.X + m.mg + gap, yB = -(gap + p.h);
+    const y0 = mk.side === 'below' ? yB : yA;
+    const parts = p.parts.map((pt) => R.shiftPart(pt, -p.w / 2, y0));
+    return { adv: 0, parts, clip: {}, anc: {}, form: 'isol', mark: mk.id, markAnchor: mk.side === 'below' ? [0, y0 + p.h] : [0, y0], markTop: y0 + p.h };
+  };
+
+  /* where marks attach on a base glyph: above and below its ink, near where its dots go (font units, x from the left) */
+  FM.anchorsFor = function (built, dna, m) {
+    if (!built || !built.parts || !built.parts.length) return null;
+    const s = 0.12;
+    const r = R.font.rasterize(built, dna, s);
+    if (!r) return null;
+    const { W, H } = r;
+    const data = r.ctx.getImageData(0, 0, W, H).data;
+    const top = new Float32Array(W).fill(NaN), bot = new Float32Array(W).fill(NaN);
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) if (data[(y * W + x) * 4 + 3] > 90) { top[x] = y; break; }
+      for (let y = H - 1; y >= 0; y--) if (data[(y * W + x) * 4 + 3] > 90) { bot[x] = y; break; }
+    }
+    const toFont = r.toFont;
+    const xOf = (X) => toFont(X, 0)[0];
+    const Xof = (fx) => { const a = toFont(0, 0)[0], b = toFont(1, 0)[0]; return (fx - a) / (b - a); };
+    const yOf = (Y) => toFont(0, Y)[1];
+    const gap = FM.markGap(m);
+    const hw = Math.max(m.ds * 0.8, m.W * 1.2);
+    const ink = R.partBounds(built.parts, dna);
+    const cx = built.adv - (ink.u0 + ink.u1) / 2;
+    const pick = (hint, fn) => {
+      const fx = hint != null ? hint : cx;
+      const X0 = Math.max(0, Math.floor(Xof(fx - hw))), X1 = Math.min(W - 1, Math.ceil(Xof(fx + hw)));
+      let best = null;
+      for (let X = X0; X <= X1; X++) { const v = fn === 'top' ? top[X] : bot[X]; if (isNaN(v)) continue; if (best == null || (fn === 'top' ? v < best : v > best)) best = v; }
+      if (best == null) return null;
+      const y = fn === 'top' ? Math.max(yOf(best) + gap, m.X + gap) : Math.min(yOf(best) - gap, -gap);
+      return [Math.round(fx), Math.round(y)];
+    };
+    const ha = built.anc && built.anc.above ? built.adv - built.anc.above[0] : null;
+    const hb = built.anc && built.anc.below ? built.adv - built.anc.below[0] : null;
+    return { top: pick(ha, 'top'), bottom: pick(hb != null ? hb : ha, 'bottom') };
+  };
+
+  /* ---------------------------------------------------------------- reading a forms file */
+  FM.isForms = (parsed) => { const b = parsed.box; return b[2] / b[3] < 1; };
+  FM.read = function (parsed) {
+    const report = { matched: 0, ignored: 0, open: 0, outlineOnly: 0, outside: 0, issues: parsed.issues.slice(), kind: 'forms' };
+    const [bx, by, bw, bh] = parsed.box;
+    const kx = FM.SIZE.W / bw, ky = FM.SIZE.H / bh;
+    if (Math.abs(kx - ky) / kx > 0.02) report.issues.push('size');
+    const toT = (q) => [(q[0] - bx) * kx, (q[1] - by) * ky];
+    const frames = FM.frames().filter((f) => f.kind !== 'none');
+    const per = {};
+    for (const sh of IO.inkShapes(parsed, toT, report)) {
+      const byFrame = {};
+      for (const sub of sh.subs) {
+        const fr = frames.find((f) => sub.cx >= f.x0 && sub.cx <= f.x1 && sub.cy >= f.y0 && sub.cy <= f.y1);
+        if (!fr) { report.outside++; continue; }
+        (byFrame[fr.key] = byFrame[fr.key] || { cmds: [], fr }).cmds.push(...sub.cmds);
+      }
+      for (const key in byFrame) { (per[key] = per[key] || []).push({ cmds: byFrame[key].cmds, rule: sh.rule, fr: byFrame[key].fr }); report.matched++; }
+    }
+    const forms = {};
+    for (const key in per) {
+      const fr = per[key][0].fr;
+      let shapes = per[key].map((s) => ({ rule: s.rule, cmds: IO.xcmds(s.cmds, (q) => [(fr.ref - q[0]) / SC, (fr.base - q[1]) / SC]) }));
+      if (fr.kind === 'small' || fr.kind === 'mark') {
+        const bb = IO.bboxOf([].concat(...shapes.map((s) => G.flattenCmds(s.cmds, 10))));
+        shapes = shapes.map((s) => ({ rule: s.rule, cmds: IO.xcmds(s.cmds, (q) => [q[0] - bb.u0, q[1] - bb.y0]) }));
+      }
+      const d = IO.makePiece(key, shapes, null, 0);
+      Object.assign(d, { kind: fr.kind, rasm: fr.rasm, form: fr.form });
+      forms[key] = d;
+    }
+    return { forms, report };
+  };
+
+  /* ---------------------------------------------------------------- measuring the joins */
+  const vspans = (d, u) => G.spanAt(d.polys, u, true);
+  function bandSpan(d, u, W) {
+    // the vertical section at u nearest to the joint band
+    const sp = vspans(d, u).filter((s) => s[0] < W * 1.6 && s[1] > -W * 0.6);
+    if (!sp.length) return null;
+    sp.sort((a, b) => Math.abs((a[0] + a[1]) / 2 - W / 2) - Math.abs((b[0] + b[1]) / 2 - W / 2));
+    return [sp[0][0], sp[0][1]];
+  }
+  FM.measure = function (d, m) {
+    const W = m.W, ms = {};
+    const f = d.form;
+    if (d.kind !== 'form' && d.kind !== 'lig') return ms;
+    if (joinsR(f)) {
+      ms.entryGap = d.bbox.u0;                                       // > 0: the join stops short of the line
+      ms.entry = bandSpan(d, Math.max(d.bbox.u0, 0) + 2, W);
+    }
+    if (joinsL(f)) {
+      let left = null;
+      for (const k of [0.15, 0.3, 0.5, 0.7]) {
+        const hs = G.spanAt(d.polys, W * k);
+        if (hs.length) { const l = Math.max(...hs.map((s) => s[1])); if (left == null || l > left) left = l; }
+      }
+      ms.exitU = left;
+      ms.exit = left != null ? bandSpan(d, left - 2, W) : null;
+    }
+    return ms;
+  };
+  // the kashida: the section most joins share
+  FM.measureKash = function () {
+    const y0 = [], y1 = [];
+    for (const key in FM.drawn) {
+      const ms = FM.drawn[key].meas || {};
+      for (const s of [ms.entry, ms.exit]) if (s) { y0.push(s[0]); y1.push(s[1]); }
+    }
+    if (y0.length < 2) return null;
+    const med = (a) => { a = a.slice().sort((p, q) => p - q); return a[a.length >> 1]; };
+    const k0 = Math.round(Math.max(-40, med(y0))), k1 = Math.round(med(y1));
+    return k1 - k0 > 8 ? [k0, k1] : null;
+  };
+
+  FM.check = function (key, d, m) {
+    const items = [], W = m.W, ms = d.meas || {}, k = FM.kash;
+    const add = (level, msg) => items.push({ level, msg });
+    const AR = (v) => String(Math.round(v)).replace(/[0-9]/g, (x) => '٠١٢٣٤٥٦٧٨٩'[x]).replace('-', '−');
+    if (d.kind === 'small' || d.kind === 'mark') {
+      if (d.w < 8 || d.h < 8) add('warn', 'الشكل صغير جداً');
+      return items;
+    }
+    const f = d.form;
+    if (joinsR(f)) {
+      if (!ms.entry) add('error', 'الوصلة اليمنى لا تصل إلى الشريط عند خط الحافة');
+      else if (ms.entryGap > 4) add('warn', 'الوصلة اليمنى تقف قبل خط الحافة بـ' + AR(ms.entryGap) + ' وحدة؛ سيصلها المحرك بوصلة قصيرة');
+    }
+    if (joinsL(f) && !ms.exit) add('error', 'لا وصلة يسرى على الشريط');
+    const off = (s) => k && s && (Math.abs(s[0] - k[0]) > Math.max(6, (k[1] - k[0]) * 0.18) || Math.abs(s[1] - k[1]) > Math.max(6, (k[1] - k[0]) * 0.18));
+    if (off(ms.entry) || off(ms.exit)) {
+      const s = off(ms.entry) ? ms.entry : ms.exit;
+      add('warn', 'سماكة الوصلة هنا ' + AR(s[1] - s[0]) + ' (من ' + AR(s[0]) + ' إلى ' + AR(s[1]) + ') والكشيدة ' + AR(k[1] - k[0]) + '؛ ستظهر درجة عند الاتصال');
+    }
+    if (d.bbox.y1 > m.A * 1.35) add('warn', 'الشكل أعلى بكثير من خط الألف');
+    return items;
+  };
+
+  /* the pen and the grid, read from the drawn forms */
+  FM.dnaFrom = function () {
+    const out = {}, get = (k) => FM.get(k);
+    const al = get('alef.isol');
+    if (al) {
+      const top = al.bbox.y1;
+      const hs = G.spanAt(al.polys, top * 0.5);
+      if (hs.length) { const w = Math.max(...hs.map((s) => s[1] - s[0])); if (w > 10) out.weight = Math.round(w); }
+      out.alif = Math.round(top);
+    }
+    const bi = get('beh.init');
+    if (bi) out.xh = Math.round(bi.bbox.y1);
+    const fi = get('feh.init');
+    if (fi) out.loop = Math.round(fi.bbox.y1);
+    const ni = get('noon.isol');
+    if (ni && ni.bbox.y0 < 0) out.desc = Math.round(-ni.bbox.y0);
+    const hi = get('hah.isol');
+    if (hi && hi.bbox.y0 < 0) out.deep = Math.round(-hi.bbox.y0);
+    return out;
+  };
+
+  /* ---------------------------------------------------------------- the template */
+  FM.template = function (m, opts) {
+    opts = opts || {};
+    if (opts.kash && !FM.kash) {
+      FM.kash = opts.kash; FM._force = true;
+      try { return FM.template(m, Object.assign({}, opts, { kash: null })); } finally { FM.kash = null; FM._force = false; }
+    }
+    const dna = m.dna, esc = IO.esc, rtl = IO.rtl, f1 = IO.f1;
+    const { W: TW, H: TH } = FM.SIZE;
+    const out = [];
+    out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${TW}" height="${TH}" viewBox="0 0 ${TW} ${TH}">`);
+    out.push(`<title>Rasm — forms template</title>`);
+    out.push(`<rect id="paper" x="0" y="0" width="${TW}" height="${TH}" fill="#f4f2ef"/>`);
+    out.push(`<g id="guides">`);
+    out.push(`<text x="${TW - GAP}" y="${GAP + 80}" font-family="Arial" font-size="72" fill="#191919" text-anchor="end">${rtl('رسم — قالب الأشكال: كل حرف في كل موضع')}</text>`);
+    [
+      '١ في كل إطار شكل مرسوم مسبقاً من قطعك. صحّحه بأداة القلم أو ارسمه من جديد: شكلاً مغلقاً مملوءاً بالأسود.',
+      '٢ ما يتصل من اليمين يلمس خط الحافة الأزرق. وما يتصل من اليسار يمتد على الشريط وينتهي بقطع عمودي.',
+      '٣ سماكة الوصلة عند الحافة هي الكشيدة في الخط كله: اجعلها واحدة في كل الأشكال. لا تغيّر حجم اللوحة.',
+      '٤ النقاط تُوضع آلياً فلا ترسمها هنا. صدّر: File › Export › Export As › SVG، ثم ارفع الملف في المحرك.'
+    ].forEach((t, i) => out.push(`<text x="${TW - GAP}" y="${GAP + 140 + i * 34}" font-family="Arial" font-size="26" fill="#5f5a55" text-anchor="end">${rtl(t)}</text>`));
+    const k = FM.kash || [0, m.W];
+    const draw = [];
+    const glyphPath = (built, fr) => {
+      const contours = R.font.outline(built, dna, 0.6);
+      return IO.contoursD(contours, (x) => fr.ref - (built.adv - x) * SC, (y) => fr.base - y * SC);
+    };
+    const drawnPath = (d, fr, small) => d.shapes.map((sh) => `<path d="${IO.cmdsD(sh.cmds, small ? small.X : (u) => fr.ref - u * SC, small ? small.Y : (y) => fr.base - y * SC)}" fill="#000000"${sh.rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}/>`).join('');
+    // a light beh for the harakat frames: their size is judged against a letter
+    let behBuilt = null;
+    try { behBuilt = R.buildLetter(m, 'beh', 'isol', null); } catch (e) { /* none */ }
+    for (const fr of FM.frames()) {
+      const X = (u) => fr.ref - u * SC, Y = (y) => fr.base - y * SC;
+      const id = 'f-' + fr.key.replace('.', '-');
+      if (fr.kind === 'none') {
+        out.push(`<g id="${id}"><rect x="${fr.x0}" y="${fr.y0}" width="${FW}" height="${FH}" rx="18" fill="none" stroke="#e2ddd7" stroke-width="2" stroke-dasharray="8 10"/>`);
+        out.push(`<text x="${fr.x0 + FW / 2}" y="${fr.y0 + FH / 2}" font-family="Arial" font-size="28" fill="#b9b3ac" text-anchor="middle">${rtl('لا يتصل بما بعده')}</text></g>`);
+        continue;
+      }
+      out.push(`<g id="${id}">`);
+      out.push(`<rect x="${fr.x0}" y="${fr.y0}" width="${FW}" height="${FH}" rx="18" fill="#ffffff" stroke="#d9d4ce" stroke-width="2"/>`);
+      let title = '', sub = '';
+      if (fr.kind === 'form') { title = shown(fr.ch, fr.form) + '  ' + FORM_AR[fr.form]; sub = familyOf(fr.rasm); }
+      else if (fr.kind === 'lig') { title = (fr.form === 'fina' ? 'ـلا' : 'لا') + '  ' + FORM_AR[fr.form]; sub = 'لا لأ لإ لآ'; }
+      else if (fr.kind === 'small') { title = R.slots.byId[fr.key].ar; sub = fr.key === 'dot' ? 'تُنسخ إلى نقطتين وثلاث' : 'اختيارية'; }
+      else { title = FM.markById[fr.key].ar; sub = fr.side === 'below' ? 'تحت الحرف' : 'فوق الحرف'; }
+      out.push(`<text x="${fr.x1 - 24}" y="${fr.y0 + 58}" font-family="Arial" font-size="46" fill="#191919" text-anchor="end">${rtl(title)}</text>`);
+      out.push(`<text x="${fr.x1 - 24}" y="${fr.y0 + 98}" font-family="Arial" font-size="24" fill="#8a847d" text-anchor="end">${rtl(sub)}</text>`);
+      out.push(`<text x="${fr.x0 + 20}" y="${fr.y0 + 44}" font-family="Courier New, monospace" font-size="20" fill="#a59f98">${esc(fr.key.toUpperCase())}</text>`);
+      if (fr.kind === 'form' || fr.kind === 'lig') {
+        out.push(`<rect x="${fr.x0 + 14}" y="${f1(Y(k[1]))}" width="${FW - 28}" height="${f1((k[1] - k[0]) * SC)}" fill="#ffd8c2"/>`);
+        const ml = [[0, '#8a847d', ''], [m.X, '#c9c3bc', '8 8'], [m.A, '#c9c3bc', '8 8'], [-m.D, '#c9c3bc', '8 8']];
+        for (const [y, col, dash] of ml) out.push(`<line x1="${fr.x0 + 14}" y1="${f1(Y(y))}" x2="${fr.x1 - 14}" y2="${f1(Y(y))}" stroke="${col}" stroke-width="2"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`);
+        out.push(`<line x1="${fr.ref}" y1="${f1(Y(m.A + 60))}" x2="${fr.ref}" y2="${f1(Y(-m.DD - 40))}" stroke="#8fa1ff" stroke-width="2.5" stroke-dasharray="4 8"/>`);
+        if (joinsR(fr.form)) out.push(`<text x="${fr.ref + 8}" y="${f1(Y(-m.DD - 30))}" font-family="Arial" font-size="20" fill="#6f84ff">${rtl('تتصل هنا')}</text>`);
+      }
+      // the draft (or what was drawn before) on the drawing layer
+      try {
+        const prev = FM.drawn[fr.key];
+        if (fr.kind === 'form' || fr.kind === 'lig') {
+          if (prev) draw.push(drawnPath(prev, fr));
+          else {
+            const built = fr.kind === 'form' ? R.buildLetter(m, fr.rasm, fr.form, null) : R.buildLigature(m, R.ligatures[0], fr.form);
+            draw.push(`<path d="${glyphPath(built, fr)}" fill="#000000"/>`);
+            if (joinsL(fr.form)) {
+              const ex = X(built.adv);
+              out.push(`<line x1="${f1(ex)}" y1="${f1(Y(m.W * 2.6))}" x2="${f1(ex)}" y2="${f1(Y(-m.W * 1.6))}" stroke="#8fa1ff" stroke-width="2" stroke-dasharray="3 7"/>`);
+              out.push(`<text x="${f1(ex - 6)}" y="${f1(Y(-m.W * 1.6) + 22)}" font-family="Arial" font-size="20" fill="#6f84ff" text-anchor="end">${rtl('مخرج الوصلة')}</text>`);
+            }
+          }
+        } else if (fr.kind === 'small') {
+          // the dot, hamza and madda as the font has them now (yours if you drew them in the pieces)
+          const piece = prev ? { w: prev.w, h: prev.h, parts: shapesParts(prev, fr.key) } : R.slots.piece(fr.key, m, fr.key === 'hamza' ? { scale: 0.5 } : {});
+          const gx = fr.x0 + FW / 2 + piece.w * SC / 2, gy = fr.base - 120 * SC;
+          if (prev) draw.push(drawnPath(prev, fr, { X: (u) => gx - u * SC, Y: (y) => gy - y * SC }));
+          else {
+            const c = R.font.outline({ adv: piece.w, parts: piece.parts, clip: {} }, dna, 0.6);
+            draw.push(`<path d="${IO.contoursD(c, (x) => gx - piece.w * SC + x * SC, (y) => gy - y * SC)}" fill="#000000"/>`);
+          }
+        } else if (fr.kind === 'mark') {
+          // a light letter for scale, the mark above or below it
+          let topY = m.X, botY = 0, bx0 = fr.x0 + FW / 2, bw = 0;
+          if (behBuilt) {
+            const c = R.font.outline(behBuilt, dna, 0.6);
+            bw = behBuilt.adv * SC; bx0 = fr.x0 + FW / 2 - bw / 2;
+            out.push(`<path d="${IO.contoursD(c, (x) => bx0 + x * SC, (y) => fr.base - y * SC)}" fill="#e6e1db"/>`);
+            const ink = R.partBounds(behBuilt.parts, dna);
+            topY = ink.y1; botY = ink.y0;
+          }
+          const piece = prev ? { w: prev.w, h: prev.h, parts: shapesParts(prev, 'mark') } : FM.genMark(fr.key, m);
+          const gap = FM.markGap(m);
+          const my = fr.side === 'below' ? botY - gap - piece.h : topY + gap;
+          const gx = fr.x0 + FW / 2 + piece.w * SC / 2, gy = fr.base - my * SC;
+          if (prev) draw.push(drawnPath(prev, fr, { X: (u) => gx - u * SC, Y: (y) => gy - y * SC }));
+          else {
+            const c = R.font.outline({ adv: piece.w, parts: piece.parts, clip: {} }, dna, 0.6);
+            draw.push(`<path d="${IO.contoursD(c, (x) => gx - piece.w * SC + x * SC, (y) => gy - y * SC)}" fill="#000000"/>`);
+          }
+        }
+      } catch (e) { console.error(fr.key, e); }
+      out.push(`</g>`);
+    }
+    out.push(`</g>`);
+    out.push(`<g id="draw">${draw.join('\n')}</g>`);
+    out.push(`</svg>`);
+    return out.join('\n');
+  };
+
+  /* ---------------------------------------------------------------- import / clear / project */
+  FM.adopt = function (forms, m) {
+    for (const k in FM.drawn) delete FM.drawn[k];
+    for (const k in FM.use) delete FM.use[k];
+    Object.assign(FM.drawn, forms);
+    FM.remeasure(m);
+  };
+  FM.remeasure = function (m) {
+    FM.kash = null;
+    for (const key in FM.drawn) FM.drawn[key].meas = FM.measure(FM.drawn[key], m);
+    FM.kash = FM.measureKash();
+  };
+  FM.clear = function () { for (const k in FM.drawn) delete FM.drawn[k]; for (const k in FM.use) delete FM.use[k]; FM.kash = null; };
+  FM.save = function () {
+    const out = {};
+    for (const key in FM.drawn) out[key] = { shapes: FM.drawn[key].shapes, kind: FM.drawn[key].kind, rasm: FM.drawn[key].rasm, form: FM.drawn[key].form };
+    return { drawn: out, use: Object.assign({}, FM.use) };
+  };
+  FM.load = function (data, m) {
+    FM.clear();
+    if (!data) return;
+    for (const key in (data.drawn || {})) {
+      const o = data.drawn[key];
+      const d = IO.makePiece(key, o.shapes, null, 0);
+      Object.assign(d, { kind: o.kind, rasm: o.rasm, form: o.form });
+      FM.drawn[key] = d;
+    }
+    Object.assign(FM.use, data.use || {});
+    FM.remeasure(m);
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
 /* رسم — application: the Illustrator workflow wired to the engine.
  * 01 template & upload · 02 pieces & their checks · 03 recipes · 04 build & tests · 05 tester · 06 logos · 07 export */
 (function () {
@@ -4207,8 +4892,10 @@ button { cursor: pointer; }
     font: null, fontVer: -1, fontFace: null, fontBuf: null, stat: 'idle',
     file: null, checks: {}, report: null, collisions: [],
     ov: { sk: true, lines: true, det: true }, crop: null, sel: 'beh.init',
-    mkColor: 'ink', feat: { ctx: true, rlig: true, kash: true, rasm: true }
+    mkColor: 'ink', feat: { ctx: true, rlig: true, kash: true, rasm: true },
+    tpl: 'forms', draftKash: 'thin', formsFile: null, formChecks: {}
   };
+  const FM = R.forms;
   let M = R.metrics(S.dna, S.pp);
   const INV = R.inventory();
   const SPEC = {}; INV.forEach((s) => { SPEC[s.name] = s; });
@@ -4254,7 +4941,12 @@ button { cursor: pointer; }
     const x = (cx != null ? cx : w / 2) - (g.adv - uc) * ss;
     R.drawGlyph(ctx, g, S.dna, { x, base: baseAt(h, ss), s: ss, colorOf });
   }
-  const wordGlyphs = (text, kashida) => R.shapeText(text, kashida || 0).map((x) => G(x.name)).filter(Boolean);
+  const wordGlyphs = (text, kashida) => R.shapeText(text, kashida || 0, { marks: true }).map((x) => {
+    const g = G(x.name);
+    return g ? (x.mark ? { markOf: g, adv: 0 } : g) : null;
+  }).filter(Boolean);
+  let ancCache = new WeakMap();
+  const anchorsOf = (g) => { let a = ancCache.get(g); if (a === undefined) { a = FM.anchorsFor(g, S.dna, M); ancCache.set(g, a); } return a; };
   function drawRun(ctx, glyphs, box, color, align, sMax) {
     const total = glyphs.reduce((a, g) => a + g.adv, 0) || 1;
     let s = Math.min(box.h * 0.94 / VSPAN(), box.w * 0.96 / total);
@@ -4262,7 +4954,18 @@ button { cursor: pointer; }
     const base = box.y + baseAt(box.h, s);
     let x = align === 'right' ? box.x + box.w : box.x + (box.w + total * s) / 2;
     const colorOf = typeof color === 'function' ? color : () => color;
-    for (const g of glyphs) { x -= g.adv * s; R.drawGlyph(ctx, g, S.dna, { x, base, s, colorOf }); }
+    let prev = null, prevX = 0;
+    for (const g of glyphs) {
+      if (g.markOf) {
+        // a harakah: its anchor on the anchor of the letter before it
+        const mk = g.markOf, a = prev && anchorsOf(prev);
+        const at = a && (FM.markById[mk.mark].side === 'below' ? a.bottom : a.top);
+        if (at) R.drawGlyph(ctx, mk, S.dna, { x: prevX + (at[0] - mk.markAnchor[0]) * s, base: base - (at[1] - mk.markAnchor[1]) * s, s, colorOf });
+        continue;
+      }
+      x -= g.adv * s; R.drawGlyph(ctx, g, S.dna, { x, base, s, colorOf });
+      prev = g; prevX = x;
+    }
     return s;
   }
 
@@ -4366,7 +5069,7 @@ button { cursor: pointer; }
         setStat('building', p); return true;
       });
       if (seq !== buildSeq || ver !== S.ver) return null;
-      const buf = res.font.toArrayBuffer();
+      const buf = res.toArrayBuffer();
       const fam = 'RasmLive' + seq;
       const ff = new FontFace(fam, buf.slice(0));
       await ff.load();
@@ -4395,7 +5098,7 @@ button { cursor: pointer; }
     S.ver++;
     R.clampDNA(S.dna);
     M = R.metrics(S.dna, S.pp);
-    cache = new Map(); rcache = new Map(); usageVer = -1;
+    cache = new Map(); rcache = new Map(); usageVer = -1; ancCache = new WeakMap();
     requestRender();
     scheduleBuild(now ? 40 : 900);
   }
@@ -4429,6 +5132,13 @@ button { cursor: pointer; }
   /* ---------------------------------------------------------------- 01 template & upload */
   let thumbURL = null, thumbVer = -1;
   function renderThumb() {
+    const forms = S.tpl === 'forms';
+    $('#tplThumb').hidden = forms; $('#tplCanvas').hidden = !forms;
+    for (const ol of $$('#start .steps')) ol.hidden = ol.dataset.k !== S.tpl;
+    $('#draftKash').hidden = !forms;
+    for (const b of $$('#tplSeg button')) b.setAttribute('aria-pressed', String(b.dataset.k === S.tpl));
+    for (const b of $$('#draftKash button')) b.setAttribute('aria-pressed', String(b.dataset.k === S.draftKash));
+    if (forms) { renderFormsThumb(); return; }
     if (thumbVer === S.ver) return;
     thumbVer = S.ver;
     try {
@@ -4438,7 +5148,43 @@ button { cursor: pointer; }
       $('#tplThumb').src = thumbURL;
     } catch (e) { console.error(e); }
   }
+  // the forms template, drawn on a canvas: what you drew in ink, the draft from the pieces in grey
+  function renderFormsThumb() {
+    const cv = $('#tplCanvas');
+    const ratio = FM.SIZE.H / FM.SIZE.W, avail = Math.max(10, cv.parentNode.clientWidth - 36);
+    const h = Math.round(Math.min(560, avail * ratio)), w = Math.round(h / ratio);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    sizeCanvas(cv, h);
+    const ctx = cv.getContext('2d');
+    const k = w / FM.SIZE.W, s = FM.SC * k;
+    ctx.fillStyle = '#f4f2ef'; ctx.fillRect(0, 0, w, h);
+    for (const fr of FM.frames()) {
+      if (fr.kind === 'none') continue;
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(fr.x0 * k, fr.y0 * k, (fr.x1 - fr.x0) * k, (fr.y1 - fr.y0) * k);
+      let g = null;
+      if (fr.kind === 'form') g = RG(fr.rasm, fr.form);
+      else if (fr.kind === 'lig') g = G(fr.form === 'fina' ? 'lamAlef.fina' : 'lamAlef');
+      else if (fr.kind === 'mark') g = G(fr.key);
+      else if (fr.kind === 'small') { const pc = R.slots.piece(fr.key, M, fr.key === 'hamza' ? { scale: 0.9 } : {}); g = { adv: pc.w, parts: pc.parts, clip: {} }; }
+      if (!g) continue;
+      const drawnHere = FM.has(fr.key) || (fr.kind === 'small' && R.slots.hasDrawn(fr.key));
+      const col = drawnHere ? '#191919' : '#9a948d';
+      if (fr.kind === 'mark' || fr.kind === 'small') {
+        // small things: centred in their frame, a little larger so they read
+        const b = R.partBounds(g.parts, S.dna), ss = s * 1.6;
+        const cxu = (b.u0 + b.u1) / 2, cyu = (b.y0 + b.y1) / 2;
+        R.drawGlyph(ctx, g, S.dna, { x: (fr.x0 + fr.x1) / 2 * k - (g.adv - cxu) * ss, base: (fr.y0 + fr.y1) / 2 * k + cyu * ss, s: ss, colorOf: () => col });
+      } else R.drawGlyph(ctx, g, S.dna, { x: fr.ref * k - g.adv * s, base: fr.base * k, s, colorOf: () => col });
+    }
+  }
   async function downloadTemplate() {
+    if (S.tpl === 'forms') {
+      toast('يُجهَّز قالب الأشكال…');
+      await new Promise((r) => setTimeout(r, 40));
+      const opts = (!FM.kash && S.draftKash === 'thin') ? { kash: [0, Math.round(M.W * 0.45)] } : {};
+      await saveFile('rasm-forms.svg', FM.template(M, opts), 'image/svg+xml');
+      return;
+    }
     const svg = IO.template(M, R.slots.drawn);
     await saveFile('rasm-template.svg', svg, 'image/svg+xml');
   }
@@ -4454,6 +5200,7 @@ button { cursor: pointer; }
   function importSVG(text, name, isDemo) {
     let parsed;
     try { parsed = IO.parse(text); } catch (e) { toast(e.message || 'تعذّرت قراءة الملف'); return; }
+    if (FM.isForms(parsed)) { importForms(parsed, name); return; }
     const { pieces, report } = IO.toPieces(parsed);
     const n = Object.keys(pieces).length;
     S.file = { name, report, count: n, demo: !!isDemo };
@@ -4481,6 +5228,41 @@ button { cursor: pointer; }
     if (fit.roundness != null) S.dna.roundness = fit.roundness;
     S.measured = Object.assign({}, S.dna);
   }
+  /* the forms file: every glyph drawn whole. It does not touch the pieces: they fill what is not drawn */
+  function importForms(parsed, name) {
+    const { forms, report } = FM.read(parsed);
+    const n = Object.keys(forms).length;
+    S.formsFile = { name, report, count: n };
+    if (!n) { renderImport(); toast('لم أجد أشكالاً سوداء داخل الإطارات.'); return; }
+    for (const id of ['dot', 'hamza', 'madda']) {
+      if (!forms[id]) continue;
+      R.slots.drawn[id] = IO.makePiece(id, forms[id].shapes, null, 0);
+      delete forms[id];
+    }
+    FM.adopt(forms, M);
+    Object.assign(S.dna, FM.dnaFrom());
+    if (R.slots.drawn.dot) S.dna.dotSize = +(Math.max(R.slots.drawn.dot.w, R.slots.drawn.dot.h) / S.dna.weight).toFixed(2);
+    R.clampDNA(S.dna); S.measured = Object.assign({}, S.dna);
+    FM.remeasure(R.metrics(S.dna, S.pp));
+    changed(true);
+    runFormChecks();
+    toast('وصل ' + AR(FM.count()) + ' شكلاً من ٦٤. الحروف الآن من رسمك مباشرة.');
+  }
+  function runFormChecks() {
+    S.formChecks = {};
+    for (const key in FM.drawn) {
+      try { const it = FM.check(key, FM.drawn[key], M); if (it.length) S.formChecks[key] = it; } catch (e) { S.formChecks[key] = [{ level: 'warn', msg: 'تعذّر الفحص: ' + e.message }]; }
+    }
+    requestRender();
+  }
+  const formLabel = (key) => {
+    const fr = FM.frameByKey(key);
+    if (!fr) return key;
+    if (fr.kind === 'form') return (fr.form === 'isol' ? fr.ch : fr.form === 'init' ? fr.ch + 'ـ' : fr.form === 'medi' ? 'ـ' + fr.ch + 'ـ' : 'ـ' + fr.ch) + ' ' + FM.FORM_AR[fr.form];
+    if (fr.kind === 'lig') return 'لام ألف ' + FM.FORM_AR[fr.form];
+    if (fr.kind === 'mark') return FM.markById[key].ar;
+    return key;
+  };
   // a file made from our template (exported again by Illustrator or not)
   const isTemplate = (text) => /id="frame-(stem|tooth|basin)"/.test(text) || /viewBox="0 0 8220 6820"/.test(text);
   function runPieceChecks() {
@@ -4495,6 +5277,7 @@ button { cursor: pointer; }
   function renderImport() {
     const box = $('#importSummary');
     const chip = $('#svgName');
+    if (S.formsFile && Object.keys(FM.drawn).length) { renderFormsImport(box, chip); return; }
     if (!S.file) { chip.textContent = 'لم يُرفع ملف'; chip.className = 'chip'; box.innerHTML = ''; return; }
     chip.textContent = S.file.demo ? 'ملف تجريبي رسمه المحرك' : S.file.name;
     chip.className = 'chip ' + (S.file.demo ? '' : 'drawn');
@@ -4525,6 +5308,33 @@ button { cursor: pointer; }
     box.appendChild(ul);
   }
 
+  function renderFormsImport(box, chip) {
+    const f = S.formsFile, r = f.report;
+    chip.textContent = f.name; chip.className = 'chip drawn';
+    const nForms = FM.count(), nLig = ['lamAlef.isol', 'lamAlef.fina'].filter(FM.has).length, nMarks = FM.MARKS.filter((mk) => FM.has(mk.id)).length;
+    const rows = [];
+    rows.push(['ok', 'وصل ' + AR(nForms) + ' شكلاً من ٦٤' + (nLig ? '، ولام ألف' + (nLig === 2 ? ' بشكليه' : '') : '') + (nMarks ? '، و' + AR(nMarks) + ' من الحركات الثماني' : '')]);
+    if (nForms < 64) rows.push(['info', 'ما لم تُرسم من الأشكال تكملها القطع.']);
+    if (FM.kash) rows.push(['info', 'الكشيدة: سماكتها ' + AR(FM.kash[1] - FM.kash[0]) + ' وحدة، من ' + AR(FM.kash[0]) + ' إلى ' + AR(FM.kash[1]) + ' فوق السطر.']);
+    const probs = Object.keys(S.formChecks);
+    for (const key of probs.slice(0, 8)) for (const it of S.formChecks[key]) rows.push([it.level, formLabel(key) + ': ' + it.msg]);
+    if (probs.length > 8) rows.push(['warn', 'وأشكال أخرى عليها ملاحظات: ' + AR(probs.length - 8)]);
+    if (r.open) rows.push(['warn', AR(r.open) + ' مسار مفتوح لم يُقرأ. أغلقه أو حوّل الخط إلى شكل (Outline Stroke).']);
+    if (r.outside) rows.push(['warn', AR(r.outside) + ' شكل خارج الإطارات تُرك.']);
+    if (r.issues.includes('size')) rows.push(['error', 'حجم اللوحة تغيّر عن القالب، فقد تقع الأشكال في غير إطاراتها.']);
+    box.innerHTML = '';
+    const done = el('div', 'done');
+    const t = el('span');
+    t.append(el('b', '', 'رسومك مستعملة: '), document.createTextNode(AR(nForms) + ' شكلاً كاملاً، والخط مبني منها مباشرة.'));
+    const go = el('button', 'btn small', 'اذهب إلى الوصفات'); go.type = 'button';
+    go.addEventListener('click', () => $('#recipes').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    done.append(t, go);
+    box.appendChild(done);
+    const ul = el('ul', 'checks');
+    for (const [lv, tx] of rows) ul.appendChild(el('li', lv, tx));
+    box.appendChild(ul);
+  }
+
   /* demo: a designer's export, simulated so the whole flow can be tried without Illustrator */
   function demoSVG() {
     const style = R.clampDNA(Object.assign(R.defaultDNA(), { weight: 96, roundness: 0.85, cap: 'round', dotShape: 'circle', xh: 450, loop: 410, desc: 260 }));
@@ -4550,6 +5360,8 @@ button { cursor: pointer; }
 
   function initStart() {
     $('#tplBtn').addEventListener('click', downloadTemplate);
+    for (const b of $$('#tplSeg button')) b.addEventListener('click', () => { S.tpl = b.dataset.k; thumbVer = -1; renderThumb(); });
+    for (const b of $$('#draftKash button')) b.addEventListener('click', () => { S.draftKash = b.dataset.k; renderThumb(); });
     $('#svgFile').addEventListener('change', async (e) => {
       const f = e.target.files[0]; e.target.value = '';
       if (f) importSVG(await f.text(), f.name, false);
@@ -4573,7 +5385,8 @@ button { cursor: pointer; }
     $('#demoBtn').addEventListener('click', () => { importSVG(demoSVG(), 'demo', true); toast('حُمّل ملف تجريبي'); });
     $('#clearDrawn').addEventListener('click', () => {
       for (const k in R.slots.drawn) delete R.slots.drawn[k];
-      clearPP('drawn'); S.file = null; S.checks = {}; S.drawnDNA = {};
+      FM.clear();
+      clearPP('drawn'); S.file = null; S.formsFile = null; S.checks = {}; S.formChecks = {}; S.drawnDNA = {};
       changed(true); toast('مُسحت الرسوم. كل القطع يولّدها القلم الآن.');
     });
   }
@@ -4810,6 +5623,9 @@ button { cursor: pointer; }
     toast('أُنزلت «' + META(id).ar + '» إلى السطر');
   }
   function renderPieces() {
+    const nd = FM.count(), note = $('#piecesNote');
+    note.hidden = !nd;
+    if (nd) note.textContent = 'رسمت ' + AR(nd) + ' شكلاً كاملاً في قالب الأشكال. القطع هنا تملأ ما لم ترسمه فقط، وهي مصدر المسودة في القالب.';
     const ink = T('--ink'), accent = T('--accent'), rest = T('--rest'), line = T('--line'), band = T('--band');
     for (const card of $$('#slots .slot')) {
       const id = card.dataset.slot, meta = META(id);
@@ -4871,6 +5687,7 @@ button { cursor: pointer; }
   const FORMS = ['isol', 'init', 'medi', 'fina'];
   const FORM_AR = { isol: 'منفصل', init: 'أوّل', medi: 'وسط', fina: 'آخر' };
   function formulaOf(built) {
+    if (built.drawnForm) return 'مرسوم كاملاً';
     return R.recipeOf(built).map((it) => (META(it.id) ? META(it.id).short : it.id) + (it.n > 1 ? '×' + AR(it.n) : '')).join(' + ');
   }
   // the recipe as text with a joint mark on each side that connects (right = to the letter before)
@@ -4924,15 +5741,18 @@ button { cursor: pointer; }
         const cv = c.querySelector('canvas');
         const { ctx, w, h } = sizeCanvas(cv);
         drawCentered(ctx, g, w, h, h * 0.98 / VSPAN(), colorOf);
-        const items = g ? R.recipeOf(g) : [];
+        const items = g && !g.drawnForm ? R.recipeOf(g) : [];
         const has = !!S.hl && items.some((it) => it.id === S.hl);
         if (has) uses++;
         c.classList.toggle('uses', has);
+        c.classList.toggle('drawn', !!(g && g.drawnForm));
         setFormula(c.querySelector('.mx-f'), g, f);
       }
     }
+    const nd = FM.count();
     $('#coverage').textContent = S.hl ? '«' + META(S.hl).ar + '» في ' + AR(uses) + ' وصفة من ' + AR(total) + '.'
-      : AR(total) + ' وصفة، كلها من القطع الاثنتي عشرة والوصلة. الشَّرطة على جانب الوصفة تعني أن الحرف يتصل من تلك الجهة.';
+      : nd ? AR(nd) + ' شكلاً من ' + AR(total) + ' مرسوم كاملاً في قالب الأشكال، والباقي من القطع. الشَّرطة على جانب الوصفة تعني أن الحرف يتصل من تلك الجهة.'
+        : AR(total) + ' وصفة، كلها من القطع الاثنتي عشرة والوصلة. الشَّرطة على جانب الوصفة تعني أن الحرف يتصل من تلك الجهة.';
   }
 
   /* ---------------------------------------------------------------- 04 tests */
@@ -4952,13 +5772,15 @@ button { cursor: pointer; }
   function joinCheck(res, m) {
     const bad = [];
     const W = m.W;
+    // the band a joint must fill: the drawn kashida when there is one
+    const k = FM.kashFor(), lo = k ? k[0] + (k[1] - k[0]) * 0.2 : W * 0.2, hi = k ? k[1] - (k[1] - k[0]) * 0.2 : W * 0.8;
     for (const spec of INV) {
       const name = spec.name, f = spec.form;
       const jr = f === 'fina' || f === 'medi', jl = f === 'init' || f === 'medi';
       if (!jr && !jl && name !== 'tatweel') continue;
       const built = res.built[name], polys = contoursToPolys(res.outlines[name] || []);
       if (!built || !polys.length) continue;
-      const covered = (x) => R.geom.spanAt(polys, x, true).some((s) => s[0] <= W * 0.2 && s[1] >= W * 0.8);
+      const covered = (x) => R.geom.spanAt(polys, x, true).some((s) => s[0] <= lo && s[1] >= hi);
       if ((jr || name === 'tatweel') && !covered(built.adv - 3)) bad.push(name);
       else if ((jl || name === 'tatweel') && !covered(3)) bad.push(name);
     }
@@ -5033,6 +5855,14 @@ button { cursor: pointer; }
       const bad = joinCheck(res, m);
       items.push(bad.length ? ['warn', 'وصل غير مكتمل عند الحافة: ' + bad.slice(0, 6).join('، ')] : ['ok', 'الوصل: كل شكل متصل يغطي الشريط عند حافته']);
       items.push(shapingCheck(fam, res));
+      const L = res.layout || {};
+      items.push(L.marks && L.marks.length === FM.MARKS.length && L.bases.length > 100
+        ? ['ok', 'الحركات: ' + AR(L.marks.length) + ' حركات، مواضعها محسوبة على ' + AR(L.bases.length) + ' شكلاً، والشدّة تحمل الحركة فوقها (mark · mkmk)']
+        : ['warn', 'الحركات غير مكتملة في جدول المواضع']);
+      if (FM.count()) {
+        const off = Object.keys(S.formChecks).filter((k) => S.formChecks[k].some((x) => /الكشيدة|درجة/.test(x.msg))).length;
+        items.push(off ? ['warn', 'الكشيدة: ' + AR(off) + ' شكلاً وصلاتها بسماكة مختلفة'] : ['ok', 'الكشيدة: الوصلات كلها بسماكة واحدة' + (FM.kash ? ' (' + AR(FM.kash[1] - FM.kash[0]) + ' وحدة)' : '')]);
+      }
       const hits = collisionCheck(res, m);
       S.collisions = hits.list;
       items.push(hits.list.length ? ['warn', 'تداخل في ' + AR(hits.list.length) + ' زوجاً من ' + AR(hits.pairs)] : ['ok', 'التداخل: لا يتداخل أي حرفين متجاورين (' + AR(hits.pairs) + ' زوجاً)']);
@@ -5063,6 +5893,7 @@ button { cursor: pointer; }
   function charOf(spec) {
     if (spec.kind === 'letter') return String.fromCodePoint(spec.letter.uni);
     if (spec.kind === 'lig') return 'لا';
+    if (spec.kind === 'mark') return '\u25CC' + String.fromCodePoint(spec.uni);
     if (spec.kind === 'extra') return spec.extra.uni === 0x20 ? '␣' : spec.extra.uni === 0xA0 ? '⍽' : String.fromCodePoint(spec.extra.uni);
     return '';
   }
@@ -5214,7 +6045,7 @@ button { cursor: pointer; }
     for (const id in R.slots.drawn) drawn[id] = { shapes: R.slots.drawn[id].shapes, placeU: R.slots.drawn[id].placeU };
     const slots = {};
     for (const id in R.slots.overrides) { const o = R.slots.overrides[id]; try { slots[id] = { png: o.img.toDataURL('image/png'), wu: o.wu, hu: o.hu, y0: o.y0, source: S.src[id] || 'upload' }; } catch (e) { /* skip */ } }
-    const data = JSON.stringify({ app: 'rasm', v: 2, family: famName(), dna: S.dna, measured: S.measured, drawnDNA: S.drawnDNA, pp: S.pp, ppSrc: S.ppSrc, useDrawn: R.slots.useDrawn, drawn, slots });
+    const data = JSON.stringify({ app: 'rasm', v: 3, family: famName(), dna: S.dna, measured: S.measured, drawnDNA: S.drawnDNA, pp: S.pp, ppSrc: S.ppSrc, useDrawn: R.slots.useDrawn, drawn, slots, forms: FM.save() });
     await saveFile(fileBase() + '-rasm.json', data, 'application/json');
   }
   async function loadProject(file) {
@@ -5236,7 +6067,9 @@ button { cursor: pointer; }
         img.onerror = () => res(); img.src = o.png;
       })));
       S.file = Object.keys(R.slots.drawn).length ? { name: file.name, report: { open: 0, outlineOnly: 0, outside: 0, issues: [] }, count: Object.keys(R.slots.drawn).length } : null;
-      buildAxes(); changed(true); runPieceChecks();
+      FM.load(j.forms, R.metrics(S.dna, S.pp));
+      S.formsFile = Object.keys(FM.drawn).length ? { name: file.name, report: { open: 0, outlineOnly: 0, outside: 0, issues: [] }, count: Object.keys(FM.drawn).length } : null;
+      buildAxes(); changed(true); runPieceChecks(); runFormChecks();
       toast('فُتح المشروع');
     } catch (e) { toast(e.message || 'تعذّر فتح الملف'); }
   }
