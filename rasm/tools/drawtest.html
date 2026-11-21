@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>draw test</title>
+<style>body{margin:12px;font:13px sans-serif;background:#fff} pre{direction:ltr;white-space:pre-wrap;font:12px monospace} canvas,img{border:1px solid #eee;display:block;margin:6px 0;max-width:100%}
+.t{font-family:DrawnTest;font-size:64px;line-height:1.7;direction:rtl}</style></head>
+<body><pre id="log"></pre><div id="out"></div>
+<div class="t">بسم الله الرحمن الرحيم</div><div class="t">محمد سلام لا إله إلا هلال</div>
+<script src="../vendor/opentype.min.js"></script>
+<script src="../src/core.js"></script><script src="../src/slots.js"></script><script src="../src/recipes.js"></script>
+<script src="../src/trace.js"></script><script src="../src/font.js"></script><script src="../src/analyze.js"></script><script src="../src/svgio.js"></script>
+<script>
+(async () => {
+  const log = (t) => document.getElementById('log').textContent += t + '\n';
+  const out = document.getElementById('out');
+  try {
+    const R = window.Rasm, IO = R.svg;
+    const q = new URLSearchParams(location.search);
+    // 1) the template the designer downloads
+    const base = R.clampDNA(R.defaultDNA());
+    const m0 = R.metrics(base);
+    let tpl = IO.template(m0, {});
+    log('template bytes ' + tpl.length);
+    // 2) a simulated designer draws in another style, exported like Illustrator does
+    const style = R.clampDNA(Object.assign(R.defaultDNA(), JSON.parse(q.get('style') || '{"weight":104,"roundness":0.95,"cap":"round","dotShape":"circle","xh":440,"loop":400}')));
+    const ms = R.metrics(style);
+    let drawn = '<g id="Layer_2"><style>.cls-1{fill:#231f20;}.cls-2{fill:none;stroke:#000;stroke-width:2px;}</style>';
+    IO.frames().forEach((fr, i) => {
+      if (q.get('skip') && q.get('skip').split(',').includes(fr.id)) return;
+      const p = {};
+      if (fr.id === 'stem') p.free = true; if (fr.id === 'basin') p.full = true;
+      if (fr.id === 'cup') { p.top = ms.t; p.topCap = ms.cap; } if (fr.id === 'ain') { p.botEnd = ms.h; p.botCap = ms.cap; }
+      const piece = R.slots.piece(fr.id, ms, p);
+      const contours = R.font.outline({ adv: piece.w, parts: piece.parts, clip: {} }, style, 0.6);
+      const small = ['dot', 'hamza', 'madda'].includes(fr.id);
+      const gx = small ? fr.x0 + 700 : fr.ref - piece.w, gy = small ? fr.base - 200 : fr.base;
+      // relative commands + a translate transform, like Illustrator output
+      let d = '';
+      for (const c of contours) {
+        let px = c.start[0], py = -c.start[1];
+        d += 'M' + px.toFixed(2) + ',' + py.toFixed(2);
+        for (const sg of c.segs) {
+          if (sg.c1) { d += 'c' + [sg.c1[0] - px, -sg.c1[1] - py, sg.c2[0] - px, -sg.c2[1] - py, sg.p[0] - px, -sg.p[1] - py].map(v => v.toFixed(2)).join(','); }
+          else d += 'l' + (sg.p[0] - px).toFixed(2) + ',' + (-sg.p[1] - py).toFixed(2);
+          px = sg.p[0]; py = -sg.p[1];
+        }
+        d += 'z';
+      }
+      drawn += `<path class="cls-1" transform="translate(${gx.toFixed(2)} ${gy.toFixed(2)})" d="${d}"/>`;
+    });
+    drawn += '<path class="cls-2" d="M10,10 L200,200"/></g>';   // a stray open line
+    const exported = tpl.replace('</svg>', drawn + '</svg>');
+    // 3) back into the engine
+    const t0 = performance.now();
+    const parsed = IO.parse(exported);
+    const { pieces, report } = IO.toPieces(parsed);
+    log('parse+map ms ' + Math.round(performance.now() - t0) + ' report ' + JSON.stringify(report));
+    for (const id in pieces) { pieces[id].meas = IO.measure(pieces[id], style.weight); R.slots.drawn[id] = pieces[id]; }
+    const dnaPatch = IO.dnaFrom(pieces);
+    log('dna from drawings ' + JSON.stringify(dnaPatch));
+    const dna = R.clampDNA(Object.assign(R.defaultDNA(), dnaPatch));
+    const fit = IO.fitAll(pieces, R.metrics(dna));
+    if (fit.roundness != null) dna.roundness = fit.roundness;
+    log('fitted ' + JSON.stringify(fit));
+    const m = R.metrics(dna, fit.pp);
+    const ctx = { W: m.W, D: m.D, DD: m.DD, stemW: pieces.stem ? pieces.stem.meas.width : null };
+    for (const id of IO.ORDER) if (pieces[id]) { const it = IO.check(id, pieces[id], ctx); log(id.padEnd(6) + ' ' + (it.length ? it.map(x => x.level + ': ' + x.msg).join(' | ') : 'ok')); }
+    // 4) words drawn from the pieces
+    const res = await R.font.build({ dna, m }, { family: 'DrawnTest' });
+    const buf = res.font.toArrayBuffer();
+    log('font glyphs ' + res.font.glyphs.length + ' bytes ' + buf.byteLength);
+    const ff = new FontFace('DrawnTest', buf); await ff.load(); document.fonts.add(ff);
+    const svg = R.textToSVG(res, q.get('w') || 'بسم الله ضحك فوق كتب ليل نهر عين محمد سلام', { size: 110 });
+    const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); out.appendChild(img);
+    // template preview
+    const ti = new Image(); ti.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(exported); ti.style.width = '1200px'; out.appendChild(ti);
+    await new Promise(r => setTimeout(r, 400));
+    document.title = 'done';
+  } catch (e) { log('ERROR ' + e.stack); document.title = 'ERR'; }
+})();
+</script></body></html>

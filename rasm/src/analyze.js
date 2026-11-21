@@ -152,6 +152,9 @@
   const median = (a) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
   const pct = (a, p) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.max(0, Math.round(p * (s.length - 1))))]; };
 
+  A._edt = (m, w, h) => edt(m, w, h);
+  A._thin = (m, w, h) => thin(m, w, h);
+
   /* ---------------------------------------------------------------- main analysis */
   A.run = function (canvas) {
     const w = canvas.width, h = canvas.height, N = w * h;

@@ -347,6 +347,142 @@
   S.overrides = {};
   S.useImage = {};   // false → the piece keeps its fitted vector form even though an image exists
 
+  /* ------------------------------------------------------------ drawn pieces (from the designer's SVG)
+   * S.drawn[id] = { shapes:[{cmds, rule}], polys, bbox, w, h, meas } in (u, y): u = 0 at the right edge.
+   * One drawing serves every variant through three operations: place, stretch in a straight zone, clip. */
+  S.drawn = {};
+  S.useDrawn = {};
+  const hasD = (id) => !!S.drawn[id] && S.useDrawn[id] !== false;
+  S.hasDrawn = hasD;
+  const BIG = 1e5;
+  const rectPoly = (u0, y0, u1, y1) => [[u0, y0], [u1, y0], [u1, y1], [u0, y1]];
+  function dShapes(d, slot, fn, keep, cut) {
+    return d.shapes.map((sh) => {
+      let part = { type: 'shape', cmds: sh.cmds, rule: sh.rule, slot };
+      if (fn) part = R.xformPart(part, fn);
+      if (keep) part.keep = keep;
+      if (cut) part.cut = cut;
+      return part;
+    });
+  }
+  const chain = (fns) => { fns = fns.filter(Boolean); return fns.length ? (q) => fns.reduce((r, f) => f(r), q) : null; };
+
+  function drawnPiece(id, m, p) {
+    const d = S.drawn[id], ms = d.meas || {}, W = m.W;
+    switch (id) {
+      case 'stem': {
+        const top = d.bbox.y1;
+        let stretch = null, lean = null;
+        if (p.top != null && Math.abs(p.top - top) > 2) { const cut = top * 0.5, dy = p.top - top; stretch = (q) => q[1] > cut ? [q[0], q[1] + dy] : q; }
+        if (p.lean) { const k = Math.tan(p.lean * Math.PI / 180); lean = (q) => [q[0] + q[1] * k, q[1]]; }
+        const keep = p.bottom != null ? rectPoly(-BIG, p.bottom - W * 0.3, BIG, BIG) : null;
+        return { w: d.w, cx: ms.cx != null ? ms.cx : d.w / 2, parts: dShapes(d, 'stem', chain([stretch, lean]), keep), drawn: true };
+      }
+      case 'tooth':
+        return { w: d.w, cx: ms.cx != null ? ms.cx : d.w / 2, parts: dShapes(d, 'tooth'), drawn: true };
+      case 'basin': {
+        if (p.full) return { w: d.w, cx: d.w / 2, parts: dShapes(d, 'basin'), drawn: true };
+        const len = p.len != null ? p.len : d.w;
+        let fn = null;
+        if (Math.abs(len - d.w) > 1) { const cut = d.w * 0.5, du = len - d.w; fn = (q) => q[0] > cut ? [q[0] + du, q[1]] : q; }
+        // without its right tip (the head or the stem stands there)
+        const cut = [rectPoly(-BIG, W * 1.05, (ms.tipEnd || W) + 2, BIG)];
+        return { w: len, cx: len / 2, parts: dShapes(d, 'basin', fn, null, cut), drawn: true };
+      }
+      case 'cup': {
+        const fns = [];
+        let w = d.w, cut = null;
+        const wantW = p.variant === 'yeh' ? m.Yw : (p.w != null ? p.w : null);
+        if (wantW != null && Math.abs(wantW - d.w) > 1) { const c = d.w * 0.5, du = wantW - d.w; fns.push((q) => q[0] > c ? [q[0] + du, q[1]] : q); w = wantW; }
+        if (p.top != null && ms.armTop != null) {
+          const uMax = (ms.armW || W) * 1.4;
+          if (p.top <= W * 1.1) cut = [rectPoly(-BIG, W * 1.2, uMax, BIG)];           // ل: the stem stands on it
+          else {
+            const dy = (p.top + m.capExt) - ms.armTop;
+            if (Math.abs(dy) > 2) { const c = W * 1.6; fns.push((q) => (q[1] > c && q[0] <= uMax) ? [q[0], q[1] + dy] : q); }
+          }
+        }
+        return { w, cx: w / 2, parts: dShapes(d, 'cup', chain(fns), null, cut), drawn: true };
+      }
+      case 'head': {
+        if (p.h != null || p.w != null) {   // digits ٥ ٩
+          const k = (p.h != null ? p.h : d.h) / d.h;
+          const fn = (q) => [q[0] * k, (q[1] - d.bbox.y0) * k + (p.y0 || 0)];
+          return { w: d.w * k, h: d.h * k, cx: d.w * k / 2, parts: dShapes(d, 'head', fn), drawn: true };
+        }
+        return { w: d.w, h: d.h, cx: d.w / 2, parts: dShapes(d, 'head'), drawn: true };
+      }
+      case 'loop': return { w: d.w, h: d.h, cx: d.w / 2, parts: dShapes(d, 'loop'), drawn: true };
+      case 'arc': {
+        if (p.from || p.noTop) {
+          // the body only (ع): what lies under the line, its left side moved under the head
+          const target = p.from === 'side' ? p.su : p.from === 'vertex' ? p.vx : null;
+          const du = (target != null && ms.sideU != null) ? target - ms.sideU : 0;
+          const fn = du ? (q) => [q[0] + du, q[1]] : null;
+          return { w: d.w + du, parts: dShapes(d, 'arc', fn, rectPoly(-BIG, -BIG, BIG, W * 0.9)), drawn: true };
+        }
+        return { w: d.w, parts: dShapes(d, 'arc'), drawn: true };
+      }
+      case 'nose': {
+        if (p.variant === 'up') {
+          // ح final: keep the right side and the start of the top bar, drop the leg
+          const keep = rectPoly(-BIG, -BIG, Math.max(W * 1.6, d.w * 0.45), BIG);
+          return { w: d.w * 0.45, parts: dShapes(d, 'nose', null, keep, [rectPoly(W * 1.3, -BIG, BIG, W * 1.4)]), drawn: true };
+        }
+        return { w: d.w, exitU: ms.legEnd != null ? ms.legEnd : d.w * 0.4, parts: dShapes(d, 'nose'), drawn: true };
+      }
+      case 'ain':
+        if (p.closed) return null;                       // medial/final head: drawn by the pen
+        return { w: d.w, cx: d.w / 2, leftU: ms.leftU, parts: dShapes(d, 'ain'), drawn: true };
+      case 'tail': {
+        if (p.reach != null && p.reach <= W * 1.05) return null;
+        const keep = (p.joinTop && p.top != null) ? rectPoly(-BIG, -BIG, BIG, p.top + W * 0.3) : null;
+        return { w: d.w, parts: dShapes(d, 'tail', null, keep), drawn: true };
+      }
+      case 'kaf': {
+        const cx = ms.cx != null ? ms.cx : W / 2;
+        if (p.variant === 'dal') {
+          const keep = rectPoly(-BIG, -BIG, BIG, (ms.vertexY != null ? ms.vertexY : d.h * 0.5) + W * 0.35);
+          return { w: d.w, cx, parts: dShapes(d, 'kaf', null, keep), drawn: true };
+        }
+        return { w: d.w, cx, parts: dShapes(d, 'kaf'), drawn: true };
+      }
+      case 'heh':
+        if (p.fina) return null;
+        return { w: d.w, h: d.h, cx: d.w / 2, parts: dShapes(d, 'heh'), drawn: true };
+      case 'dot': return { w: d.w, h: d.h, parts: dShapes(d, 'dot'), drawn: true };
+      case 'hamza': {
+        const k = (p.scale || 0.5) / 0.5;
+        return { w: d.w * k, h: d.h * k, parts: dShapes(d, 'hamza', k !== 1 ? (q) => [q[0] * k, q[1] * k] : null), drawn: true };
+      }
+      case 'madda': return { w: d.w, h: d.h, parts: dShapes(d, 'madda'), drawn: true };
+    }
+    return null;
+  }
+
+  // ذيل الميم من الساق: the stem turned upside down, its terminal at the bottom
+  function meemTail(m, p) {
+    const d = S.drawn.stem, W = m.W;
+    const H = d.bbox.y1;
+    const top = p.top, bottom = (p.bot != null ? p.bot : m.dd) - m.capExt;
+    const flipTop = top + W * 0.25, len = flipTop - bottom, cut = H * 0.5, shift = H - len;
+    const fn = (q) => [q[0], q[1] > cut ? flipTop - q[1] + shift : flipTop - q[1]];
+    return { w: d.w, parts: dShapes(d, 'tail', fn, rectPoly(-BIG, -BIG, BIG, top + W * 0.3)), drawn: true };
+  }
+  // الهاء الأخيرة = رأس + ساق قصيرة
+  function hehFina(m) {
+    const W = m.W;
+    const head = hasD('head') ? drawnPiece('head', m, {}) : gen.head(m, {});
+    const H = head.h || m.pc.head.h;
+    const rise = Math.max(W * 0.8, H * 0.22);
+    let stemParts;
+    if (hasD('stem')) {
+      const d = S.drawn.stem, dy = (H + rise) - d.bbox.y1;
+      stemParts = dShapes(d, 'heh', (q) => [q[0], q[1] + dy], rectPoly(-BIG, W * 0.2, BIG, BIG));
+    } else stemParts = [stroke([[m.h, m.b], [m.h, H + rise - m.capExt]], ['butt', m.cap], 'heh')];
+    return { w: head.w, cx: head.w / 2, parts: head.parts.map((pt) => Object.assign({}, pt, { slot: 'heh' })).concat(stemParts), drawn: true };
+  }
+
   // vertical 3-slice stretch keeping the terminals intact
   function stretchV(img, newH, topFrac, botFrac) {
     const h = img.height, w = img.width;
@@ -400,6 +536,16 @@
 
   S.piece = function (id, m, p) {
     p = p || {};
+    // 1) the designer's drawings
+    if (id === 'tail' && p.reach != null && p.reach <= m.W * 1.05 && hasD('stem')) return meemTail(m, p);
+    if (id === 'heh' && p.fina && (hasD('head') || hasD('stem'))) return hehFina(m);
+    if (id === 'hamza' && !hasD('hamza') && hasD('ain')) {
+      // declared rule: الهمزة = رأس العين مصغّراً
+      const d = S.drawn.ain, k = p.scale || 0.5;
+      return { w: d.w * k, h: d.h * k, parts: dShapes(d, 'hamza', (q) => [q[0] * k, (q[1] - d.bbox.y0) * k]), drawn: true };
+    }
+    if (hasD(id)) { const dp = drawnPiece(id, m, p); if (dp) return dp; }
+    // 2) pieces cut from a logo image, 3) the pen
     if (id === 'hamza' && !S.overrides.hamza && S.overrides.ain && S.useImage.ain !== false) {
       // declared rule: الهمزة = رأس العين مصغّراً
       const o = S.overrides.ain, k = p.scale || 0.5;

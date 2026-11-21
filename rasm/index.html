@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>محرك رسم</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="يقيس شعارك ويأخذ منه الأشكال المفتاحية ويبني خطاً عربياً كاملاً — على جهازك.">
+<meta name="description" content="ارسم اثنتي عشرة قطعة في Illustrator، والمحرك يبني منها خطاً عربياً كاملاً مبرمجاً ومختبراً، على جهازك.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap">
@@ -15,9 +15,9 @@
 
 <header class="nav wrap" id="nav">
   <div class="nav-pill">
-    <a class="brand" href="#top" aria-label="رسم — إلى الأعلى"><span class="mark" aria-hidden="true">ر</span><span>رسم</span></a>
+    <a class="brand" href="#top" aria-label="رسم، إلى الأعلى"><span class="mark" aria-hidden="true">ر</span><span>رسم</span></a>
     <nav class="links" aria-label="المراحل">
-      <a href="#logo">الشعار</a><a href="#pieces">القطع</a><a href="#rasm">الهياكل</a><a href="#font">الخط</a><a href="#tester">التجربة</a><a href="#maker">الشعارات</a>
+      <a href="#start">١ القالب</a><a href="#pieces">٢ القطع</a><a href="#recipes">٣ الوصفات</a><a href="#check">٤ الفحص</a><a href="#tester">٥ التجربة</a>
     </nav>
     <button class="icon-btn" id="themeBtn" type="button" aria-label="تبديل المظهر الفاتح والداكن">
       <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
@@ -28,103 +28,128 @@
 
 <section class="hero" id="top">
   <div class="wrap">
-    <canvas class="hero-title" id="heroTitle" role="img" aria-label="كلمة «رسم» مكتوبة بالخط الذي يولّده المحرك الآن"></canvas>
-    <div class="mono kicker">RASM · ARABIC TYPE ENGINE · ON-DEVICE</div>
+    <canvas class="hero-title" id="heroTitle" role="img" aria-label="كلمة «رسم» مكتوبة بالخط الذي يبنيه المحرك الآن"></canvas>
+    <div class="mono kicker">RASM · ARABIC TYPE ENGINE · DRAW 12 PIECES, GET A FONT</div>
     <div class="hero-grid">
       <div>
-        <p class="lede">ارفع شعارك، فيقيس «رسم» قلمه ونِسبه، ويأخذ منه الأشكال المفتاحية، ثم يركّب بها ثمانية عشر هيكلاً، ومنها الحروف كلها في مواضعها الأربعة، ويبرمجها خطاً تحمّله وتكتب به.</p>
-        <a class="more mono" href="#logo">+ ابدأ بالشعار</a>
+        <p class="lede">ارسم اثنتي عشرة قطعة في Illustrator وارفعها هنا. يفحص المحرك كل قطعة، ويركّب منها الحروف في مواضعها الأربعة، ثم يبرمجها ويختبرها، ويعطيك خطاً جاهزاً للتثبيت.</p>
+        <a class="more mono" href="#start">+ ابدأ بالقالب</a>
       </div>
       <div class="acc">
         <details open>
           <summary>المنهج <span class="plus" aria-hidden="true">+</span></summary>
-          <p>المصمم لا يرسم كل حرف وحده. يرسم نحو اثني عشر شكلاً مفتاحياً، ثم يشتق الأبجدية من وصفات: كل حرف هو هذه الأشكال بهذا الترتيب. الوصفات مكتوبة مرة واحدة، وتصلح لكل شعار.</p>
+          <p>الحروف الثمانية والعشرون ترجع إلى ثمانية عشر هيكلاً، والهياكل تُبنى من اثنتي عشرة قطعة: ستّ جذور وستّ مشتقة منها. ترسم القطع مرة، والوصفات الأربع والستون تركّبها في كل حرف وموضع.</p>
+        </details>
+        <details>
+          <summary>ماذا ترسم؟ <span class="plus" aria-hidden="true">+</span></summary>
+          <p>الساق، السن، الحوض، الرأس، القوس، الذيل، ثم الكأس، العروة، الأنف، رأس العين، خط الكاف، الهاء، ومعها النقطة. ما لا ترسمه يولّده المحرك بقلم مقاس من رسمك.</p>
         </details>
         <details>
           <summary>على جهازك <span class="plus" aria-hidden="true">+</span></summary>
-          <p>القياس وتتبّع المنحنيات وكتابة ملف الخط كلها تجري داخل المتصفح. لا تُرسل صورة الشعار إلى أي خادم.</p>
-        </details>
-        <details>
-          <summary>ما الذي يُؤخذ من الشعار؟ <span class="plus" aria-hidden="true">+</span></summary>
-          <p>يقيس المحرك سماكة القلم والتباين والاستدارة والأطراف والارتفاعات والسطر، ويأخذ النقطة والساق والرأس والعروة كما هي حين يجدها. بقية الأشكال تُولَّد من هذه القياسات بقاعدة معلنة، ويمكنك قصّ أي شكل من الشعار أو رفعه بنفسك.</p>
+          <p>قراءة الملف والفحص وبناء الخط كلها تجري داخل المتصفح. لا يُرسل شيء إلى أي خادم.</p>
         </details>
       </div>
     </div>
     <div class="hero-foot">
-      <span class="price"><span class="num" id="pipelineCount">١٢ ← ١٨ ← ١٤٨</span><span class="mono" style="opacity:.75">PIECES · SKELETONS · GLYPHS</span></span>
+      <span class="price"><span class="num" id="pipelineCount">١٥ ← ٦٤ ← ١٦٥</span><span class="mono" style="opacity:.75">FRAMES · RECIPES · GLYPHS</span></span>
       <div class="specs">
-        <div class="spec"><span>الأشكال المفتاحية</span><b class="num">١٢ + ٤</b></div>
-        <div class="spec"><span>الهياكل بلا نقاط</span><b class="num">١٨</b></div>
+        <div class="spec"><span>القطع</span><b class="num">٦ جذور + ٦ مشتقة + ٣ صغيرة</b></div>
+        <div class="spec"><span>الوصفات</span><b class="num">٦٤</b></div>
         <div class="spec-sample"><canvas id="heroForms" role="img" aria-label="الباء في مواضعها الأربعة"></canvas></div>
-        <div class="spec"><span>الأشكال في ملف الخط</span><b class="num" id="glyphCount">١٤٨</b></div>
+        <div class="spec"><span>الأشكال في ملف الخط</span><b class="num" id="glyphCount">١٦٥</b></div>
         <div class="spec"><span>البرمجة</span><b class="mono" style="text-transform:none">init · medi · fina · rlig</b></div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="sheet grey" id="logo">
+<section class="sheet grey" id="start">
   <div class="wrap">
-    <div class="sec-head"><span class="step">01</span><h2>الشعار</h2><p>PNG أو JPG أو SVG. يحدد المحرك السطر ويقيس القلم والنسب، ثم يقترح القطع التي وجدها. كل قيمة قابلة للتعديل.</p></div>
+    <div class="sec-head"><span class="step">01</span><h2>القالب</h2><p>حمّل القالب، وارسم القطع في Illustrator، ثم ارفع الملف المصدَّر. كل ما بعد ذلك يقوم به المحرك.</p></div>
     <div class="logo-grid">
       <div class="card">
-        <div class="card-top"><span class="label"><b>ملف الشعار</b><span class="mono">LOGO</span></span><span class="chip" id="logoName">—</span></div>
-        <div class="stage" id="stage">
-          <canvas id="logoCanvas" aria-label="الشعار مع خطوط القياس"></canvas>
-          <div class="crop-bar" id="cropBar" hidden><span id="cropText">ارسم مستطيلاً حول القطعة</span><button type="button" id="cropCancel">إلغاء</button></div>
-        </div>
-        <div class="logo-actions">
-          <label class="btn solid" for="logoFile">اختر ملفاً</label>
-          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden>
-          <button class="btn" type="button" id="sampleBtn">الشعار التجريبي</button>
-          <div class="seg" id="overlaySeg" role="group" aria-label="طبقات القياس">
-            <button type="button" data-k="sk" aria-pressed="true">الهيكل</button>
-            <button type="button" data-k="lines" aria-pressed="true">الخطوط</button>
-            <button type="button" data-k="det" aria-pressed="true">ما وُجد</button>
-          </div>
-        </div>
-        <div class="found" id="found"></div>
-        <p class="hint">اسحب صورة إلى الإطار أو اختر ملفاً. الصورة تبقى على جهازك.</p>
+        <div class="card-top"><span class="label"><b>قالب Illustrator</b><span class="mono">TEMPLATE · SVG</span></span></div>
+        <img id="tplThumb" class="tpl-thumb" alt="معاينة القالب: خمسة عشر إطاراً بخطوطها الإرشادية">
+        <ol class="steps">
+          <li><b>حمّل القالب</b> وافتحه في Illustrator: خمسة عشر إطاراً، لكل قطعة إطار.</li>
+          <li><b>ارسم بأداة القلم</b> فوق الشكل الرمادي أو بخلافه: شكلاً مغلقاً مملوءاً بالأسود.</li>
+          <li><b>أسفل القطعة على السطر،</b> وما يتصل منها داخل الشريط البرتقالي. لا تغيّر حجم اللوحة.</li>
+          <li><b>صدّر</b> بـ <span dir="ltr" class="mono" style="text-transform:none">File › Export › Export As › SVG</span> ثم ارفع الملف هنا.</li>
+        </ol>
+        <div class="row"><button class="btn solid" type="button" id="tplBtn">تحميل القالب</button><span class="hint" style="margin:0">ما رسمته يعود معك في القالب لتعدّله.</span></div>
       </div>
       <div class="card">
-        <div class="card-top"><span class="label"><b>قياسات القلم</b><span class="mono">STYLE DNA</span></span><button class="btn small" type="button" id="resetDNA">العودة إلى المقاس</button></div>
-        <div class="axes" id="axes"></div>
-        <div class="choices" id="choices"></div>
-        <div class="legend"><span><i style="background:var(--accent)"></i>قيمة مقاسة من الشعار</span><span><i style="background:var(--line)"></i>معدّلة أو افتراضية</span></div>
+        <div class="card-top"><span class="label"><b>ملف القطع</b><span class="mono">UPLOAD · SVG</span></span><span class="chip" id="svgName">—</span></div>
+        <div class="drop" id="svgDrop">
+          <p>اسحب ملف SVG المصدَّر إلى هنا</p>
+          <label class="btn solid" for="svgFile">اختر الملف</label>
+          <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
+        </div>
+        <div class="import" id="importSummary"></div>
+        <div class="row" style="margin-top:12px"><button class="btn small" type="button" id="demoBtn">ملف تجريبي</button><button class="btn small" type="button" id="clearDrawn">امسح الرسوم</button></div>
       </div>
     </div>
+
+    <details class="fold" id="penFold">
+      <summary><span><b>القلم والشبكة</b><span class="mono">STYLE DNA</span></span><span class="plus" aria-hidden="true">+</span></summary>
+      <p class="hint">تُقاس من رسمك: سماكة الساق، وارتفاع الألف والسن والرأس، والنزول. وتُستعمل للقطع التي لم ترسمها وللوصلات.</p>
+      <div class="axes" id="axes"></div>
+      <div class="choices" id="choices"></div>
+      <div class="row" style="margin-top:12px"><button class="btn small" type="button" id="resetDNA">العودة إلى المقاس</button></div>
+    </details>
+
+    <details class="fold" id="logoFold">
+      <summary><span><b>مساعد الشعار</b><span class="mono">OPTIONAL · LOGO</span></span><span class="plus" aria-hidden="true">+</span></summary>
+      <p class="hint">ارفع شعاراً ليقيس المحرك قلمه، فتأتي الأشكال الرمادية في القالب على مقاسه. ويمكنك قصّ قطعة منه مباشرة.</p>
+      <div class="stage" id="stage" hidden>
+        <canvas id="logoCanvas" aria-label="الشعار مع خطوط القياس"></canvas>
+        <div class="crop-bar" id="cropBar" hidden><span id="cropText">ارسم مستطيلاً حول القطعة</span><button type="button" id="cropCancel">إلغاء</button></div>
+      </div>
+      <div class="logo-actions">
+        <label class="btn solid" for="logoFile">اختر شعاراً</label>
+        <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden>
+        <span class="chip" id="logoName">لا شعار</span>
+        <div class="seg" id="overlaySeg" role="group" aria-label="طبقات القياس" hidden>
+          <button type="button" data-k="sk" aria-pressed="true">الهيكل</button>
+          <button type="button" data-k="lines" aria-pressed="true">الخطوط</button>
+          <button type="button" data-k="det" aria-pressed="true">ما وُجد</button>
+        </div>
+      </div>
+      <div class="found" id="found"></div>
+    </details>
   </div>
 </section>
 
 <section class="sheet white" id="pieces">
   <div class="wrap">
-    <div class="sec-head"><span class="step">02</span><h2>الأشكال المفتاحية</h2><p>اثنا عشر شكلاً تُبنى منها الحروف كلها. كل خانة تأخذ شكلها من الشعار إن وُجد، أو تُولَّد من القياسات، أو ترفعها أنت. اضغط على الشكل لترى أين يتكرر.</p></div>
+    <div class="sec-head"><span class="step">02</span><h2>القطع</h2><p>كل قطعة مع فحصها: هل تجلس على السطر، وهل تدخل الشريط حيث تتصل، وهل سماكتها كسماكة الساق، وهل منطقة المطّ مستقيمة. ما لم ترسمه يولّده المحرك، والمشتقة ترث من أصلها.</p></div>
+    <div class="tree" id="tree" aria-label="شجرة القطع"></div>
     <div class="slots" id="slots"></div>
-    <div class="sub-head"><h3>القطع الصغيرة</h3><p>تُنسخ في كل حرف: نقطة ونقطتان وثلاث، همزة، مدّة، ووصلة.</p></div>
-    <div class="slots small" id="smallSlots"></div>
-    <input type="file" id="slotFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden>
   </div>
 </section>
 
-<section class="sheet grey" id="rasm">
+<section class="sheet grey" id="recipes">
   <div class="wrap">
-    <div class="sec-head"><span class="step">03</span><h2>ثمانية عشر هيكلاً</h2><p>الحروف الثمانية والعشرون ترجع إلى ثمانية عشر رسماً بلا نقاط، ولكل رسم أربعة مواضع. اختر قطعة لترى نصيبها من كل حرف.</p></div>
+    <div class="sec-head"><span class="step">03</span><h2>الوصفات</h2><p>كل حرف في كل موضع هو هذه القطع بهذا الترتيب. الثمانية عشر هيكلاً في مواضعها: أربع وستون وصفة، ومنها الحروف كلها بالنقاط.</p></div>
     <div class="filter">
       <div class="seg" id="hlSeg" role="group" aria-label="القطعة المعروضة"></div>
-      <div class="legend" style="margin:0"><span><i style="background:var(--accent)"></i>الجزء المشترك</span><span><i style="background:var(--rest)"></i>بقية الحرف</span></div>
+      <div class="legend" style="margin:0"><span><i style="background:var(--accent)"></i>القطعة المختارة</span><span><i style="background:var(--rest)"></i>بقية الحرف</span></div>
     </div>
-    <div class="rasm" id="rasmGrid"></div>
+    <p class="coverage" id="coverage"></p>
+    <div class="matrix" id="matrix" role="table" aria-label="جدول الوصفات"></div>
   </div>
 </section>
 
-<section class="sheet white" id="font">
+<section class="sheet white" id="check">
   <div class="wrap">
-    <div class="sec-head"><span class="step">04</span><h2>الخط الكامل</h2><p>كل هيكل في مواضعه الأربعة مع النقاط والهمزات. تُتتبَّع الأشكال إلى منحنيات بيزييه، وتُكتب جداول OpenType التي تختار الشكل حسب الموضع وتركّب لام ألف.</p></div>
+    <div class="sec-head"><span class="step">04</span><h2>البناء والفحص</h2><p>تُركَّب الأشكال وتُتتبَّع إلى منحنيات، وتُكتب جداول OpenType، ثم يُفحص الخط: الوصل عند الحواف، والتشكيل في المتصفح، والتداخل بين كل حرفين متجاورين.</p></div>
     <div class="buildbar">
       <button class="btn solid" type="button" id="buildBtn">ابنِ الخط</button>
       <div class="track" aria-hidden="true"><i id="buildTrack"></i></div>
       <span class="stat" id="buildStat">—</span>
     </div>
+    <div class="report" id="report" aria-live="polite"></div>
+    <div class="collide" id="collide"></div>
     <div class="glyph-area">
       <div class="tiles" id="tiles" role="list"></div>
       <div class="card preview" id="previewCard" style="background:var(--sheet)">
@@ -139,13 +164,13 @@
 
 <section class="sheet night" id="tester">
   <div class="wrap">
-    <div class="sec-head"><span class="step">05</span><h2>اكتب بخطك</h2><p>هذا هو ملف الخط نفسه بعد البناء، يشكّله المتصفح كما يفعل أي برنامج. عدّل النص كما تشاء.</p></div>
+    <div class="sec-head"><span class="step">05</span><h2>اكتب بخطك</h2><p>هذا ملف الخط نفسه بعد البناء، يشكّله المتصفح كما يفعل أي برنامج.</p></div>
     <div class="axisbar"><span class="mono">SIZE</span><input type="range" id="sizeRange" min="24" max="160" value="64" aria-label="حجم الخط"><span class="mono num" id="sizeOut">64</span></div>
-    <div class="tester" id="testerText" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="نص التجربة">بسم الله الرحمن الرحيم<br>خطٌّ عربي من شعارٍ واحد</div>
+    <div class="tester" id="testerText" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="نص التجربة">بسم الله الرحمن الرحيم<br>خطٌّ عربي من اثنتي عشرة قطعة</div>
     <div class="presets" id="presets">
       <button type="button" data-t="أ ب ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ي">الأبجدية</button>
       <button type="button" data-t="بسم الله الرحمن الرحيم">البسملة</button>
-      <button type="button" data-t="لا إله إلا الله — سلام عليكم">لام ألف</button>
+      <button type="button" data-t="لا إله إلا الله، سلام عليكم">لام ألف</button>
       <button type="button" data-t="١٢٣٤٥٦٧٨٩٠ ، ؛ ؟ !">الأرقام</button>
       <button type="button" data-t="مـحـمـد · كـتـاب · جـمـيـل">الكشيدة</button>
     </div>
@@ -184,17 +209,17 @@
       <button class="btn small" type="button" id="saveProject">حفظ المشروع (JSON)</button>
       <label class="btn small" for="loadProject">فتح مشروع</label><input type="file" id="loadProject" accept=".json,application/json" hidden>
     </div>
-    <small id="exportNote">اسم الخط بالحروف اللاتينية. داخل هذه الصفحة يُحفظ الخط في ملف مضغوط فيه ملف ‎.otf‎.</small>
+    <small id="exportNote">اسم الخط بالحروف اللاتينية.</small>
   </div>
 </section>
 
 <footer class="foot">
   <div class="wrap">
     <div class="foot-grid">
-      <div><canvas id="footMark" role="img" aria-label="رسم"></canvas><p style="font-size:14px;margin-top:8px">محرك خطوط عربية يعمل في المتصفح: من شعار واحد إلى خط كامل.</p></div>
-      <div><h3>المراحل</h3><ul><li><a href="#logo">١ الشعار والقياس</a></li><li><a href="#pieces">٢ الأشكال المفتاحية</a></li><li><a href="#rasm">٣ الهياكل</a></li><li><a href="#font">٤ الخط والبرمجة</a></li><li><a href="#tester">٥ التجربة والتحميل</a></li></ul></div>
-      <div><h3>الملفات</h3><ul><li>الخط: OpenType ‏(.otf)</li><li>الشعار: SVG و PNG</li><li>المشروع: JSON</li></ul></div>
-      <div><h3>الحدود الحالية</h3><ul><li>اسم الخط بالحروف اللاتينية</li><li>التشكيل والحركات لم تُرسم بعد</li><li>الأرقام اللاتينية غير مرسومة</li></ul></div>
+      <div><canvas id="footMark" role="img" aria-label="رسم"></canvas><p style="font-size:14px;margin-top:8px">محرك خطوط عربية يعمل في المتصفح: من اثنتي عشرة قطعة إلى خط كامل.</p></div>
+      <div><h3>المراحل</h3><ul><li><a href="#start">١ القالب والرفع</a></li><li><a href="#pieces">٢ القطع وفحصها</a></li><li><a href="#recipes">٣ الوصفات</a></li><li><a href="#check">٤ البناء والفحص</a></li><li><a href="#tester">٥ التجربة والتحميل</a></li></ul></div>
+      <div><h3>الملفات</h3><ul><li>القالب: SVG لـ Illustrator</li><li>الخط: OpenType ‏(.otf)</li><li>الشعار: SVG و PNG</li><li>المشروع: JSON</li></ul></div>
+      <div><h3>الحدود الحالية</h3><ul><li>الحركات لم تُبرمج بعد (GPOS)</li><li>منحنيات الخط تُتتبَّع بدقة نصف وحدة</li><li>اسم الخط بالحروف اللاتينية</li></ul></div>
     </div>
     <p class="colophon">مكتبة الكتابة: opentype.js ‏(MIT). الواجهة: IBM Plex Sans Arabic و IBM Plex Mono.</p>
   </div>
@@ -211,6 +236,7 @@
 <script src="src/trace.js"></script>
 <script src="src/font.js"></script>
 <script src="src/analyze.js"></script>
+<script src="src/svgio.js"></script>
 <script src="src/app.js"></script>
 </body>
 </html>

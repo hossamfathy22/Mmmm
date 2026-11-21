@@ -331,6 +331,75 @@
     return c;
   };
 
+  /* ---------------------------------------------------------------- drawn outlines ('shape' parts)
+   * cmds: [['M',u,y], ['L',u,y], ['C',u1,y1,u2,y2,u,y], ['Z'], …] in (u, y) units
+   * keep: optional polygon (only ink inside is kept) · cut: optional polygons removed from the ink */
+  G.flattenCmds = function (cmds, steps) {
+    steps = steps || 10;
+    const polys = [];
+    let cur = null, last = null;
+    for (const c of cmds) {
+      if (c[0] === 'M') { if (cur && cur.length > 1) polys.push(cur); cur = [[c[1], c[2]]]; last = [c[1], c[2]]; }
+      else if (c[0] === 'L') { cur.push([c[1], c[2]]); last = [c[1], c[2]]; }
+      else if (c[0] === 'C') {
+        const p0 = last, p1 = [c[1], c[2]], p2 = [c[3], c[4]], p3 = [c[5], c[6]];
+        G.cubic(p0, p1, p2, p3, cur, steps); last = p3;
+      } else if (c[0] === 'Z') { if (cur && cur.length > 1) polys.push(cur); cur = null; }
+    }
+    if (cur && cur.length > 1) polys.push(cur);
+    return polys;
+  };
+  G.inPoly = function (pt, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i], b = poly[j];
+      if ((a[1] > pt[1]) !== (b[1] > pt[1]) && pt[0] < (b[0] - a[0]) * (pt[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+    }
+    return inside;
+  };
+  // horizontal ink intervals of a set of closed polylines at height y (even-odd pairing)
+  G.spanAt = function (polys, y, vertical) {
+    const xs = [];
+    const A = vertical ? 1 : 0, B = vertical ? 0 : 1;
+    for (const P of polys) {
+      for (let i = 0, n = P.length; i < n; i++) {
+        const a = P[i], b = P[(i + 1) % n];
+        if ((a[B] > y) !== (b[B] > y)) xs.push(a[A] + (y - a[B]) * (b[A] - a[A]) / (b[B] - a[B]));
+      }
+    }
+    xs.sort((p, q) => p - q);
+    const out = [];
+    for (let i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]);
+    return out;
+  };
+
+  function tracePath(ctx, cmds, view) {
+    for (const c of cmds) {
+      if (c[0] === 'M') { const [x, y] = view.map(c[1], c[2]); ctx.moveTo(x, y); }
+      else if (c[0] === 'L') { const [x, y] = view.map(c[1], c[2]); ctx.lineTo(x, y); }
+      else if (c[0] === 'C') { const a = view.map(c[1], c[2]), b = view.map(c[3], c[4]), d = view.map(c[5], c[6]); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], d[0], d[1]); }
+      else if (c[0] === 'Z') ctx.closePath();
+    }
+  }
+  function polyPath(ctx, poly, view) {
+    poly.forEach((pt, i) => { const [x, y] = view.map(pt[0], pt[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.closePath();
+  }
+  Pen.fillShape = function (ctx, part, view) {
+    ctx.save();
+    if (part.keep || (part.cut && part.cut.length)) {
+      ctx.beginPath();
+      if (part.keep) polyPath(ctx, part.keep, view);
+      else ctx.rect(-1e5, -1e5, 2e5, 2e5);
+      for (const c of (part.cut || [])) polyPath(ctx, c, view);
+      ctx.clip('evenodd');
+    }
+    ctx.beginPath();
+    tracePath(ctx, part.cmds, view);
+    ctx.fill(part.rule || 'nonzero');
+    ctx.restore();
+  };
+
   /* draw a list of parts. colorOf(part) → css colour. */
   Pen.drawParts = function (ctx, parts, dna, view, colorOf) {
     for (const part of parts) {
@@ -338,6 +407,7 @@
       ctx.fillStyle = col; ctx.strokeStyle = col;
       if (part.type === 'stroke') Pen.strokePart(ctx, part, dna, view);
       else if (part.type === 'poly') Pen.fillPoly(ctx, part.pts, view);
+      else if (part.type === 'shape') Pen.fillShape(ctx, part, view);
       else if (part.type === 'image') {
         const [X1, Y1] = view.map(part.u0 + part.w, part.y0 + part.h); // left, top
         const [X2, Y2] = view.map(part.u0, part.y0);                    // right, bottom
@@ -348,6 +418,19 @@
     }
   };
 
+  /* points of a shape part that are actually inked (respecting keep/cut) */
+  R.shapePoints = function (p) {
+    const pts = [];
+    for (const P of G.flattenCmds(p.cmds, 8)) for (const q of P) {
+      if (p.keep && !G.inPoly(q, p.keep)) continue;
+      if (p.cut && p.cut.some(c => G.inPoly(q, c))) continue;
+      pts.push(q);
+    }
+    // the clip edges themselves bound the ink too
+    if (p.keep) for (const q of p.keep) { for (const P of G.flattenCmds(p.cmds, 8)) { if (G.inPoly(q, P)) { pts.push(q); break; } } }
+    return pts;
+  };
+
   /* ink bounds of parts in (u,y) */
   R.partBounds = function (parts, dna) {
     let u0 = Infinity, u1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -356,22 +439,38 @@
         u0 = Math.min(u0, p.u0); u1 = Math.max(u1, p.u0 + p.w); y0 = Math.min(y0, p.y0); y1 = Math.max(y1, p.y0 + p.h);
         continue;
       }
+      const pts = p.type === 'shape' ? (p._pts || (p._pts = R.shapePoints(p))) : p.pts;
       const e = p.type === 'stroke' ? ((p.w || dna.weight) * (p.wmul || 1)) / 2 : 0;
-      for (const q of p.pts) {
+      for (const q of pts) {
         u0 = Math.min(u0, q[0] - e); u1 = Math.max(u1, q[0] + e); y0 = Math.min(y0, q[1] - e); y1 = Math.max(y1, q[1] + e);
       }
     }
     return { u0, u1, y0, y1 };
   };
 
+  /* apply a point transform to any part (images only translate) */
+  R.xformPart = function (p, fn) {
+    if (p.type === 'image') return p;
+    const out = Object.assign({}, p);
+    if (p.pts) out.pts = p.pts.map(fn);
+    if (p.ctrl) out.ctrl = p.ctrl.map(fn);
+    if (p.cmds) out.cmds = p.cmds.map(c => {
+      if (c[0] === 'Z') return c;
+      const r = [c[0]];
+      for (let i = 1; i < c.length; i += 2) { const q = fn([c[i], c[i + 1]]); r.push(q[0], q[1]); }
+      return r;
+    });
+    if (p.keep) out.keep = p.keep.map(fn);
+    if (p.cut) out.cut = p.cut.map(poly => poly.map(fn));
+    delete out._pts;
+    return out;
+  };
   R.shiftPart = function (p, du, dy) {
     if (p.type === 'image') return Object.assign({}, p, { u0: p.u0 + du, y0: p.y0 + dy });
-    const out = Object.assign({}, p, { pts: p.pts.map(q => [q[0] + du, q[1] + dy]) });
-    if (p.ctrl) out.ctrl = p.ctrl.map(q => [q[0] + du, q[1] + dy]);
-    return out;
+    return R.xformPart(p, q => [q[0] + du, q[1] + dy]);
   };
   R.scalePart = function (p, k, cu, cy) {
     if (p.type === 'image') return Object.assign({}, p, { u0: cu + (p.u0 - cu) * k, y0: cy + (p.y0 - cy) * k, w: p.w * k, h: p.h * k });
-    return Object.assign({}, p, { pts: p.pts.map(q => [cu + (q[0] - cu) * k, cy + (q[1] - cy) * k]), wmul: (p.wmul || 1) * (p.keepWeight ? 1 : 1) });
+    return R.xformPart(p, q => [cu + (q[0] - cu) * k, cy + (q[1] - cy) * k]);
   };
 })(typeof window !== 'undefined' ? window : globalThis);

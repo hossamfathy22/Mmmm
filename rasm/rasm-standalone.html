@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>محرك رسم</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="يقيس شعارك ويأخذ منه الأشكال المفتاحية ويبني خطاً عربياً كاملاً — على جهازك.">
+<meta name="description" content="ارسم اثنتي عشرة قطعة في Illustrator، والمحرك يبني منها خطاً عربياً كاملاً مبرمجاً ومختبراً، على جهازك.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap">
@@ -39,6 +39,10 @@
   --f-ar: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --live: "IBM Plex Sans Arabic";
+  --ok: #2f7d4f;
+  --warn: #a86400;
+  --bad: #c2321b;
+  --band: #ffe6d6;
   --r-sheet: 28px;
   --r-card: 18px;
 }
@@ -49,6 +53,7 @@
     --night: #0b0b0b; --night-ink: #f1eee9; --night-muted: #8f8a84; --night-line: #2f2d2b;
     --lav: #5444b8; --lav-soft: #25214a; --lav-ink: #efecff;
     --accent: #ff7b4d; --rest: #4b4743; --blue: #8fa1ff; --pill: #ffcf96; --pill-ink: #191919; --field: #1b1a19;
+    --ok: #7fd3a0; --warn: #f2b45a; --bad: #e0573f; --band: #3a2519;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4);
     color-scheme: dark;
   }
@@ -59,6 +64,7 @@
   --night: #0b0b0b; --night-ink: #f1eee9; --night-muted: #8f8a84; --night-line: #2f2d2b;
   --lav: #5444b8; --lav-soft: #25214a; --lav-ink: #efecff;
   --accent: #ff7b4d; --rest: #4b4743; --blue: #8fa1ff; --pill: #ffcf96; --pill-ink: #191919; --field: #1b1a19;
+  --ok: #7fd3a0; --warn: #f2b45a; --bad: #e0573f; --band: #3a2519;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4);
   color-scheme: dark;
 }
@@ -184,36 +190,111 @@ button { cursor: pointer; }
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 14px; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 6px; }
 
-/* ---------- 02 key shapes */
-.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px; }
+/* ---------- 01 template & upload */
+.tpl-thumb { display: block; width: 100%; aspect-ratio: 8220 / 6820; object-fit: contain; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
+.steps { list-style: none; counter-reset: st; margin: 16px 0 16px; padding: 0; display: grid; gap: 10px; }
+.steps li { counter-increment: st; position: relative; padding-inline-start: 38px; min-height: 26px; font-size: 14.5px; line-height: 1.65; color: var(--muted); }
+.steps li::before { content: counter(st, arabic-indic); position: absolute; inset-inline-start: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+.steps li b { color: var(--ink); font-weight: 600; }
+.drop { border: 1.5px dashed var(--rest); border-radius: 14px; background: var(--field); min-height: 168px; display: grid; place-items: center; align-content: center; gap: 12px; text-align: center; padding: 22px 16px; transition: border-color .15s, background .15s; }
+.drop p { color: var(--muted); font-size: 15px; }
+.drop.drag { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--field)); }
+.import { margin-top: 14px; }
+.chip.drawn { background: var(--ink); color: var(--paper); }
+.chip.derived { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.chip.warn { background: color-mix(in srgb, var(--warn) 16%, var(--card)); color: var(--warn); }
+.chip.error { background: var(--bad); color: #fff; }
+
+/* check lists (pieces, import, font) */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.checks li { position: relative; padding-inline-start: 24px; font-size: 13.5px; line-height: 1.55; color: var(--ink); }
+.checks li::before { position: absolute; inset-inline-start: 0; top: 1px; width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; line-height: 1; font-family: var(--f-mono); }
+.checks li.ok::before { content: "✓"; background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.checks li.warn::before { content: "!"; background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.checks li.error::before { content: "×"; background: var(--bad); color: #fff; }
+.checks li.info { color: var(--muted); }
+.checks li.info::before { content: "·"; background: var(--field); color: var(--muted); font-size: 16px; }
+.checks.big { gap: 0; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); column-gap: 28px; }
+.checks.big li { font-size: 14.5px; padding-block: 10px; padding-inline-start: 30px; border-top: 1px solid var(--line); }
+.checks.big li::before { top: 11px; width: 20px; height: 20px; font-size: 12px; }
+
+/* folds (pen DNA, logo assistant) */
+.fold { background: var(--card); border-radius: var(--r-card); margin-top: 16px; padding: 0 18px; }
+.fold > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; cursor: pointer; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary > span:first-child { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.fold > summary b { color: var(--ink); font-size: 15px; font-weight: 600; }
+.fold .plus { width: 24px; height: 24px; border: 1.5px solid currentColor; border-radius: 50%; display: grid; place-items: center; font-size: 15px; line-height: 1; transition: transform .2s; flex: none; }
+.fold[open] .plus { transform: rotate(45deg); }
+.fold[open] { padding-bottom: 18px; }
+.fold > .hint:first-of-type { margin: 0 0 14px; }
+.fold .stage { margin-top: 4px; }
+
+/* ---------- 02 pieces */
+.tree { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.branch { display: flex; align-items: center; gap: 4px; background: var(--sheet); border-radius: 999px; padding: 4px; }
+.node { border: 0; background: transparent; border-radius: 999px; padding: 4px 11px; font-size: 13.5px; color: var(--muted); white-space: nowrap; }
+.node.root { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); }
+.node:hover { color: var(--ink); }
+.branch .arrow { color: var(--rest); font-size: 13px; padding-inline: 2px; }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 268px), 1fr)); gap: 14px; }
+.slot { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.slot.is-hl { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.slot .piece-cv { width: 100%; height: 150px; display: block; border-radius: 10px; background: var(--paper); }
+.slot .use-cv { width: 100%; height: 52px; display: block; }
+.slot .lineage { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.slot .checks li { font-size: 12.5px; }
+.slot .usage { color: var(--muted); font-size: 10.5px; margin-top: -6px; }
+.slot .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.slot .label .mono { font-size: 10.5px; }
 @media (max-width: 560px) {
   .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .slot { padding: 10px; gap: 8px; }
-  .slot canvas { height: 118px; }
-  .slot .rule { display: none; }
+  .slot .piece-cv { height: 112px; }
+  .slot .use-cv { height: 40px; }
+  .slot .lineage { display: none; }
+  .slot .card-top { flex-direction: column; align-items: flex-start; gap: 6px; }
   .slot .acts .btn { padding: 3px 9px; font-size: 12px; }
   .slot .label .mono { display: none; }
 }
-.slot { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.slot.is-hl { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.slot canvas { width: 100%; height: 150px; display: block; cursor: pointer; }
-.slot .meta { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.slot .letters { font-size: 17px; letter-spacing: 0; }
-.slot .rule { font-size: 12.5px; color: var(--muted); line-height: 1.5; min-height: 2.9em; }
-.slot .acts { display: flex; flex-wrap: wrap; gap: 6px; }
-.sub-head { display: flex; align-items: baseline; gap: 12px; margin: 34px 0 14px; }
-.sub-head h3 { font-size: 20px; }
-.sub-head p { color: var(--muted); font-size: 14px; }
-.slots.small .slot canvas { height: 96px; }
 
-/* ---------- 03 skeletons */
-.filter { margin-bottom: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
-.rasm { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 176px), 1fr)); gap: 12px; }
-.rcard { background: var(--card); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.rcard canvas.big { width: 100%; height: 150px; display: block; }
-.rcard canvas.forms { width: 100%; height: 48px; display: block; }
-.rcard .cap { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--muted); }
-.rcard .cap b { font-size: 20px; color: var(--ink); font-weight: 600; }
+/* ---------- 03 recipes */
+.filter { margin-bottom: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.coverage { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+.matrix { display: grid; gap: 8px; }
+.mx-row { display: grid; grid-template-columns: 74px repeat(4, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+.mx-head { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 66px); z-index: 2; background: var(--sheet); padding-block: 6px; }
+.mx-head span { color: var(--muted); text-align: center; }
+.mx-name { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; text-align: center; }
+.mx-name b { font-size: 30px; font-weight: 600; line-height: 1.3; }
+.mx-name span { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.mx-cell { background: var(--card); border-radius: 12px; padding: 6px 6px 8px; min-width: 0; display: flex; flex-direction: column; gap: 2px; box-shadow: 0 0 0 1px transparent; transition: box-shadow .15s; }
+.mx-cell canvas { width: 100%; height: 86px; display: block; }
+.mx-f { font-size: 11.5px; color: var(--muted); text-align: center; line-height: 1.45; overflow-wrap: anywhere; }
+.j { display: inline-block; width: 10px; height: 2.5px; border-radius: 2px; background: currentColor; vertical-align: middle; margin-inline: 4px; opacity: .75; }
+.mx-cell.none { background: transparent; border: 1px dashed var(--line); justify-content: center; }
+.mx-cell.none .mx-f { font-size: 11px; color: var(--rest); }
+.mx-cell.uses { box-shadow: 0 0 0 1.5px var(--accent); }
+@media (max-width: 640px) {
+  .mx-row { grid-template-columns: 44px repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .mx-name b { font-size: 22px; }
+  .mx-name span { display: none; }
+  .mx-cell { padding: 4px 3px 6px; border-radius: 9px; }
+  .mx-cell canvas { height: 58px; }
+  .mx-f { font-size: 9.5px; }
+}
+
+/* ---------- 04 report */
+.report { background: var(--sheet); border-radius: var(--r-card); padding: 6px 18px; margin-bottom: 14px; }
+.report:empty { display: none; }
+.report .checks.big li:first-child, .report .checks.big li:nth-child(2) { border-top: 0; }
+.collide:empty { display: none; }
+.collide { margin-bottom: 18px; }
+.collide .hint { margin: 0 0 8px; }
+.pairs { display: flex; flex-wrap: wrap; gap: 8px; }
+.pair { margin: 0; background: var(--sheet); border-radius: 12px; padding: 6px 8px; width: 132px; }
+.pair canvas { width: 100%; height: 64px; display: block; }
+.pair figcaption { font-size: 12px; color: var(--muted); text-align: center; }
 
 /* ---------- 04 font */
 .buildbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; background: var(--card); border-radius: 999px; padding: 6px 16px 6px 6px; margin-bottom: 18px; }
@@ -297,9 +378,9 @@ button { cursor: pointer; }
 
 <header class="nav wrap" id="nav">
   <div class="nav-pill">
-    <a class="brand" href="#top" aria-label="رسم — إلى الأعلى"><span class="mark" aria-hidden="true">ر</span><span>رسم</span></a>
+    <a class="brand" href="#top" aria-label="رسم، إلى الأعلى"><span class="mark" aria-hidden="true">ر</span><span>رسم</span></a>
     <nav class="links" aria-label="المراحل">
-      <a href="#logo">الشعار</a><a href="#pieces">القطع</a><a href="#rasm">الهياكل</a><a href="#font">الخط</a><a href="#tester">التجربة</a><a href="#maker">الشعارات</a>
+      <a href="#start">١ القالب</a><a href="#pieces">٢ القطع</a><a href="#recipes">٣ الوصفات</a><a href="#check">٤ الفحص</a><a href="#tester">٥ التجربة</a>
     </nav>
     <button class="icon-btn" id="themeBtn" type="button" aria-label="تبديل المظهر الفاتح والداكن">
       <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
@@ -310,103 +391,128 @@ button { cursor: pointer; }
 
 <section class="hero" id="top">
   <div class="wrap">
-    <canvas class="hero-title" id="heroTitle" role="img" aria-label="كلمة «رسم» مكتوبة بالخط الذي يولّده المحرك الآن"></canvas>
-    <div class="mono kicker">RASM · ARABIC TYPE ENGINE · ON-DEVICE</div>
+    <canvas class="hero-title" id="heroTitle" role="img" aria-label="كلمة «رسم» مكتوبة بالخط الذي يبنيه المحرك الآن"></canvas>
+    <div class="mono kicker">RASM · ARABIC TYPE ENGINE · DRAW 12 PIECES, GET A FONT</div>
     <div class="hero-grid">
       <div>
-        <p class="lede">ارفع شعارك، فيقيس «رسم» قلمه ونِسبه، ويأخذ منه الأشكال المفتاحية، ثم يركّب بها ثمانية عشر هيكلاً، ومنها الحروف كلها في مواضعها الأربعة، ويبرمجها خطاً تحمّله وتكتب به.</p>
-        <a class="more mono" href="#logo">+ ابدأ بالشعار</a>
+        <p class="lede">ارسم اثنتي عشرة قطعة في Illustrator وارفعها هنا. يفحص المحرك كل قطعة، ويركّب منها الحروف في مواضعها الأربعة، ثم يبرمجها ويختبرها، ويعطيك خطاً جاهزاً للتثبيت.</p>
+        <a class="more mono" href="#start">+ ابدأ بالقالب</a>
       </div>
       <div class="acc">
         <details open>
           <summary>المنهج <span class="plus" aria-hidden="true">+</span></summary>
-          <p>المصمم لا يرسم كل حرف وحده. يرسم نحو اثني عشر شكلاً مفتاحياً، ثم يشتق الأبجدية من وصفات: كل حرف هو هذه الأشكال بهذا الترتيب. الوصفات مكتوبة مرة واحدة، وتصلح لكل شعار.</p>
+          <p>الحروف الثمانية والعشرون ترجع إلى ثمانية عشر هيكلاً، والهياكل تُبنى من اثنتي عشرة قطعة: ستّ جذور وستّ مشتقة منها. ترسم القطع مرة، والوصفات الأربع والستون تركّبها في كل حرف وموضع.</p>
+        </details>
+        <details>
+          <summary>ماذا ترسم؟ <span class="plus" aria-hidden="true">+</span></summary>
+          <p>الساق، السن، الحوض، الرأس، القوس، الذيل، ثم الكأس، العروة، الأنف، رأس العين، خط الكاف، الهاء، ومعها النقطة. ما لا ترسمه يولّده المحرك بقلم مقاس من رسمك.</p>
         </details>
         <details>
           <summary>على جهازك <span class="plus" aria-hidden="true">+</span></summary>
-          <p>القياس وتتبّع المنحنيات وكتابة ملف الخط كلها تجري داخل المتصفح. لا تُرسل صورة الشعار إلى أي خادم.</p>
-        </details>
-        <details>
-          <summary>ما الذي يُؤخذ من الشعار؟ <span class="plus" aria-hidden="true">+</span></summary>
-          <p>يقيس المحرك سماكة القلم والتباين والاستدارة والأطراف والارتفاعات والسطر، ويأخذ النقطة والساق والرأس والعروة كما هي حين يجدها. بقية الأشكال تُولَّد من هذه القياسات بقاعدة معلنة، ويمكنك قصّ أي شكل من الشعار أو رفعه بنفسك.</p>
+          <p>قراءة الملف والفحص وبناء الخط كلها تجري داخل المتصفح. لا يُرسل شيء إلى أي خادم.</p>
         </details>
       </div>
     </div>
     <div class="hero-foot">
-      <span class="price"><span class="num" id="pipelineCount">١٢ ← ١٨ ← ١٤٨</span><span class="mono" style="opacity:.75">PIECES · SKELETONS · GLYPHS</span></span>
+      <span class="price"><span class="num" id="pipelineCount">١٥ ← ٦٤ ← ١٦٥</span><span class="mono" style="opacity:.75">FRAMES · RECIPES · GLYPHS</span></span>
       <div class="specs">
-        <div class="spec"><span>الأشكال المفتاحية</span><b class="num">١٢ + ٤</b></div>
-        <div class="spec"><span>الهياكل بلا نقاط</span><b class="num">١٨</b></div>
+        <div class="spec"><span>القطع</span><b class="num">٦ جذور + ٦ مشتقة + ٣ صغيرة</b></div>
+        <div class="spec"><span>الوصفات</span><b class="num">٦٤</b></div>
         <div class="spec-sample"><canvas id="heroForms" role="img" aria-label="الباء في مواضعها الأربعة"></canvas></div>
-        <div class="spec"><span>الأشكال في ملف الخط</span><b class="num" id="glyphCount">١٤٨</b></div>
+        <div class="spec"><span>الأشكال في ملف الخط</span><b class="num" id="glyphCount">١٦٥</b></div>
         <div class="spec"><span>البرمجة</span><b class="mono" style="text-transform:none">init · medi · fina · rlig</b></div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="sheet grey" id="logo">
+<section class="sheet grey" id="start">
   <div class="wrap">
-    <div class="sec-head"><span class="step">01</span><h2>الشعار</h2><p>PNG أو JPG أو SVG. يحدد المحرك السطر ويقيس القلم والنسب، ثم يقترح القطع التي وجدها. كل قيمة قابلة للتعديل.</p></div>
+    <div class="sec-head"><span class="step">01</span><h2>القالب</h2><p>حمّل القالب، وارسم القطع في Illustrator، ثم ارفع الملف المصدَّر. كل ما بعد ذلك يقوم به المحرك.</p></div>
     <div class="logo-grid">
       <div class="card">
-        <div class="card-top"><span class="label"><b>ملف الشعار</b><span class="mono">LOGO</span></span><span class="chip" id="logoName">—</span></div>
-        <div class="stage" id="stage">
-          <canvas id="logoCanvas" aria-label="الشعار مع خطوط القياس"></canvas>
-          <div class="crop-bar" id="cropBar" hidden><span id="cropText">ارسم مستطيلاً حول القطعة</span><button type="button" id="cropCancel">إلغاء</button></div>
-        </div>
-        <div class="logo-actions">
-          <label class="btn solid" for="logoFile">اختر ملفاً</label>
-          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden>
-          <button class="btn" type="button" id="sampleBtn">الشعار التجريبي</button>
-          <div class="seg" id="overlaySeg" role="group" aria-label="طبقات القياس">
-            <button type="button" data-k="sk" aria-pressed="true">الهيكل</button>
-            <button type="button" data-k="lines" aria-pressed="true">الخطوط</button>
-            <button type="button" data-k="det" aria-pressed="true">ما وُجد</button>
-          </div>
-        </div>
-        <div class="found" id="found"></div>
-        <p class="hint">اسحب صورة إلى الإطار أو اختر ملفاً. الصورة تبقى على جهازك.</p>
+        <div class="card-top"><span class="label"><b>قالب Illustrator</b><span class="mono">TEMPLATE · SVG</span></span></div>
+        <img id="tplThumb" class="tpl-thumb" alt="معاينة القالب: خمسة عشر إطاراً بخطوطها الإرشادية">
+        <ol class="steps">
+          <li><b>حمّل القالب</b> وافتحه في Illustrator: خمسة عشر إطاراً، لكل قطعة إطار.</li>
+          <li><b>ارسم بأداة القلم</b> فوق الشكل الرمادي أو بخلافه: شكلاً مغلقاً مملوءاً بالأسود.</li>
+          <li><b>أسفل القطعة على السطر،</b> وما يتصل منها داخل الشريط البرتقالي. لا تغيّر حجم اللوحة.</li>
+          <li><b>صدّر</b> بـ <span dir="ltr" class="mono" style="text-transform:none">File › Export › Export As › SVG</span> ثم ارفع الملف هنا.</li>
+        </ol>
+        <div class="row"><button class="btn solid" type="button" id="tplBtn">تحميل القالب</button><span class="hint" style="margin:0">ما رسمته يعود معك في القالب لتعدّله.</span></div>
       </div>
       <div class="card">
-        <div class="card-top"><span class="label"><b>قياسات القلم</b><span class="mono">STYLE DNA</span></span><button class="btn small" type="button" id="resetDNA">العودة إلى المقاس</button></div>
-        <div class="axes" id="axes"></div>
-        <div class="choices" id="choices"></div>
-        <div class="legend"><span><i style="background:var(--accent)"></i>قيمة مقاسة من الشعار</span><span><i style="background:var(--line)"></i>معدّلة أو افتراضية</span></div>
+        <div class="card-top"><span class="label"><b>ملف القطع</b><span class="mono">UPLOAD · SVG</span></span><span class="chip" id="svgName">—</span></div>
+        <div class="drop" id="svgDrop">
+          <p>اسحب ملف SVG المصدَّر إلى هنا</p>
+          <label class="btn solid" for="svgFile">اختر الملف</label>
+          <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
+        </div>
+        <div class="import" id="importSummary"></div>
+        <div class="row" style="margin-top:12px"><button class="btn small" type="button" id="demoBtn">ملف تجريبي</button><button class="btn small" type="button" id="clearDrawn">امسح الرسوم</button></div>
       </div>
     </div>
+
+    <details class="fold" id="penFold">
+      <summary><span><b>القلم والشبكة</b><span class="mono">STYLE DNA</span></span><span class="plus" aria-hidden="true">+</span></summary>
+      <p class="hint">تُقاس من رسمك: سماكة الساق، وارتفاع الألف والسن والرأس، والنزول. وتُستعمل للقطع التي لم ترسمها وللوصلات.</p>
+      <div class="axes" id="axes"></div>
+      <div class="choices" id="choices"></div>
+      <div class="row" style="margin-top:12px"><button class="btn small" type="button" id="resetDNA">العودة إلى المقاس</button></div>
+    </details>
+
+    <details class="fold" id="logoFold">
+      <summary><span><b>مساعد الشعار</b><span class="mono">OPTIONAL · LOGO</span></span><span class="plus" aria-hidden="true">+</span></summary>
+      <p class="hint">ارفع شعاراً ليقيس المحرك قلمه، فتأتي الأشكال الرمادية في القالب على مقاسه. ويمكنك قصّ قطعة منه مباشرة.</p>
+      <div class="stage" id="stage" hidden>
+        <canvas id="logoCanvas" aria-label="الشعار مع خطوط القياس"></canvas>
+        <div class="crop-bar" id="cropBar" hidden><span id="cropText">ارسم مستطيلاً حول القطعة</span><button type="button" id="cropCancel">إلغاء</button></div>
+      </div>
+      <div class="logo-actions">
+        <label class="btn solid" for="logoFile">اختر شعاراً</label>
+        <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden>
+        <span class="chip" id="logoName">لا شعار</span>
+        <div class="seg" id="overlaySeg" role="group" aria-label="طبقات القياس" hidden>
+          <button type="button" data-k="sk" aria-pressed="true">الهيكل</button>
+          <button type="button" data-k="lines" aria-pressed="true">الخطوط</button>
+          <button type="button" data-k="det" aria-pressed="true">ما وُجد</button>
+        </div>
+      </div>
+      <div class="found" id="found"></div>
+    </details>
   </div>
 </section>
 
 <section class="sheet white" id="pieces">
   <div class="wrap">
-    <div class="sec-head"><span class="step">02</span><h2>الأشكال المفتاحية</h2><p>اثنا عشر شكلاً تُبنى منها الحروف كلها. كل خانة تأخذ شكلها من الشعار إن وُجد، أو تُولَّد من القياسات، أو ترفعها أنت. اضغط على الشكل لترى أين يتكرر.</p></div>
+    <div class="sec-head"><span class="step">02</span><h2>القطع</h2><p>كل قطعة مع فحصها: هل تجلس على السطر، وهل تدخل الشريط حيث تتصل، وهل سماكتها كسماكة الساق، وهل منطقة المطّ مستقيمة. ما لم ترسمه يولّده المحرك، والمشتقة ترث من أصلها.</p></div>
+    <div class="tree" id="tree" aria-label="شجرة القطع"></div>
     <div class="slots" id="slots"></div>
-    <div class="sub-head"><h3>القطع الصغيرة</h3><p>تُنسخ في كل حرف: نقطة ونقطتان وثلاث، همزة، مدّة، ووصلة.</p></div>
-    <div class="slots small" id="smallSlots"></div>
-    <input type="file" id="slotFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden>
   </div>
 </section>
 
-<section class="sheet grey" id="rasm">
+<section class="sheet grey" id="recipes">
   <div class="wrap">
-    <div class="sec-head"><span class="step">03</span><h2>ثمانية عشر هيكلاً</h2><p>الحروف الثمانية والعشرون ترجع إلى ثمانية عشر رسماً بلا نقاط، ولكل رسم أربعة مواضع. اختر قطعة لترى نصيبها من كل حرف.</p></div>
+    <div class="sec-head"><span class="step">03</span><h2>الوصفات</h2><p>كل حرف في كل موضع هو هذه القطع بهذا الترتيب. الثمانية عشر هيكلاً في مواضعها: أربع وستون وصفة، ومنها الحروف كلها بالنقاط.</p></div>
     <div class="filter">
       <div class="seg" id="hlSeg" role="group" aria-label="القطعة المعروضة"></div>
-      <div class="legend" style="margin:0"><span><i style="background:var(--accent)"></i>الجزء المشترك</span><span><i style="background:var(--rest)"></i>بقية الحرف</span></div>
+      <div class="legend" style="margin:0"><span><i style="background:var(--accent)"></i>القطعة المختارة</span><span><i style="background:var(--rest)"></i>بقية الحرف</span></div>
     </div>
-    <div class="rasm" id="rasmGrid"></div>
+    <p class="coverage" id="coverage"></p>
+    <div class="matrix" id="matrix" role="table" aria-label="جدول الوصفات"></div>
   </div>
 </section>
 
-<section class="sheet white" id="font">
+<section class="sheet white" id="check">
   <div class="wrap">
-    <div class="sec-head"><span class="step">04</span><h2>الخط الكامل</h2><p>كل هيكل في مواضعه الأربعة مع النقاط والهمزات. تُتتبَّع الأشكال إلى منحنيات بيزييه، وتُكتب جداول OpenType التي تختار الشكل حسب الموضع وتركّب لام ألف.</p></div>
+    <div class="sec-head"><span class="step">04</span><h2>البناء والفحص</h2><p>تُركَّب الأشكال وتُتتبَّع إلى منحنيات، وتُكتب جداول OpenType، ثم يُفحص الخط: الوصل عند الحواف، والتشكيل في المتصفح، والتداخل بين كل حرفين متجاورين.</p></div>
     <div class="buildbar">
       <button class="btn solid" type="button" id="buildBtn">ابنِ الخط</button>
       <div class="track" aria-hidden="true"><i id="buildTrack"></i></div>
       <span class="stat" id="buildStat">—</span>
     </div>
+    <div class="report" id="report" aria-live="polite"></div>
+    <div class="collide" id="collide"></div>
     <div class="glyph-area">
       <div class="tiles" id="tiles" role="list"></div>
       <div class="card preview" id="previewCard" style="background:var(--sheet)">
@@ -421,13 +527,13 @@ button { cursor: pointer; }
 
 <section class="sheet night" id="tester">
   <div class="wrap">
-    <div class="sec-head"><span class="step">05</span><h2>اكتب بخطك</h2><p>هذا هو ملف الخط نفسه بعد البناء، يشكّله المتصفح كما يفعل أي برنامج. عدّل النص كما تشاء.</p></div>
+    <div class="sec-head"><span class="step">05</span><h2>اكتب بخطك</h2><p>هذا ملف الخط نفسه بعد البناء، يشكّله المتصفح كما يفعل أي برنامج.</p></div>
     <div class="axisbar"><span class="mono">SIZE</span><input type="range" id="sizeRange" min="24" max="160" value="64" aria-label="حجم الخط"><span class="mono num" id="sizeOut">64</span></div>
-    <div class="tester" id="testerText" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="نص التجربة">بسم الله الرحمن الرحيم<br>خطٌّ عربي من شعارٍ واحد</div>
+    <div class="tester" id="testerText" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="نص التجربة">بسم الله الرحمن الرحيم<br>خطٌّ عربي من اثنتي عشرة قطعة</div>
     <div class="presets" id="presets">
       <button type="button" data-t="أ ب ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ي">الأبجدية</button>
       <button type="button" data-t="بسم الله الرحمن الرحيم">البسملة</button>
-      <button type="button" data-t="لا إله إلا الله — سلام عليكم">لام ألف</button>
+      <button type="button" data-t="لا إله إلا الله، سلام عليكم">لام ألف</button>
       <button type="button" data-t="١٢٣٤٥٦٧٨٩٠ ، ؛ ؟ !">الأرقام</button>
       <button type="button" data-t="مـحـمـد · كـتـاب · جـمـيـل">الكشيدة</button>
     </div>
@@ -466,17 +572,17 @@ button { cursor: pointer; }
       <button class="btn small" type="button" id="saveProject">حفظ المشروع (JSON)</button>
       <label class="btn small" for="loadProject">فتح مشروع</label><input type="file" id="loadProject" accept=".json,application/json" hidden>
     </div>
-    <small id="exportNote">اسم الخط بالحروف اللاتينية. داخل هذه الصفحة يُحفظ الخط في ملف مضغوط فيه ملف ‎.otf‎.</small>
+    <small id="exportNote">اسم الخط بالحروف اللاتينية.</small>
   </div>
 </section>
 
 <footer class="foot">
   <div class="wrap">
     <div class="foot-grid">
-      <div><canvas id="footMark" role="img" aria-label="رسم"></canvas><p style="font-size:14px;margin-top:8px">محرك خطوط عربية يعمل في المتصفح: من شعار واحد إلى خط كامل.</p></div>
-      <div><h3>المراحل</h3><ul><li><a href="#logo">١ الشعار والقياس</a></li><li><a href="#pieces">٢ الأشكال المفتاحية</a></li><li><a href="#rasm">٣ الهياكل</a></li><li><a href="#font">٤ الخط والبرمجة</a></li><li><a href="#tester">٥ التجربة والتحميل</a></li></ul></div>
-      <div><h3>الملفات</h3><ul><li>الخط: OpenType ‏(.otf)</li><li>الشعار: SVG و PNG</li><li>المشروع: JSON</li></ul></div>
-      <div><h3>الحدود الحالية</h3><ul><li>اسم الخط بالحروف اللاتينية</li><li>التشكيل والحركات لم تُرسم بعد</li><li>الأرقام اللاتينية غير مرسومة</li></ul></div>
+      <div><canvas id="footMark" role="img" aria-label="رسم"></canvas><p style="font-size:14px;margin-top:8px">محرك خطوط عربية يعمل في المتصفح: من اثنتي عشرة قطعة إلى خط كامل.</p></div>
+      <div><h3>المراحل</h3><ul><li><a href="#start">١ القالب والرفع</a></li><li><a href="#pieces">٢ القطع وفحصها</a></li><li><a href="#recipes">٣ الوصفات</a></li><li><a href="#check">٤ البناء والفحص</a></li><li><a href="#tester">٥ التجربة والتحميل</a></li></ul></div>
+      <div><h3>الملفات</h3><ul><li>القالب: SVG لـ Illustrator</li><li>الخط: OpenType ‏(.otf)</li><li>الشعار: SVG و PNG</li><li>المشروع: JSON</li></ul></div>
+      <div><h3>الحدود الحالية</h3><ul><li>الحركات لم تُبرمج بعد (GPOS)</li><li>منحنيات الخط تُتتبَّع بدقة نصف وحدة</li><li>اسم الخط بالحروف اللاتينية</li></ul></div>
     </div>
     <p class="colophon">مكتبة الكتابة: opentype.js ‏(MIT). الواجهة: IBM Plex Sans Arabic و IBM Plex Mono.</p>
   </div>
@@ -822,6 +928,75 @@ button { cursor: pointer; }
     return c;
   };
 
+  /* ---------------------------------------------------------------- drawn outlines ('shape' parts)
+   * cmds: [['M',u,y], ['L',u,y], ['C',u1,y1,u2,y2,u,y], ['Z'], …] in (u, y) units
+   * keep: optional polygon (only ink inside is kept) · cut: optional polygons removed from the ink */
+  G.flattenCmds = function (cmds, steps) {
+    steps = steps || 10;
+    const polys = [];
+    let cur = null, last = null;
+    for (const c of cmds) {
+      if (c[0] === 'M') { if (cur && cur.length > 1) polys.push(cur); cur = [[c[1], c[2]]]; last = [c[1], c[2]]; }
+      else if (c[0] === 'L') { cur.push([c[1], c[2]]); last = [c[1], c[2]]; }
+      else if (c[0] === 'C') {
+        const p0 = last, p1 = [c[1], c[2]], p2 = [c[3], c[4]], p3 = [c[5], c[6]];
+        G.cubic(p0, p1, p2, p3, cur, steps); last = p3;
+      } else if (c[0] === 'Z') { if (cur && cur.length > 1) polys.push(cur); cur = null; }
+    }
+    if (cur && cur.length > 1) polys.push(cur);
+    return polys;
+  };
+  G.inPoly = function (pt, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i], b = poly[j];
+      if ((a[1] > pt[1]) !== (b[1] > pt[1]) && pt[0] < (b[0] - a[0]) * (pt[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+    }
+    return inside;
+  };
+  // horizontal ink intervals of a set of closed polylines at height y (even-odd pairing)
+  G.spanAt = function (polys, y, vertical) {
+    const xs = [];
+    const A = vertical ? 1 : 0, B = vertical ? 0 : 1;
+    for (const P of polys) {
+      for (let i = 0, n = P.length; i < n; i++) {
+        const a = P[i], b = P[(i + 1) % n];
+        if ((a[B] > y) !== (b[B] > y)) xs.push(a[A] + (y - a[B]) * (b[A] - a[A]) / (b[B] - a[B]));
+      }
+    }
+    xs.sort((p, q) => p - q);
+    const out = [];
+    for (let i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]);
+    return out;
+  };
+
+  function tracePath(ctx, cmds, view) {
+    for (const c of cmds) {
+      if (c[0] === 'M') { const [x, y] = view.map(c[1], c[2]); ctx.moveTo(x, y); }
+      else if (c[0] === 'L') { const [x, y] = view.map(c[1], c[2]); ctx.lineTo(x, y); }
+      else if (c[0] === 'C') { const a = view.map(c[1], c[2]), b = view.map(c[3], c[4]), d = view.map(c[5], c[6]); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], d[0], d[1]); }
+      else if (c[0] === 'Z') ctx.closePath();
+    }
+  }
+  function polyPath(ctx, poly, view) {
+    poly.forEach((pt, i) => { const [x, y] = view.map(pt[0], pt[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.closePath();
+  }
+  Pen.fillShape = function (ctx, part, view) {
+    ctx.save();
+    if (part.keep || (part.cut && part.cut.length)) {
+      ctx.beginPath();
+      if (part.keep) polyPath(ctx, part.keep, view);
+      else ctx.rect(-1e5, -1e5, 2e5, 2e5);
+      for (const c of (part.cut || [])) polyPath(ctx, c, view);
+      ctx.clip('evenodd');
+    }
+    ctx.beginPath();
+    tracePath(ctx, part.cmds, view);
+    ctx.fill(part.rule || 'nonzero');
+    ctx.restore();
+  };
+
   /* draw a list of parts. colorOf(part) → css colour. */
   Pen.drawParts = function (ctx, parts, dna, view, colorOf) {
     for (const part of parts) {
@@ -829,6 +1004,7 @@ button { cursor: pointer; }
       ctx.fillStyle = col; ctx.strokeStyle = col;
       if (part.type === 'stroke') Pen.strokePart(ctx, part, dna, view);
       else if (part.type === 'poly') Pen.fillPoly(ctx, part.pts, view);
+      else if (part.type === 'shape') Pen.fillShape(ctx, part, view);
       else if (part.type === 'image') {
         const [X1, Y1] = view.map(part.u0 + part.w, part.y0 + part.h); // left, top
         const [X2, Y2] = view.map(part.u0, part.y0);                    // right, bottom
@@ -839,6 +1015,19 @@ button { cursor: pointer; }
     }
   };
 
+  /* points of a shape part that are actually inked (respecting keep/cut) */
+  R.shapePoints = function (p) {
+    const pts = [];
+    for (const P of G.flattenCmds(p.cmds, 8)) for (const q of P) {
+      if (p.keep && !G.inPoly(q, p.keep)) continue;
+      if (p.cut && p.cut.some(c => G.inPoly(q, c))) continue;
+      pts.push(q);
+    }
+    // the clip edges themselves bound the ink too
+    if (p.keep) for (const q of p.keep) { for (const P of G.flattenCmds(p.cmds, 8)) { if (G.inPoly(q, P)) { pts.push(q); break; } } }
+    return pts;
+  };
+
   /* ink bounds of parts in (u,y) */
   R.partBounds = function (parts, dna) {
     let u0 = Infinity, u1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -847,23 +1036,39 @@ button { cursor: pointer; }
         u0 = Math.min(u0, p.u0); u1 = Math.max(u1, p.u0 + p.w); y0 = Math.min(y0, p.y0); y1 = Math.max(y1, p.y0 + p.h);
         continue;
       }
+      const pts = p.type === 'shape' ? (p._pts || (p._pts = R.shapePoints(p))) : p.pts;
       const e = p.type === 'stroke' ? ((p.w || dna.weight) * (p.wmul || 1)) / 2 : 0;
-      for (const q of p.pts) {
+      for (const q of pts) {
         u0 = Math.min(u0, q[0] - e); u1 = Math.max(u1, q[0] + e); y0 = Math.min(y0, q[1] - e); y1 = Math.max(y1, q[1] + e);
       }
     }
     return { u0, u1, y0, y1 };
   };
 
+  /* apply a point transform to any part (images only translate) */
+  R.xformPart = function (p, fn) {
+    if (p.type === 'image') return p;
+    const out = Object.assign({}, p);
+    if (p.pts) out.pts = p.pts.map(fn);
+    if (p.ctrl) out.ctrl = p.ctrl.map(fn);
+    if (p.cmds) out.cmds = p.cmds.map(c => {
+      if (c[0] === 'Z') return c;
+      const r = [c[0]];
+      for (let i = 1; i < c.length; i += 2) { const q = fn([c[i], c[i + 1]]); r.push(q[0], q[1]); }
+      return r;
+    });
+    if (p.keep) out.keep = p.keep.map(fn);
+    if (p.cut) out.cut = p.cut.map(poly => poly.map(fn));
+    delete out._pts;
+    return out;
+  };
   R.shiftPart = function (p, du, dy) {
     if (p.type === 'image') return Object.assign({}, p, { u0: p.u0 + du, y0: p.y0 + dy });
-    const out = Object.assign({}, p, { pts: p.pts.map(q => [q[0] + du, q[1] + dy]) });
-    if (p.ctrl) out.ctrl = p.ctrl.map(q => [q[0] + du, q[1] + dy]);
-    return out;
+    return R.xformPart(p, q => [q[0] + du, q[1] + dy]);
   };
   R.scalePart = function (p, k, cu, cy) {
     if (p.type === 'image') return Object.assign({}, p, { u0: cu + (p.u0 - cu) * k, y0: cy + (p.y0 - cy) * k, w: p.w * k, h: p.h * k });
-    return Object.assign({}, p, { pts: p.pts.map(q => [cu + (q[0] - cu) * k, cy + (q[1] - cy) * k]), wmul: (p.wmul || 1) * (p.keepWeight ? 1 : 1) });
+    return R.xformPart(p, q => [cu + (q[0] - cu) * k, cy + (q[1] - cy) * k]);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1218,6 +1423,142 @@ button { cursor: pointer; }
   S.overrides = {};
   S.useImage = {};   // false → the piece keeps its fitted vector form even though an image exists
 
+  /* ------------------------------------------------------------ drawn pieces (from the designer's SVG)
+   * S.drawn[id] = { shapes:[{cmds, rule}], polys, bbox, w, h, meas } in (u, y): u = 0 at the right edge.
+   * One drawing serves every variant through three operations: place, stretch in a straight zone, clip. */
+  S.drawn = {};
+  S.useDrawn = {};
+  const hasD = (id) => !!S.drawn[id] && S.useDrawn[id] !== false;
+  S.hasDrawn = hasD;
+  const BIG = 1e5;
+  const rectPoly = (u0, y0, u1, y1) => [[u0, y0], [u1, y0], [u1, y1], [u0, y1]];
+  function dShapes(d, slot, fn, keep, cut) {
+    return d.shapes.map((sh) => {
+      let part = { type: 'shape', cmds: sh.cmds, rule: sh.rule, slot };
+      if (fn) part = R.xformPart(part, fn);
+      if (keep) part.keep = keep;
+      if (cut) part.cut = cut;
+      return part;
+    });
+  }
+  const chain = (fns) => { fns = fns.filter(Boolean); return fns.length ? (q) => fns.reduce((r, f) => f(r), q) : null; };
+
+  function drawnPiece(id, m, p) {
+    const d = S.drawn[id], ms = d.meas || {}, W = m.W;
+    switch (id) {
+      case 'stem': {
+        const top = d.bbox.y1;
+        let stretch = null, lean = null;
+        if (p.top != null && Math.abs(p.top - top) > 2) { const cut = top * 0.5, dy = p.top - top; stretch = (q) => q[1] > cut ? [q[0], q[1] + dy] : q; }
+        if (p.lean) { const k = Math.tan(p.lean * Math.PI / 180); lean = (q) => [q[0] + q[1] * k, q[1]]; }
+        const keep = p.bottom != null ? rectPoly(-BIG, p.bottom - W * 0.3, BIG, BIG) : null;
+        return { w: d.w, cx: ms.cx != null ? ms.cx : d.w / 2, parts: dShapes(d, 'stem', chain([stretch, lean]), keep), drawn: true };
+      }
+      case 'tooth':
+        return { w: d.w, cx: ms.cx != null ? ms.cx : d.w / 2, parts: dShapes(d, 'tooth'), drawn: true };
+      case 'basin': {
+        if (p.full) return { w: d.w, cx: d.w / 2, parts: dShapes(d, 'basin'), drawn: true };
+        const len = p.len != null ? p.len : d.w;
+        let fn = null;
+        if (Math.abs(len - d.w) > 1) { const cut = d.w * 0.5, du = len - d.w; fn = (q) => q[0] > cut ? [q[0] + du, q[1]] : q; }
+        // without its right tip (the head or the stem stands there)
+        const cut = [rectPoly(-BIG, W * 1.05, (ms.tipEnd || W) + 2, BIG)];
+        return { w: len, cx: len / 2, parts: dShapes(d, 'basin', fn, null, cut), drawn: true };
+      }
+      case 'cup': {
+        const fns = [];
+        let w = d.w, cut = null;
+        const wantW = p.variant === 'yeh' ? m.Yw : (p.w != null ? p.w : null);
+        if (wantW != null && Math.abs(wantW - d.w) > 1) { const c = d.w * 0.5, du = wantW - d.w; fns.push((q) => q[0] > c ? [q[0] + du, q[1]] : q); w = wantW; }
+        if (p.top != null && ms.armTop != null) {
+          const uMax = (ms.armW || W) * 1.4;
+          if (p.top <= W * 1.1) cut = [rectPoly(-BIG, W * 1.2, uMax, BIG)];           // ل: the stem stands on it
+          else {
+            const dy = (p.top + m.capExt) - ms.armTop;
+            if (Math.abs(dy) > 2) { const c = W * 1.6; fns.push((q) => (q[1] > c && q[0] <= uMax) ? [q[0], q[1] + dy] : q); }
+          }
+        }
+        return { w, cx: w / 2, parts: dShapes(d, 'cup', chain(fns), null, cut), drawn: true };
+      }
+      case 'head': {
+        if (p.h != null || p.w != null) {   // digits ٥ ٩
+          const k = (p.h != null ? p.h : d.h) / d.h;
+          const fn = (q) => [q[0] * k, (q[1] - d.bbox.y0) * k + (p.y0 || 0)];
+          return { w: d.w * k, h: d.h * k, cx: d.w * k / 2, parts: dShapes(d, 'head', fn), drawn: true };
+        }
+        return { w: d.w, h: d.h, cx: d.w / 2, parts: dShapes(d, 'head'), drawn: true };
+      }
+      case 'loop': return { w: d.w, h: d.h, cx: d.w / 2, parts: dShapes(d, 'loop'), drawn: true };
+      case 'arc': {
+        if (p.from || p.noTop) {
+          // the body only (ع): what lies under the line, its left side moved under the head
+          const target = p.from === 'side' ? p.su : p.from === 'vertex' ? p.vx : null;
+          const du = (target != null && ms.sideU != null) ? target - ms.sideU : 0;
+          const fn = du ? (q) => [q[0] + du, q[1]] : null;
+          return { w: d.w + du, parts: dShapes(d, 'arc', fn, rectPoly(-BIG, -BIG, BIG, W * 0.9)), drawn: true };
+        }
+        return { w: d.w, parts: dShapes(d, 'arc'), drawn: true };
+      }
+      case 'nose': {
+        if (p.variant === 'up') {
+          // ح final: keep the right side and the start of the top bar, drop the leg
+          const keep = rectPoly(-BIG, -BIG, Math.max(W * 1.6, d.w * 0.45), BIG);
+          return { w: d.w * 0.45, parts: dShapes(d, 'nose', null, keep, [rectPoly(W * 1.3, -BIG, BIG, W * 1.4)]), drawn: true };
+        }
+        return { w: d.w, exitU: ms.legEnd != null ? ms.legEnd : d.w * 0.4, parts: dShapes(d, 'nose'), drawn: true };
+      }
+      case 'ain':
+        if (p.closed) return null;                       // medial/final head: drawn by the pen
+        return { w: d.w, cx: d.w / 2, leftU: ms.leftU, parts: dShapes(d, 'ain'), drawn: true };
+      case 'tail': {
+        if (p.reach != null && p.reach <= W * 1.05) return null;
+        const keep = (p.joinTop && p.top != null) ? rectPoly(-BIG, -BIG, BIG, p.top + W * 0.3) : null;
+        return { w: d.w, parts: dShapes(d, 'tail', null, keep), drawn: true };
+      }
+      case 'kaf': {
+        const cx = ms.cx != null ? ms.cx : W / 2;
+        if (p.variant === 'dal') {
+          const keep = rectPoly(-BIG, -BIG, BIG, (ms.vertexY != null ? ms.vertexY : d.h * 0.5) + W * 0.35);
+          return { w: d.w, cx, parts: dShapes(d, 'kaf', null, keep), drawn: true };
+        }
+        return { w: d.w, cx, parts: dShapes(d, 'kaf'), drawn: true };
+      }
+      case 'heh':
+        if (p.fina) return null;
+        return { w: d.w, h: d.h, cx: d.w / 2, parts: dShapes(d, 'heh'), drawn: true };
+      case 'dot': return { w: d.w, h: d.h, parts: dShapes(d, 'dot'), drawn: true };
+      case 'hamza': {
+        const k = (p.scale || 0.5) / 0.5;
+        return { w: d.w * k, h: d.h * k, parts: dShapes(d, 'hamza', k !== 1 ? (q) => [q[0] * k, q[1] * k] : null), drawn: true };
+      }
+      case 'madda': return { w: d.w, h: d.h, parts: dShapes(d, 'madda'), drawn: true };
+    }
+    return null;
+  }
+
+  // ذيل الميم من الساق: the stem turned upside down, its terminal at the bottom
+  function meemTail(m, p) {
+    const d = S.drawn.stem, W = m.W;
+    const H = d.bbox.y1;
+    const top = p.top, bottom = (p.bot != null ? p.bot : m.dd) - m.capExt;
+    const flipTop = top + W * 0.25, len = flipTop - bottom, cut = H * 0.5, shift = H - len;
+    const fn = (q) => [q[0], q[1] > cut ? flipTop - q[1] + shift : flipTop - q[1]];
+    return { w: d.w, parts: dShapes(d, 'tail', fn, rectPoly(-BIG, -BIG, BIG, top + W * 0.3)), drawn: true };
+  }
+  // الهاء الأخيرة = رأس + ساق قصيرة
+  function hehFina(m) {
+    const W = m.W;
+    const head = hasD('head') ? drawnPiece('head', m, {}) : gen.head(m, {});
+    const H = head.h || m.pc.head.h;
+    const rise = Math.max(W * 0.8, H * 0.22);
+    let stemParts;
+    if (hasD('stem')) {
+      const d = S.drawn.stem, dy = (H + rise) - d.bbox.y1;
+      stemParts = dShapes(d, 'heh', (q) => [q[0], q[1] + dy], rectPoly(-BIG, W * 0.2, BIG, BIG));
+    } else stemParts = [stroke([[m.h, m.b], [m.h, H + rise - m.capExt]], ['butt', m.cap], 'heh')];
+    return { w: head.w, cx: head.w / 2, parts: head.parts.map((pt) => Object.assign({}, pt, { slot: 'heh' })).concat(stemParts), drawn: true };
+  }
+
   // vertical 3-slice stretch keeping the terminals intact
   function stretchV(img, newH, topFrac, botFrac) {
     const h = img.height, w = img.width;
@@ -1271,6 +1612,16 @@ button { cursor: pointer; }
 
   S.piece = function (id, m, p) {
     p = p || {};
+    // 1) the designer's drawings
+    if (id === 'tail' && p.reach != null && p.reach <= m.W * 1.05 && hasD('stem')) return meemTail(m, p);
+    if (id === 'heh' && p.fina && (hasD('head') || hasD('stem'))) return hehFina(m);
+    if (id === 'hamza' && !hasD('hamza') && hasD('ain')) {
+      // declared rule: الهمزة = رأس العين مصغّراً
+      const d = S.drawn.ain, k = p.scale || 0.5;
+      return { w: d.w * k, h: d.h * k, parts: dShapes(d, 'hamza', (q) => [q[0] * k, (q[1] - d.bbox.y0) * k]), drawn: true };
+    }
+    if (hasD(id)) { const dp = drawnPiece(id, m, p); if (dp) return dp; }
+    // 2) pieces cut from a logo image, 3) the pen
     if (id === 'hamza' && !S.overrides.hamza && S.overrides.ain && S.useImage.ain !== false) {
       // declared rule: الهمزة = رأس العين مصغّراً
       const o = S.overrides.ain, k = p.scale || 0.5;
@@ -1504,14 +1855,14 @@ button { cursor: pointer; }
   RX.alef = (b, m, f) => {
     const fin = f === 'fina';
     const s = b.P('stem', 0, 0, { free: !fin });
-    if (fin) b.entry = { u: s.cx, dir: 'up' };
+    if (fin) b.entry = { u: s.cx, dir: s.drawn ? 'flat' : 'up' };
     b.anc.above = [s.cx, m.A + m.mg * 0.7];
     b.anc.below = [s.cx, -m.mg * 0.7];
   };
 
   function tooth(b, m, f) {
     const t = b.P('tooth', 0, 0);
-    const dir = m.pc.tooth.style === 'stub' && !t.image ? 'up' : 'flat';
+    const dir = m.pc.tooth.style === 'stub' && !t.image && !t.drawn ? 'up' : 'flat';
     b.exit = { u: t.cx, dir };
     if (f === 'medi') b.entry = { u: t.cx, dir };
     b.anc.above = [t.cx, m.X + m.mg];
@@ -1523,7 +1874,7 @@ button { cursor: pointer; }
   RX.beh = (b, m, f) => {
     if (joinsL(f)) return tooth(b, m, f);
     const p = b.P('basin', 0, 0, { full: true });
-    if (f === 'fina') b.entry = { u: p.image ? p.w * 0.1 : m.h, dir: p.image ? 'flat' : 'up' };
+    if (f === 'fina') b.entry = { u: (p.image || p.drawn) ? Math.min(p.w * 0.1, m.W * 0.5) : m.h, dir: (p.image || p.drawn) ? 'flat' : 'up' };
     b.anc.above = [p.w * 0.5, m.W + m.mg * 0.55];
     b.anc.below = [p.w * 0.5, -m.mg];
   };
@@ -1543,7 +1894,7 @@ button { cursor: pointer; }
     if (joinsL(f)) return tooth(b, m, f);
     const fin = f === 'fina';
     const c = cupArm(b, m, 0, fin ? m.b + (m.t - m.b) * 0.62 : m.t);
-    if (fin) b.entry = { u: m.h, dir: 'up' };
+    if (fin) b.entry = { u: m.h, dir: c.drawn ? 'flat' : 'up' };
     b.anc.above = [c.w * 0.5, m.W + m.mg * 0.45];
     b.anc.below = [c.w * 0.5, m.d - m.h - m.mg];
   };
@@ -1552,7 +1903,7 @@ button { cursor: pointer; }
     if (joinsL(f)) return tooth(b, m, f);
     const fin = f === 'fina';
     const y = b.P('cup', 0, 0, { variant: 'yeh', top: fin ? m.b + (m.t - m.b) * 0.55 : m.t, topCap: m.cap });
-    if (fin) b.entry = { u: m.h, dir: 'up' };
+    if (fin) b.entry = { u: m.h, dir: y.drawn ? 'flat' : 'up' };
     b.anc.above = [m.h + m.W * 0.3, m.X + m.mg * 0.6];
     b.anc.below = [y.cx, m.d - m.h - m.mg * 0.8];
   };
@@ -1562,7 +1913,7 @@ button { cursor: pointer; }
     const t0 = b.P('tooth', 0, 0);
     const c0 = t0.cx, c1 = c0 + sg, c2 = c0 + 2 * sg;
     b.P('tooth', c1 - t0.cx, 0);
-    b.base(c0, c2, !joinsR(f) && m.pc.tooth.style === 'stub' && !t0.image);
+    b.base(c0, c2, !joinsR(f) && m.pc.tooth.style === 'stub' && !t0.image && !t0.drawn);
     if (f === 'isol' || f === 'fina') cupArm(b, m, c2 - m.h, m.t);
     else { b.P('tooth', c2 - t0.cx, 0); b.exit = { u: c2, dir: 'flat' }; }
     if (joinsR(f)) b.entry = { u: c0, dir: 'flat' };
@@ -1591,7 +1942,7 @@ button { cursor: pointer; }
   RX.ain = (b, m, f) => {
     if (f === 'init') {
       const a = b.P('ain', 0, 0, { botEnd: m.h, botCap: m.cap });
-      b.exit = { u: a.w - m.h, dir: a.image ? 'flat' : 'up' };
+      b.exit = { u: a.leftU != null ? a.leftU : a.w - m.h, dir: (a.image || a.drawn) ? 'flat' : 'up' };
       b.anc.above = [a.w * 0.5, m.X + m.mg];
       return;
     }
@@ -1608,7 +1959,7 @@ button { cursor: pointer; }
     const rh = m.rr('ain', (top - m.b) / 2);
     const a = b.P('ain', 0, 0, { botEnd: m.h + hw * 0.22, botCap: m.cap });
     const leg = Math.max(m.W * 0.9, rh * 0.6 + m.W * 0.5);
-    b.P('arc', 0, 0, { from: 'side', su: a.w - m.h, leg, w, endU: m.h + w * 0.04 });
+    b.P('arc', 0, 0, { from: 'side', su: a.leftU != null ? a.leftU : a.w - m.h, leg, w, endU: m.h + w * 0.04 });
     b.anc.above = [a.w * 0.5, m.X + m.mg];
   };
 
@@ -1639,15 +1990,16 @@ button { cursor: pointer; }
   RX.dal = (b, m, f) => {
     // declared rule: الدال = خط الكاف على السطر
     const w = m.Dw;
-    b.P('kaf', 0, 0, { variant: 'dal' });
-    if (f === 'fina') b.entry = { u: m.h, dir: 'flat' };
+    const k = b.P('kaf', 0, 0, { variant: 'dal' });
+    if (k.drawn) b.S([[k.cx, m.b], [k.cx + w * 0.72, m.b]], 0, { slot: 'kaf', caps: ['butt', m.cap] });
+    if (f === 'fina') b.entry = { u: k.drawn ? k.cx : m.h, dir: 'flat' };
     b.anc.above = [w * 0.46, m.X + m.mg];
   };
 
   RX.reh = (b, m, f) => {
     if (f === 'fina') {
-      b.P('tail', 0, 0, { top: m.b, topCap: 'butt', joinTop: true });
-      b.entry = { u: m.h, dir: 'down' };
+      const t = b.P('tail', 0, 0, { top: m.b, topCap: 'butt', joinTop: true });
+      b.entry = { u: m.h, dir: t.drawn ? 'flat' : 'down' };
       b.anc.above = [m.h + m.W * 0.3, m.W + m.mg];
     } else {
       b.P('tail', 0, 0, { top: m.t });
@@ -1688,7 +2040,7 @@ button { cursor: pointer; }
   RX.kaf = (b, m, f) => {
     if (joinsL(f)) {
       const k = b.P('kaf', 0, 0);
-      b.exit = { u: k.cx, dir: k.image ? 'flat' : 'up' };
+      b.exit = { u: k.cx, dir: (k.image || k.drawn) ? 'flat' : 'up' };
       if (f === 'medi') b.entry = { u: k.cx, dir: 'flat' };
       return;
     }
@@ -1705,21 +2057,21 @@ button { cursor: pointer; }
   RX.lam = (b, m, f) => {
     const s = b.P('stem', 0, 0);
     if (f === 'isol' || f === 'fina') b.P('cup', s.cx - m.h, 0, { top: m.b, w: m.Cw * 1.04 });
-    if (joinsL(f)) b.exit = { u: s.cx, dir: 'up' };
-    if (joinsR(f)) b.entry = { u: s.cx, dir: f === 'fina' ? 'flat' : 'up' };
+    if (joinsL(f)) b.exit = { u: s.cx, dir: s.drawn ? 'flat' : 'up' };
+    if (joinsR(f)) b.entry = { u: s.cx, dir: (f === 'fina' || s.drawn) ? 'flat' : 'up' };
     b.anc.above = [s.cx, m.A + m.mg];
   };
 
   RX.heh = (b, m, f) => {
     if (f === 'fina') {
       const e = b.P('heh', 0, 0, { fina: true });
-      b.entry = { u: m.h, dir: 'up' };
+      b.entry = { u: m.h, dir: e.drawn ? 'flat' : 'up' };
       b.anc.above = [e.w * 0.62, m.L + m.mg * 0.9];
       return;
     }
     const e = b.P('heh', 0, 0);
-    if (joinsL(f)) b.exit = { u: e.w - m.h, dir: e.image ? 'flat' : 'up' };
-    if (f === 'medi') b.entry = { u: m.h, dir: e.image ? 'flat' : 'up' };
+    if (joinsL(f)) b.exit = { u: e.w - m.h, dir: (e.image || e.drawn) ? 'flat' : 'up' };
+    if (f === 'medi') b.entry = { u: m.h, dir: (e.image || e.drawn) ? 'flat' : 'up' };
     b.anc.above = [e.w * 0.5, m.Eh + m.mg];
   };
 
@@ -1731,6 +2083,17 @@ button { cursor: pointer; }
     // لام ألف = ساقان ووصلة: the lam stands, the alef leans out from the shared foot
     const La = Math.max(0.46 * m.A * m.wf, 3.8 * m.W);
     const foot = La * 0.42;
+    if (R.slots.hasDrawn('stem')) {
+      const lam = b.P('stem', 0, 0, {});
+      const lean = Math.atan((La - m.h - foot) / Math.max(1, m.a - m.b)) * 180 / Math.PI;
+      const al = R.slots.piece('stem', m, { lean });
+      for (const part of al.parts) b.parts.push(R.shiftPart(part, foot - al.cx, 0));
+      b.S([[lam.cx, m.b], [foot, m.b]], 0, { slot: 'conn', caps: ['butt', 'butt'] });
+      if (f === 'fina') b.entry = { u: lam.cx, dir: 'flat' };
+      b.anc.above = [La - m.h, m.A + m.mg * 0.7];
+      b.anc.below = [foot + (La - foot) * 0.25, -m.mg * 0.7];
+      return;
+    }
     const lean = Math.tan(m.pc.stem.lean * Math.PI / 180) * (m.a - m.b);
     b.S([[m.h + lean, m.a], [m.h, m.b], [foot, m.b], [La - m.h + lean, m.a]], [0, m.rr('stem', m.W * 1.4), m.rr('stem', m.W * 1.1), 0],
       { tags: ['stem', 'conn', 'stem'], caps: [m.cap, m.cap] });
@@ -1920,7 +2283,7 @@ button { cursor: pointer; }
     let parts = b.parts.map(p => R.shiftPart(p, shift, 0));
     // slant: shear (tops lean to the left for positive values)
     const k = Math.tan((m.dna.slant || 0) * Math.PI / 180);
-    if (k) parts = parts.map(p => p.type === 'image' ? Object.assign({}, p, { skew: k }) : Object.assign({}, p, { pts: p.pts.map(q => [q[0] + q[1] * k, q[1]]) }));
+    if (k) parts = parts.map(p => p.type === 'image' ? Object.assign({}, p, { skew: k }) : R.xformPart(p, q => [q[0] + q[1] * k, q[1]]));
     const anc = {};
     for (const key in b.anc) anc[key] = [b.anc[key][0] + shift, b.anc[key][1]];
     return { adv, parts, clip: { right: jr ? -m.ov : null, left: jl ? adv + m.ov : null }, anc, form: f };
@@ -1994,8 +2357,9 @@ button { cursor: pointer; }
     for (const p of built.parts) {
       if (!p.slot || p.slot === 'conn' || p.slot === 'dot') continue;
       let u0 = Infinity;
-      if (p.type === 'image') u0 = p.u0; else for (const q of p.pts) u0 = Math.min(u0, q[0]);
-      items.push({ slot: p.slot, u0 });
+      const pts = p.type === 'image' ? [[p.u0, 0]] : p.type === 'shape' ? R.shapePoints(p) : p.pts;
+      for (const q of pts) u0 = Math.min(u0, q[0]);
+      if (isFinite(u0)) items.push({ slot: p.slot, u0 });
     }
     items.sort((a, b) => a.u0 - b.u0);
     const order = [], count = {};
@@ -2693,6 +3057,9 @@ button { cursor: pointer; }
   const median = (a) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
   const pct = (a, p) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.max(0, Math.round(p * (s.length - 1))))]; };
 
+  A._edt = (m, w, h) => edt(m, w, h);
+  A._thin = (m, w, h) => thin(m, w, h);
+
   /* ---------------------------------------------------------------- main analysis */
   A.run = function (canvas) {
     const w = canvas.width, h = canvas.height, N = w * h;
@@ -3117,24 +3484,654 @@ button { cursor: pointer; }
 
 </script>
 <script>
-/* رسم — application: wires the engine to the page. */
+/* رسم — Illustrator round-trip: the drawing template (SVG with one frame per piece and its guides)
+ * and the reader for the SVG the designer exports back. Drawn pieces come back as exact Bézier
+ * outlines in font units. */
+(function (root) {
+  'use strict';
+  const R = root.Rasm;
+  const G = R.geom;
+  const IO = R.svg = {};
+
+  /* ---------------------------------------------------------------- template geometry */
+  IO.ORDER = ['stem', 'tooth', 'basin', 'head', 'arc', 'tail', 'cup', 'loop', 'nose', 'ain', 'kaf', 'heh', 'dot', 'hamza', 'madda'];
+  const COLS = 5, FW = 1500, FH = 1900, GAP = 120, HEAD = 640, BASE = 1220, REF = 330;
+  IO.SIZE = { W: COLS * FW + (COLS + 1) * GAP, H: HEAD + 3 * FH + 4 * GAP };
+  IO.frame = function (i) {
+    const row = Math.floor(i / COLS), col = COLS - 1 - (i % COLS);      // first frame at the top-right (Arabic order)
+    const x0 = GAP + col * (FW + GAP), y0 = HEAD + GAP + row * (FH + GAP);
+    return { id: IO.ORDER[i], x0, y0, x1: x0 + FW, y1: y0 + FH, base: y0 + BASE, ref: x0 + FW - REF };
+  };
+  IO.frames = () => IO.ORDER.map((_, i) => IO.frame(i));
+  const SMALL = { dot: 1, hamza: 1, madda: 1 };
+
+  /* what each frame asks for (shown on the template and in the report) */
+  IO.GUIDE = {
+    stem: ['ارسم الألف كاملة: من السطر إلى خط الألف.', 'عرضها هو سماكة القلم للخط كله.', 'اترك وسطها مستقيماً: هنا يُمطّ.'],
+    tooth: ['نتوء يقف على السطر، وقدمه داخل الشريط.', 'ارتفاعه يحدد ارتفاع الأسنان كلها.'],
+    basin: ['حوض الباء كاملاً بطرفيه، وقاعدته داخل الشريط.', 'اترك وسط القاعدة مستقيماً: هنا يُمدّ للكاف والفاء.'],
+    head: ['عروة صغيرة مغلقة تجلس على السطر.', 'رأس الفاء والقاف والميم والواو.'],
+    arc: ['الحاء المنفردة كاملة: ذراع علوية، وقوس ينزل تحت السطر.', 'جسمه يُستعمل أيضاً للعين.'],
+    tail: ['الراء المنفردة: نزول يعبر الشريط وينعطف يساراً.'],
+    cup: ['النون المنفردة بلا نقطة: ذراعها اليمنى تعبر الشريط إلى ارتفاع السن.', 'اترك قاع الكأس أفقياً في وسطه: هنا تُوسَّع للياء واللام.'],
+    loop: ['عروة الصاد والطاء: مغلقة، ممدودة، تجلس على السطر.'],
+    nose: ['رأس الحاء الأولى «حـ»: خط علوي، وجانب أيمن ينزل، وساق قصيرة على الشريط إلى اليسار.'],
+    ain: ['رأس العين الأولى «عـ»: قوس صغير مفتوح لليمين، أسفله على الشريط.', 'منه تُصنع الهمزة إن لم ترسمها.'],
+    kaf: ['الكاف الأولى «كـ»: الشَّرطة المائلة والقائم النازل إلى الشريط.', 'نصفها الأسفل يصير الدال.'],
+    heh: ['الهاء المنفردة: قبة على السطر، وفي داخلها عين صغيرة.'],
+    dot: ['نقطة واحدة. تُنسخ إلى نقطتين وثلاث.'],
+    hamza: ['اختيارية: إن تركتها تُصنع من رأس العين.'],
+    madda: ['اختيارية: موجة المدّ فوق الألف.']
+  };
+
+  /* ---------------------------------------------------------------- template */
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Arabic lines: an explicit right-to-left embedding, anchored at their right end. This reads the same in
+  // renderers that ignore the SVG direction attribute (the anchor then still means the right edge)
+  const rtl = (t) => '\u202B' + esc(t) + '\u202C';
+  const wrap = (t, n) => {
+    const out = []; let cur = '';
+    for (const w of String(t).split(' ')) { if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const f1 = (v) => (Math.round(v * 10) / 10).toString();
+
+  function contoursD(contours, X, Y) {
+    // contours from R.font.outline (font coords) → path data
+    let d = '';
+    for (const c of contours) {
+      d += 'M' + f1(X(c.start[0])) + ' ' + f1(Y(c.start[1]));
+      for (const sg of c.segs) {
+        d += sg.c1 ? 'C' + f1(X(sg.c1[0])) + ' ' + f1(Y(sg.c1[1])) + ' ' + f1(X(sg.c2[0])) + ' ' + f1(Y(sg.c2[1])) + ' ' + f1(X(sg.p[0])) + ' ' + f1(Y(sg.p[1]))
+          : 'L' + f1(X(sg.p[0])) + ' ' + f1(Y(sg.p[1]));
+      }
+      d += 'Z';
+    }
+    return d;
+  }
+  function cmdsD(cmds, X, Y) {
+    let d = '';
+    for (const c of cmds) {
+      if (c[0] === 'Z') d += 'Z';
+      else if (c[0] === 'C') d += 'C' + [X(c[1]), Y(c[2]), X(c[3]), Y(c[4]), X(c[5]), Y(c[6])].map(f1).join(' ');
+      else d += c[0] + f1(X(c[1])) + ' ' + f1(Y(c[2]));
+    }
+    return d;
+  }
+
+  /* the template SVG. m: current metrics (guides follow the pen); drawn: pieces already drawn (kept, editable) */
+  IO.template = function (m, drawn) {
+    drawn = drawn || {};
+    const { W: TW, H: TH } = IO.SIZE;
+    const out = [];
+    out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${TW}" height="${TH}" viewBox="0 0 ${TW} ${TH}">`);
+    out.push(`<title>Rasm — piece template</title>`);
+    out.push(`<rect id="paper" x="0" y="0" width="${TW}" height="${TH}" fill="#f4f2ef"/>`);
+    out.push(`<g id="guides">`);
+    out.push(`<text x="${TW - GAP}" y="${GAP + 150}" font-family="Arial" font-size="130" fill="#191919" text-anchor="end">${rtl('رسم — قالب القطع')}</text>`);
+    const lines = [
+      '١ ارسم كل قطعة داخل إطارها بأداة القلم: شكلاً مغلقاً مملوءاً بالأسود.',
+      '٢ اجعل أسفل القطعة على السطر، وما يتصل منها داخل الشريط البرتقالي.',
+      '٣ الشكل الرمادي اقتراح من المحرك: ارسم فوقه أو خالفه. لا تغيّر حجم اللوحة.',
+      '٤ صدّر: File › Export › Export As › SVG، ثم ارفع الملف في المحرك.'
+    ];
+    lines.forEach((t, i) => out.push(`<text x="${TW - GAP}" y="${GAP + 270 + i * 70}" font-family="Arial" font-size="48" fill="#5f5a55" text-anchor="end">${rtl(t)}</text>`));
+    const W = m.W;
+    IO.frames().forEach((fr) => {
+      const id = fr.id, meta = R.slots.byId[id];
+      const X = (u) => fr.ref - u, Y = (y) => fr.base - y;
+      out.push(`<g id="frame-${id}">`);
+      out.push(`<rect x="${fr.x0}" y="${fr.y0}" width="${FW}" height="${FH}" rx="36" fill="#ffffff" stroke="#d9d4ce" stroke-width="4"/>`);
+      const num = meta.n ? meta.n + ' ' : '';
+      out.push(`<text x="${fr.x1 - 50}" y="${fr.y0 + 110}" font-family="Arial" font-size="86" fill="#191919" text-anchor="end">${rtl(num + meta.ar)}</text>`);
+      out.push(`<text x="${fr.x0 + 50}" y="${fr.y0 + 100}" font-family="Courier New, monospace" font-size="40" fill="#9a948d">${esc(id.toUpperCase())}${meta.role ? ' · ' + (meta.role === 'root' ? 'ROOT' : 'DERIVED') : ''}</text>`);
+      (IO.GUIDE[id] || []).reduce((a, t) => a.concat(wrap(t, 56)), []).forEach((t, i) => out.push(`<text x="${fr.x1 - 50}" y="${fr.y0 + 185 + i * 54}" font-family="Arial" font-size="40" fill="#6f6a64" text-anchor="end">${rtl(t)}</text>`));
+      if (!SMALL[id]) {
+        // the joint band and the metric lines
+        out.push(`<rect x="${fr.x0 + 30}" y="${f1(Y(W))}" width="${FW - 60}" height="${f1(W)}" fill="#ffd8c2"/>`);
+        // guide colours stay light so the reader never mistakes them for ink
+        const ml = [[0, 'BASE 0', '#8a847d', ''], [m.X, 'TOOTH ' + Math.round(m.X), '#a59f98', '14 10'], [m.A, 'ALIF ' + Math.round(m.A), '#a59f98', '14 10'],
+          [m.L, 'HEAD ' + Math.round(m.L), '#c9c3bc', '6 10'], [-m.D, 'DESC −' + Math.round(m.D), '#a59f98', '14 10'], [-m.DD, 'DEEP −' + Math.round(m.DD), '#c9c3bc', '6 10']];
+        for (const [y, lab, col, dash] of ml) {
+          out.push(`<line x1="${fr.x0 + 30}" y1="${f1(Y(y))}" x2="${fr.x1 - 30}" y2="${f1(Y(y))}" stroke="${col}" stroke-width="3"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`);
+          // secondary lines (head, deep) label at the far end so they never sit on a main label
+          const far = col === '#c9c3bc';
+          out.push(`<text x="${far ? fr.x1 - 40 : fr.x0 + 40}" y="${f1(Y(y) - 12)}" font-family="Courier New, monospace" font-size="30" fill="${col}"${far ? ' text-anchor="end"' : ''}>${lab}</text>`);
+        }
+        // the piece's right join line
+        out.push(`<line x1="${fr.ref}" y1="${f1(Y(m.A + 60))}" x2="${fr.ref}" y2="${f1(Y(-m.DD - 40))}" stroke="#8fa1ff" stroke-width="3" stroke-dasharray="4 12"/>`);
+        out.push(`<text x="${fr.ref + 14}" y="${f1(Y(-m.DD - 30))}" font-family="Arial" font-size="30" fill="#6f84ff">حافة القطعة اليمنى</text>`);
+      }
+      // the engine's suggestion, as a light ghost
+      try {
+        const piece = IO.suggestion(id, m);
+        if (piece) {
+          const pseudo = { adv: piece.w, parts: piece.parts, clip: {} };
+          const contours = R.font.outline(pseudo, m.dna, 0.6);
+          const gx = SMALL[id] ? (fr.x0 + FW / 2 - piece.w / 2) : fr.ref - piece.w;
+          const gy = SMALL[id] ? (fr.base - 200) : fr.base;
+          const d = contoursD(contours, (x) => gx + x, (y) => gy - y);
+          out.push(`<path d="${d}" fill="#e6e1db"/>`);
+        }
+      } catch (e) { /* no ghost */ }
+      out.push(`</g>`);
+    });
+    out.push(`</g>`);
+    // the drawing layer: pieces already drawn come back here, editable
+    out.push(`<g id="draw">`);
+    IO.frames().forEach((fr) => {
+      const d = drawn[fr.id];
+      if (!d) return;
+      const gx = SMALL[fr.id] ? fr.x0 + FW / 2 - d.w / 2 : fr.ref + (d.placeU || 0);
+      const gy = SMALL[fr.id] ? fr.base - 200 : fr.base;
+      for (const sh of d.shapes) out.push(`<path d="${cmdsD(sh.cmds, (u) => (SMALL[fr.id] ? gx + d.w - u : gx - u), (y) => gy - y)}" fill="#000000"${sh.rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}/>`);
+    });
+    out.push(`</g>`);
+    out.push(`</svg>`);
+    return out.join('\n');
+  };
+
+  // the engine's own version of a piece (pen + current metrics), used as the ghost
+  IO.suggestion = function (id, m) {
+    const saved = R.slots.drawn[id], savedImg = R.slots.overrides[id];
+    delete R.slots.drawn[id]; delete R.slots.overrides[id];
+    try {
+      const p = {};
+      if (id === 'stem') p.free = true;
+      if (id === 'basin') p.full = true;
+      if (id === 'cup') { p.top = m.t; p.topCap = m.cap; }
+      if (id === 'ain') { p.botEnd = m.h; p.botCap = m.cap; }
+      if (id === 'hamza') p.scale = 0.5;
+      return R.slots.piece(id, m, p);
+    } finally {
+      if (saved) R.slots.drawn[id] = saved;
+      if (savedImg) R.slots.overrides[id] = savedImg;
+    }
+  };
+
+  IO.contoursD = contoursD;
+  IO.cmdsD = cmdsD;
+
+  /* ---------------------------------------------------------------- SVG reading */
+  const NAMED = { black: '#000000', white: '#ffffff', red: '#ff0000', none: 'none', transparent: 'none' };
+  function parseColor(v) {
+    if (v == null) return null;
+    v = String(v).trim().toLowerCase();
+    if (!v || v === 'none' || v === 'transparent') return 'none';
+    if (NAMED[v]) return NAMED[v];
+    if (v[0] === '#') {
+      if (v.length === 4) return '#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3];
+      return v.slice(0, 7);
+    }
+    const m = v.match(/rgba?\(\s*([\d.]+)%?[\s,]+([\d.]+)%?[\s,]+([\d.]+)%?/);
+    if (m) return '#' + [m[1], m[2], m[3]].map(x => Math.max(0, Math.min(255, Math.round(+x)))).map(x => x.toString(16).padStart(2, '0')).join('');
+    if (v.startsWith('url(')) return '#000000';
+    return '#000000';
+  }
+  function lum(hex) {
+    if (!hex || hex === 'none') return 1;
+    const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+    return 0.299 * r + 0.587 * g + 0.114 * b;
+  }
+
+  function parseCSS(text, rules) {
+    text = text.replace(/\/\*[\s\S]*?\*\//g, '');
+    const re = /([^{}]+)\{([^}]*)\}/g;
+    let mm;
+    while ((mm = re.exec(text))) {
+      const decl = {};
+      mm[2].split(';').forEach((d) => { const i = d.indexOf(':'); if (i > 0) decl[d.slice(0, i).trim().toLowerCase()] = d.slice(i + 1).trim(); });
+      mm[1].split(',').forEach((sel) => { sel = sel.trim(); if (sel) rules[sel] = Object.assign(rules[sel] || {}, decl); });
+    }
+  }
+
+  // matrices [a b c d e f]: x' = a x + c y + e, y' = b x + d y + f
+  const mul = (A, B) => [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3], A[0] * B[4] + A[2] * B[5] + A[4], A[1] * B[4] + A[3] * B[5] + A[5]];
+  const ID = [1, 0, 0, 1, 0, 0];
+  function parseTransform(t) {
+    let M = ID.slice();
+    if (!t) return M;
+    const re = /(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/g;
+    let mm;
+    while ((mm = re.exec(t))) {
+      const a = mm[2].split(/[\s,]+/).filter(Boolean).map(Number);
+      let T = ID;
+      if (mm[1] === 'matrix') T = a.slice(0, 6);
+      else if (mm[1] === 'translate') T = [1, 0, 0, 1, a[0] || 0, a[1] || 0];
+      else if (mm[1] === 'scale') T = [a[0], 0, 0, a.length > 1 ? a[1] : a[0], 0, 0];
+      else if (mm[1] === 'rotate') {
+        const r = (a[0] || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+        T = [c, s, -s, c, 0, 0];
+        if (a.length >= 3) T = mul(mul([1, 0, 0, 1, a[1], a[2]], T), [1, 0, 0, 1, -a[1], -a[2]]);
+      } else if (mm[1] === 'skewX') T = [1, 0, Math.tan(a[0] * Math.PI / 180), 1, 0, 0];
+      else if (mm[1] === 'skewY') T = [1, Math.tan(a[0] * Math.PI / 180), 0, 1, 0, 0];
+      M = mul(M, T);
+    }
+    return M;
+  }
+
+  // path data → absolute commands (M L C Z), arcs and quadratics turned into cubics
+  function parseD(d) {
+    const out = [];
+    const reNum = /[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?/y;
+    let i = 0;
+    const n = d.length;
+    const skip = () => { while (i < n && (d[i] === ' ' || d[i] === ',' || d[i] === '\n' || d[i] === '\t' || d[i] === '\r')) i++; };
+    const num = () => { skip(); reNum.lastIndex = i; const m = reNum.exec(d); if (!m) return null; i = reNum.lastIndex; return parseFloat(m[0]); };
+    const flag = () => { skip(); const c = d[i]; if (c === '0' || c === '1') { i++; return +c; } return null; };
+    let cmd = null, x = 0, y = 0, sx = 0, sy = 0, pc = null, pq = null, lastCmd = '';
+    const isCmd = (c) => /[MmLlHhVvCcSsQqTtAaZz]/.test(c);
+    while (i < n) {
+      skip(); if (i >= n) break;
+      if (isCmd(d[i])) { cmd = d[i++]; }
+      else if (!cmd) break;
+      const rel = cmd === cmd.toLowerCase(), C = cmd.toUpperCase();
+      if (C === 'Z') { out.push(['Z']); x = sx; y = sy; pc = pq = null; lastCmd = 'Z'; cmd = null; continue; }
+      if (C === 'M') {
+        const a = num(), b = num(); if (a == null || b == null) break;
+        x = rel ? x + a : a; y = rel ? y + b : b; sx = x; sy = y;
+        out.push(['M', x, y]); cmd = rel ? 'l' : 'L'; pc = pq = null; lastCmd = 'M'; continue;
+      }
+      if (C === 'L') { const a = num(), b = num(); if (a == null || b == null) break; x = rel ? x + a : a; y = rel ? y + b : b; out.push(['L', x, y]); pc = pq = null; lastCmd = 'L'; continue; }
+      if (C === 'H') { const a = num(); if (a == null) break; x = rel ? x + a : a; out.push(['L', x, y]); pc = pq = null; lastCmd = 'L'; continue; }
+      if (C === 'V') { const a = num(); if (a == null) break; y = rel ? y + a : a; out.push(['L', x, y]); pc = pq = null; lastCmd = 'L'; continue; }
+      if (C === 'C' || C === 'S') {
+        let x1, y1;
+        if (C === 'C') { const a = num(), b = num(); if (a == null) break; x1 = rel ? x + a : a; y1 = rel ? y + b : b; }
+        else { x1 = pc ? 2 * x - pc[0] : x; y1 = pc ? 2 * y - pc[1] : y; }
+        const c = num(), e = num(), f = num(), g = num(); if (g == null) break;
+        const x2 = rel ? x + c : c, y2 = rel ? y + e : e, x3 = rel ? x + f : f, y3 = rel ? y + g : g;
+        out.push(['C', x1, y1, x2, y2, x3, y3]); pc = [x2, y2]; pq = null; x = x3; y = y3; lastCmd = 'C'; continue;
+      }
+      if (C === 'Q' || C === 'T') {
+        let qx, qy;
+        if (C === 'Q') { const a = num(), b = num(); if (a == null) break; qx = rel ? x + a : a; qy = rel ? y + b : b; }
+        else { qx = pq ? 2 * x - pq[0] : x; qy = pq ? 2 * y - pq[1] : y; }
+        const c = num(), e = num(); if (e == null) break;
+        const x3 = rel ? x + c : c, y3 = rel ? y + e : e;
+        out.push(['C', x + 2 / 3 * (qx - x), y + 2 / 3 * (qy - y), x3 + 2 / 3 * (qx - x3), y3 + 2 / 3 * (qy - y3), x3, y3]);
+        pq = [qx, qy]; pc = null; x = x3; y = y3; lastCmd = 'Q'; continue;
+      }
+      if (C === 'A') {
+        const rx = num(), ry = num(), rot = num(), la = flag(), sw = flag(), a = num(), b = num();
+        if (b == null || la == null || sw == null) break;
+        const x3 = rel ? x + a : a, y3 = rel ? y + b : b;
+        arcToCubic(x, y, rx, ry, rot, la, sw, x3, y3, out);
+        x = x3; y = y3; pc = pq = null; lastCmd = 'A'; continue;
+      }
+      break;
+    }
+    return out;
+  }
+
+  function arcToCubic(x1, y1, rx, ry, phiDeg, fa, fs, x2, y2, out) {
+    if (!rx || !ry) { out.push(['L', x2, y2]); return; }
+    rx = Math.abs(rx); ry = Math.abs(ry);
+    const phi = phiDeg * Math.PI / 180, cp = Math.cos(phi), sp = Math.sin(phi);
+    const dx = (x1 - x2) / 2, dy = (y1 - y2) / 2;
+    const x1p = cp * dx + sp * dy, y1p = -sp * dx + cp * dy;
+    let lam = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+    if (lam > 1) { const s = Math.sqrt(lam); rx *= s; ry *= s; }
+    const num = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p;
+    const den = rx * rx * y1p * y1p + ry * ry * x1p * x1p;
+    let co = Math.sqrt(Math.max(0, num / den));
+    if (fa === fs) co = -co;
+    const cxp = co * rx * y1p / ry, cyp = -co * ry * x1p / rx;
+    const cx = cp * cxp - sp * cyp + (x1 + x2) / 2, cy = sp * cxp + cp * cyp + (y1 + y2) / 2;
+    const ang = (ux, uy, vx, vy) => { const a = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy); return a; };
+    let t1 = ang(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+    let dt = ang((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
+    if (!fs && dt > 0) dt -= 2 * Math.PI; else if (fs && dt < 0) dt += 2 * Math.PI;
+    const segs = Math.max(1, Math.ceil(Math.abs(dt) / (Math.PI / 2)));
+    const d = dt / segs, k = 4 / 3 * Math.tan(d / 4);
+    const pt = (t) => [cx + rx * Math.cos(t) * cp - ry * Math.sin(t) * sp, cy + rx * Math.cos(t) * sp + ry * Math.sin(t) * cp];
+    const dv = (t) => [-rx * Math.sin(t) * cp - ry * Math.cos(t) * sp, -rx * Math.sin(t) * sp + ry * Math.cos(t) * cp];
+    for (let s = 0; s < segs; s++) {
+      const a = t1 + s * d, b = a + d;
+      const p0 = pt(a), p3 = pt(b), d0 = dv(a), d3 = dv(b);
+      out.push(['C', p0[0] + k * d0[0], p0[1] + k * d0[1], p3[0] - k * d3[0], p3[1] - k * d3[1], p3[0], p3[1]]);
+    }
+  }
+
+  const K = 0.5522847498;
+  function ellipseCmds(cx, cy, rx, ry) {
+    return [['M', cx + rx, cy], ['C', cx + rx, cy + K * ry, cx + K * rx, cy + ry, cx, cy + ry], ['C', cx - K * rx, cy + ry, cx - rx, cy + K * ry, cx - rx, cy],
+      ['C', cx - rx, cy - K * ry, cx - K * rx, cy - ry, cx, cy - ry], ['C', cx + K * rx, cy - ry, cx + rx, cy - K * ry, cx + rx, cy], ['Z']];
+  }
+  function rectCmds(x, y, w, h, rx, ry) {
+    if (!rx && !ry) return [['M', x, y], ['L', x + w, y], ['L', x + w, y + h], ['L', x, y + h], ['Z']];
+    rx = Math.min(rx || ry, w / 2); ry = Math.min(ry || rx, h / 2);
+    const kx = K * rx, ky = K * ry;
+    return [['M', x + rx, y], ['L', x + w - rx, y], ['C', x + w - rx + kx, y, x + w, y + ry - ky, x + w, y + ry], ['L', x + w, y + h - ry],
+      ['C', x + w, y + h - ry + ky, x + w - rx + kx, y + h, x + w - rx, y + h], ['L', x + rx, y + h], ['C', x + rx - kx, y + h, x, y + h - ry + ky, x, y + h - ry],
+      ['L', x, y + ry], ['C', x, y + ry - ky, x + rx - kx, y, x + rx, y], ['Z']];
+  }
+
+  /* parse an SVG file: every visible shape with its colours, in the file's own coordinates */
+  IO.parse = function (text) {
+    const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    const svg = doc.documentElement;
+    if (!svg || svg.nodeName.toLowerCase() !== 'svg' || doc.getElementsByTagName('parsererror').length) throw new Error('الملف ليس SVG صالحاً');
+    const vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+    let box;
+    if (vb.length === 4 && vb.every(isFinite) && vb[2] > 0) box = vb;
+    else box = [0, 0, parseFloat(svg.getAttribute('width')) || IO.SIZE.W, parseFloat(svg.getAttribute('height')) || IO.SIZE.H];
+    const css = {};
+    for (const st of Array.from(doc.getElementsByTagName('style'))) parseCSS(st.textContent || '', css);
+    const shapes = [], issues = new Set();
+    const SKIP = { defs: 1, clippath: 1, mask: 1, symbol: 1, style: 1, title: 1, desc: 1, metadata: 1, text: 1, tspan: 1, lineargradient: 1, radialgradient: 1, pattern: 1, filter: 1, marker: 1 };
+    const walk = (el, M, inh) => {
+      for (const node of Array.from(el.children)) {
+        const tag = node.nodeName.toLowerCase().replace(/^svg:/, '');
+        if (SKIP[tag]) continue;
+        if (node.getAttribute('id') === 'guides') continue;
+        if (tag === 'image') { issues.add('image'); continue; }
+        if (tag === 'use') { issues.add('use'); continue; }
+        const st = Object.assign({}, inh);
+        const attrs = ['fill', 'stroke', 'stroke-width', 'fill-rule', 'opacity', 'fill-opacity', 'display', 'visibility'];
+        for (const a of attrs) { const v = node.getAttribute(a); if (v != null) st[a] = v; }
+        const cls = (node.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+        for (const c of cls) { const r = css['.' + c]; if (r) for (const a of attrs) if (r[a] != null) st[a] = r[a]; }
+        const tagRule = css[tag]; if (tagRule) for (const a of attrs) if (tagRule[a] != null) st[a] = tagRule[a];
+        const sa = node.getAttribute('style');
+        if (sa) sa.split(';').forEach((d) => { const i = d.indexOf(':'); if (i > 0) { const k = d.slice(0, i).trim().toLowerCase(); if (attrs.includes(k)) st[k] = d.slice(i + 1).trim(); } });
+        if (st.display === 'none' || st.visibility === 'hidden') continue;
+        if (node.getAttribute('clip-path') || node.getAttribute('mask')) issues.add('clip');
+        const M2 = mul(M, parseTransform(node.getAttribute('transform')));
+        if (tag === 'g' || tag === 'svg' || tag === 'a' || tag === 'switch') { walk(node, M2, st); continue; }
+        let cmds = null;
+        const num = (k) => parseFloat(node.getAttribute(k)) || 0;
+        if (tag === 'path') cmds = parseD(node.getAttribute('d') || '');
+        else if (tag === 'rect') cmds = rectCmds(num('x'), num('y'), num('width'), num('height'), num('rx'), num('ry'));
+        else if (tag === 'circle') cmds = ellipseCmds(num('cx'), num('cy'), num('r'), num('r'));
+        else if (tag === 'ellipse') cmds = ellipseCmds(num('cx'), num('cy'), num('rx'), num('ry'));
+        else if (tag === 'polygon' || tag === 'polyline') {
+          const v = (node.getAttribute('points') || '').trim().split(/[\s,]+/).map(Number);
+          cmds = [];
+          for (let i = 0; i + 1 < v.length; i += 2) cmds.push([i ? 'L' : 'M', v[i], v[i + 1]]);
+          if (tag === 'polygon') cmds.push(['Z']);
+        } else if (tag === 'line') cmds = [['M', num('x1'), num('y1')], ['L', num('x2'), num('y2')]];
+        if (!cmds || !cmds.length) continue;
+        // apply the transform
+        const T = (x, y) => [M2[0] * x + M2[2] * y + M2[4], M2[1] * x + M2[3] * y + M2[5]];
+        const tc = cmds.map((c) => {
+          if (c[0] === 'Z') return c;
+          const r = [c[0]];
+          for (let i = 1; i < c.length; i += 2) { const q = T(c[i], c[i + 1]); r.push(q[0], q[1]); }
+          return r;
+        });
+        // open/closed sub-paths
+        const subs = [];
+        let cur = null;
+        for (const c of tc) { if (c[0] === 'M') { cur = { cmds: [c], closed: false }; subs.push(cur); } else if (cur) { cur.cmds.push(c); if (c[0] === 'Z') cur.closed = true; } }
+        const fill = parseColor(st.fill == null ? '#000000' : st.fill), stroke = parseColor(st.stroke == null ? 'none' : st.stroke);
+        const op = (st.opacity != null ? +st.opacity : 1) * (st['fill-opacity'] != null ? +st['fill-opacity'] : 1);
+        shapes.push({ subs, fill, stroke, opacity: isFinite(op) ? op : 1, rule: st['fill-rule'] === 'evenodd' ? 'evenodd' : 'nonzero', tag });
+      }
+    };
+    walk(svg, ID, {});
+    return { box, shapes, issues: Array.from(issues) };
+  };
+
+  /* ---------------------------------------------------------------- from an exported file to pieces */
+  const bboxOf = (polys) => {
+    let u0 = Infinity, u1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const P of polys) for (const q of P) { if (q[0] < u0) u0 = q[0]; if (q[0] > u1) u1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+    return { u0, u1, y0, y1 };
+  };
+  const xcmds = (cmds, fn) => cmds.map((c) => { if (c[0] === 'Z') return c; const r = [c[0]]; for (let i = 1; i < c.length; i += 2) { const q = fn([c[i], c[i + 1]]); r.push(q[0], q[1]); } return r; });
+
+  IO.toPieces = function (parsed) {
+    const report = { matched: 0, ignored: 0, open: 0, outlineOnly: 0, outside: 0, issues: parsed.issues.slice(), scale: 1 };
+    const [bx, by, bw, bh] = parsed.box;
+    const kx = IO.SIZE.W / bw, ky = IO.SIZE.H / bh;
+    if (Math.abs(kx - ky) / kx > 0.02) report.issues.push('size');
+    report.scale = kx;
+    const toT = (x, y) => [(x - bx) * kx, (y - by) * ky];
+    const frames = IO.frames();
+    const per = {};
+    for (const sh of parsed.shapes) {
+      const darkFill = sh.fill !== 'none' && lum(sh.fill) < 0.45 && sh.opacity > 0.4;
+      const darkStroke = sh.stroke !== 'none' && lum(sh.stroke) < 0.45 && sh.opacity > 0.4;
+      if (!darkFill && !darkStroke) { report.ignored++; continue; }
+      // the sub-paths of one shape stay together (a counter is a sub-path of its loop)
+      const byFrame = {};
+      for (const sub of sh.subs) {
+        if (!sub.closed) {
+          if (darkStroke || darkFill) report.open++;
+          if (!darkFill) continue;
+        }
+        if (!darkFill) report.outlineOnly++;
+        const cmds = xcmds(sub.cmds, (q) => toT(q[0], q[1]));
+        if (!sub.closed) cmds.push(['Z']);
+        const polys = G.flattenCmds(cmds, 8);
+        const bb = bboxOf(polys);
+        const cx = (bb.u0 + bb.u1) / 2, cy = (bb.y0 + bb.y1) / 2;
+        const fr = frames.find((f) => cx >= f.x0 && cx <= f.x1 && cy >= f.y0 && cy <= f.y1);
+        if (!fr) { report.outside++; continue; }
+        (byFrame[fr.id] = byFrame[fr.id] || { cmds: [], fr }).cmds.push(...cmds);
+      }
+      for (const id in byFrame) { (per[id] = per[id] || []).push({ cmds: byFrame[id].cmds, rule: sh.rule, fr: byFrame[id].fr }); report.matched++; }
+    }
+    const pieces = {};
+    for (const id in per) {
+      const fr = per[id][0].fr;
+      // template coords → (u, y): u grows to the left of the frame's join line, y above the frame's baseline
+      let shapes = per[id].map((s) => ({ rule: s.rule, cmds: xcmds(s.cmds, (q) => [fr.ref - q[0], fr.base - q[1]]) }));
+      let polys = [];
+      for (const s of shapes) polys = polys.concat(G.flattenCmds(s.cmds, 10));
+      const bb = bboxOf(polys);
+      // u = 0 at the piece's right edge; small pieces also sit on y = 0
+      const du = -bb.u0, dy = SMALL[id] ? -bb.y0 : 0;
+      shapes = shapes.map((s) => ({ rule: s.rule, cmds: xcmds(s.cmds, (q) => [q[0] + du, q[1] + dy]) }));
+      polys = polys.map((P) => P.map((q) => [q[0] + du, q[1] + dy]));
+      pieces[id] = IO.makePiece(id, shapes, polys, -bb.u0);
+    }
+    return { pieces, report };
+  };
+
+  IO.makePiece = function (id, shapes, polys, placeU) {
+    polys = polys || shapes.reduce((a, s) => a.concat(G.flattenCmds(s.cmds, 10)), []);
+    const bb = bboxOf(polys);
+    return { id, shapes, polys, bbox: bb, w: bb.u1 - bb.u0, h: bb.y1 - bb.y0, placeU: placeU || 0 };
+  };
+
+  /* ---------------------------------------------------------------- measuring a drawn piece */
+  const spans = (d, y) => G.spanAt(d.polys, y);
+  const vspans = (d, u) => G.spanAt(d.polys, u, true);
+  IO.measure = function (d, W) {
+    const ms = {};
+    const bb = d.bbox;
+    const right = (sp) => sp.slice().sort((a, b) => a[0] - b[0])[0];
+    const left = (sp) => sp.slice().sort((a, b) => b[1] - a[1])[0];
+    const widest = (sp) => sp.slice().sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0];
+    switch (d.id) {
+      case 'stem': {
+        const sp = spans(d, bb.y1 * 0.5); const s = widest(sp) || [0, W];
+        ms.cx = (s[0] + s[1]) / 2; ms.width = s[1] - s[0]; ms.top = bb.y1;
+        // a round end narrows fast near the top (a half circle is 65% as wide at 12% of its width down); a flat one does not
+        const near = spans(d, bb.y1 - ms.width * 0.12); const nt = widest(near);
+        ms.capRound = nt ? (nt[1] - nt[0]) < ms.width * 0.82 : false;
+        break;
+      }
+      case 'tooth': { const s = right(spans(d, Math.min(bb.y1 * 0.7, W * 1.6))) || [0, W]; ms.cx = (s[0] + s[1]) / 2; ms.width = s[1] - s[0]; ms.top = bb.y1; break; }
+      case 'basin': { const s = right(spans(d, bb.y1 * 0.6)) || [0, W]; ms.tipEnd = s[1]; break; }
+      case 'cup': {
+        const s = right(spans(d, Math.max(W * 1.8, bb.y1 * 0.6))) || [0, W];
+        ms.armW = s[1] - s[0]; ms.armTop = 0;
+        for (const P of d.polys) for (const q of P) if (q[0] <= s[1] + W * 0.3 && q[1] > ms.armTop) ms.armTop = q[1];
+        ms.depth = -bb.y0;
+        break;
+      }
+      case 'nose': { const s = right(spans(d, W * 0.5)); ms.legEnd = s ? s[1] : d.w * 0.4; break; }
+      case 'ain': { const s = left(spans(d, bb.y1 * 0.55)); ms.leftU = s ? (s[0] + s[1]) / 2 : d.w - W / 2; break; }
+      case 'arc': {
+        const s = left(spans(d, bb.y0 * 0.4)); ms.sideU = s ? (s[0] + s[1]) / 2 : d.w - W / 2; ms.depth = -bb.y0; break;
+      }
+      case 'kaf': {
+        let vx = -Infinity, vy = 0;
+        for (const P of d.polys) for (const q of P) if (q[0] > vx) { vx = q[0]; vy = q[1]; }
+        ms.vertexY = vy;
+        const s = right(spans(d, W * 1.6)) || [0, W]; ms.cx = (s[0] + s[1]) / 2;
+        break;
+      }
+      case 'head': case 'loop': case 'heh': ms.height = bb.y1 - bb.y0; break;
+    }
+    return ms;
+  };
+
+  /* rendered stroke thickness (median of 2·distance on the medial axis) */
+  IO.thickness = function (d) {
+    const s = Math.min(0.5, 600 / Math.max(d.w, d.h, 1));
+    const pad = 4;
+    const Wc = Math.ceil(d.w * s) + pad * 2, Hc = Math.ceil(d.h * s) + pad * 2;
+    const c = document.createElement('canvas'); c.width = Wc; c.height = Hc;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    const view = { s, map: (u, y) => [pad + (d.bbox.u1 - u) * s, pad + (d.bbox.y1 - y) * s] };
+    x.fillStyle = '#000';
+    for (const sh of d.shapes) R.pen.fillShape(x, { cmds: sh.cmds, rule: sh.rule }, view);
+    const data = x.getImageData(0, 0, Wc, Hc).data;
+    const mask = new Uint8Array(Wc * Hc);
+    for (let i = 0, j = 3; i < mask.length; i++, j += 4) mask[i] = data[j] > 127 ? 1 : 0;
+    const dist = R.analyze._edt(mask, Wc, Hc), sk = R.analyze._thin(mask, Wc, Hc);
+    const v = [];
+    for (let i = 0; i < mask.length; i++) if (sk[i]) v.push(2 * dist[i] - 1);
+    if (!v.length) return null;
+    v.sort((a, b) => a - b);
+    return v[v.length >> 1] / s;
+  };
+
+  /* ---------------------------------------------------------------- the guide: checks per piece */
+  // level: 'ok' | 'warn' | 'error'. fix: an action id the app can apply
+  IO.check = function (id, d, ctx) {
+    const W = ctx.W, items = [];
+    const add = (level, msg, fix) => items.push({ level, msg, fix });
+    const bb = d.bbox;
+    const AR = (v) => String(Math.round(v)).replace(/[0-9]/g, (x) => '٠١٢٣٤٥٦٧٨٩'[x]);
+    if (SMALL[id]) {
+      if (d.w < W * 0.3 || d.h < W * 0.3) add('warn', 'القطعة صغيرة جداً مقارنة بسماكة القلم');
+      return items;
+    }
+    const sits = ['stem', 'tooth', 'basin', 'head', 'loop', 'nose', 'ain', 'kaf', 'heh'];
+    const hangs = ['cup', 'arc', 'tail'];
+    if (sits.includes(id)) {
+      // a free-standing piece sits on the line; a joining one may stand anywhere inside the band
+      const lo = -W * 0.12, hi = (id === 'stem' || id === 'head' || id === 'loop' || id === 'heh' || id === 'basin') ? W * 0.12 : W * 0.75;
+      if (bb.y0 < lo || bb.y0 > hi) add('warn', 'أسفل القطعة ' + (bb.y0 > 0 ? 'أعلى' : 'أدنى') + ' من السطر بـ' + AR(Math.abs(bb.y0)) + ' وحدة', 'snap');
+      if (!spans(d, W * 0.5).length) add('error', 'لا شيء من القطعة داخل شريط الوصلة، فلن تتصل بما حولها');
+    }
+    if (hangs.includes(id)) {
+      if (bb.y0 > -W) add('error', 'يجب أن تنزل القطعة تحت السطر');
+      if (!spans(d, W * 0.5).length) add('error', 'يجب أن تعبر القطعة شريط الوصلة');
+      const want = id === 'arc' ? ctx.DD : ctx.D;
+      if (Math.abs(-bb.y0 - want) > want * 0.3) add('warn', 'النزول هنا ' + AR(-bb.y0) + ' والدليل ' + AR(want) + '؛ سيُعتمد رسمك');
+    }
+    if (id === 'stem' && d.h < W * 3) add('error', 'الساق أقصر من أن تكون ألفاً');
+    if (id === 'tooth' && bb.y1 < W * 1.6) add('warn', 'السن قصير جداً، قد يختفي في الوصلة');
+    // stroke weight against the stem
+    if (ctx.stemW && id !== 'stem') {
+      const t = IO.thickness(d);
+      if (t && Math.abs(t - ctx.stemW) > ctx.stemW * 0.16) add('warn', 'سماكة القطعة ' + AR(t) + ' وسماكة الساق ' + AR(ctx.stemW));
+    }
+    // zones that get stretched must stay straight
+    // straight zone: the cross-section is the same all along it (within a small tolerance)
+    const zone = (axis, from, to, at) => {
+      const tol = Math.max(2, W * 0.04);
+      let ref = null;
+      for (let k = 0; k <= 4; k++) {
+        const v = from + (to - from) * k / 4;
+        const sp = axis === 'y' ? spans(d, v) : vspans(d, v);
+        if (!ref) { ref = sp; continue; }
+        if (sp.length !== ref.length) return false;
+        for (let j = 0; j < sp.length; j++) {
+          if (at && (Math.abs(sp[j][0] - ref[j][0]) > tol || Math.abs(sp[j][1] - ref[j][1]) > tol)) return false;
+          if (!at && Math.abs((sp[j][1] - sp[j][0]) - (ref[j][1] - ref[j][0])) > tol) return false;
+        }
+      }
+      return true;
+    };
+    if (id === 'stem' && !zone('y', bb.y1 * 0.35, bb.y1 * 0.65, true)) add('warn', 'وسط الساق ليس مستقيماً؛ مدّها قد يُظهر كسراً');
+    if (id === 'basin' && !zone('u', d.w * 0.4, d.w * 0.6, true)) add('warn', 'وسط قاعدة الحوض ليس مستقيماً؛ مدّه قد يُظهر كسراً');
+    if (id === 'cup' && !zone('u', d.w * 0.46, d.w * 0.54, false)) add('warn', 'قاع الكأس ليس أفقياً في وسطه؛ توسيعه للياء قد يُظهر كسراً');
+    return items;
+  };
+
+  /* a drawn piece as an alpha mask (so the same fitting as for logo pieces applies) */
+  IO.asMask = function (d, s) {
+    s = s || 0.5;
+    const pad = 2;
+    const c = document.createElement('canvas');
+    c.width = Math.max(4, Math.ceil(d.w * s) + pad * 2); c.height = Math.max(4, Math.ceil(d.h * s) + pad * 2);
+    const x = c.getContext('2d', { willReadFrequently: true });
+    const view = { s, map: (u, y) => [pad + (d.bbox.u1 - u) * s, pad + (d.bbox.y1 - y) * s] };
+    x.fillStyle = '#000';
+    for (const sh of d.shapes) R.pen.fillShape(x, { cmds: sh.cmds, rule: sh.rule }, view);
+    return c;
+  };
+  /* every drawn piece's own measurements → piece parameters, so derived pieces inherit from drawn parents */
+  IO.fitAll = function (pieces, m) {
+    const pp = {}, rs = [];
+    for (const id in pieces) {
+      if (!R.slots.params[id]) continue;
+      const d = pieces[id];
+      const s = 0.5;
+      const c = IO.asMask(d, s);
+      const o = { img: c, wu: c.width / s, hu: c.height / s, y0: d.bbox.y0 - 2 / s };
+      const f = R.slots.fitParams(id, o, m);
+      if (id === 'basin' || id === 'cup' || id === 'head' || id === 'loop' || id === 'arc' || id === 'tail' || id === 'heh' || id === 'nose' || id === 'ain' || id === 'kaf') {
+        if (f.w != null) f.w = Math.round(d.w); if (f.len != null) f.len = Math.round(d.w); if (f.reach != null) f.reach = Math.round(d.w);
+        if (f.h != null) f.h = Math.round(d.h);
+      }
+      pp[id] = f;
+      if (f.r != null && R.slots.byId[id].role === 'root') rs.push(f.r);
+    }
+    return { pp, roundness: rs.length ? +(rs.reduce((a, b) => a + b, 0) / rs.length).toFixed(2) : null };
+  };
+
+  /* the pen and the vertical metrics read off the drawings */
+  IO.dnaFrom = function (drawn) {
+    const out = {};
+    const st = drawn.stem;
+    if (st) {
+      const ms = st.meas || IO.measure(st, 80);
+      out.weight = Math.round(ms.width);
+      out.alif = Math.round(ms.top);
+      out.cap = ms.capRound ? 'round' : 'butt';
+    }
+    if (drawn.tooth) out.xh = Math.round(drawn.tooth.bbox.y1);
+    if (drawn.head) out.loop = Math.round(drawn.head.h);
+    if (drawn.cup) out.desc = Math.round(-drawn.cup.bbox.y0);
+    if (drawn.arc) out.deep = Math.round(-drawn.arc.bbox.y0);
+    if (drawn.dot && out.weight) out.dotSize = +(Math.max(drawn.dot.w, drawn.dot.h) / out.weight).toFixed(2);
+    return out;
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* رسم — application: the Illustrator workflow wired to the engine.
+ * 01 template & upload · 02 pieces & their checks · 03 recipes · 04 build & tests · 05 tester · 06 logos · 07 export */
 (function () {
   'use strict';
-  const R = window.Rasm;
+  const R = window.Rasm, IO = R.svg;
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const AR = (v) => String(v).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
   const DPR = () => Math.min(2, window.devicePixelRatio || 1);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
   /* ---------------------------------------------------------------- state */
   const S = {
-    dna: R.defaultDNA(), measured: {}, an: null, logo: null, logoName: '', isSample: true,
-    src: {}, hl: null, ver: 0, font: null, fontVer: -1, fontFace: null, fontBuf: null,
-    ov: { sk: true, lines: true, det: true }, crop: null, uploadSlot: null, sel: 'beh',
-    mkColor: 'ink', feat: { ctx: true, rlig: true, kash: true, rasm: true }, stat: 'idle'
+    dna: R.defaultDNA(), measured: {}, drawnDNA: {}, pp: {}, ppSrc: {},
+    an: null, logo: null, src: {}, hl: null, ver: 0,
+    font: null, fontVer: -1, fontFace: null, fontBuf: null, stat: 'idle',
+    file: null, checks: {}, report: null, collisions: [],
+    ov: { sk: true, lines: true, det: true }, crop: null, sel: 'beh.init',
+    mkColor: 'ink', feat: { ctx: true, rlig: true, kash: true, rasm: true }
   };
-  let M = R.metrics(S.dna);
+  let M = R.metrics(S.dna, S.pp);
   const INV = R.inventory();
   const SPEC = {}; INV.forEach((s) => { SPEC[s.name] = s; });
   let cache = new Map(), rcache = new Map();
@@ -3155,6 +4152,7 @@ button { cursor: pointer; }
   }
   const css = () => getComputedStyle(document.documentElement);
   const T = (n) => css().getPropertyValue(n).trim() || '#191919';
+  const META = (id) => R.slots.byId[id];
 
   /* ---------------------------------------------------------------- drawing helpers */
   function sizeCanvas(cv, fixedH) {
@@ -3167,9 +4165,8 @@ button { cursor: pointer; }
     ctx.clearRect(0, 0, w, h);
     return { ctx, w, h };
   }
-  const VSPAN = () => M.A + M.DD + 300;            // vertical span of a glyph box in units
+  const VSPAN = () => M.A + M.DD + 300;
   const baseAt = (h, s) => (h - VSPAN() * s) / 2 + (M.A + 170) * s;
-
   function drawCentered(ctx, g, w, h, s, colorOf, cx) {
     if (!g) return;
     const b = R.partBounds(g.parts, S.dna);
@@ -3179,10 +4176,7 @@ button { cursor: pointer; }
     const x = (cx != null ? cx : w / 2) - (g.adv - uc) * ss;
     R.drawGlyph(ctx, g, S.dna, { x, base: baseAt(h, ss), s: ss, colorOf });
   }
-  function wordGlyphs(text, kashida) {
-    return R.shapeText(text, kashida || 0).map((x) => G(x.name)).filter(Boolean);
-  }
-  /* draw a run right-to-left; align 'right' | 'center' */
+  const wordGlyphs = (text, kashida) => R.shapeText(text, kashida || 0).map((x) => G(x.name)).filter(Boolean);
   function drawRun(ctx, glyphs, box, color, align, sMax) {
     const total = glyphs.reduce((a, g) => a + g.adv, 0) || 1;
     let s = Math.min(box.h * 0.94 / VSPAN(), box.w * 0.96 / total);
@@ -3194,15 +4188,13 @@ button { cursor: pointer; }
     return s;
   }
 
-  /* ---------------------------------------------------------------- toast */
+  /* ---------------------------------------------------------------- toast & downloads */
   let toastT = 0;
   function toast(msg) {
-    const el = $('#toast');
-    el.textContent = msg; el.hidden = false;
-    clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 3200);
+    const t = $('#toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3400);
   }
-
-  /* ---------------------------------------------------------------- downloads */
   let dlP = null;
   function downloadsNS() {
     if (!dlP) dlP = (window.claude && typeof window.claude.use === 'function') ? Promise.resolve(window.claude.use('downloads')).catch(() => null) : Promise.resolve(null);
@@ -3228,13 +4220,10 @@ button { cursor: pointer; }
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2500);
     toast('بدأ تحميل ' + filename);
   }
-
-  // minimal ZIP (stored) — the page's save surface accepts .zip but not .otf
   const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
   function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
   function makeZip(files) {
-    const enc = new TextEncoder();
-    const d = new Date();
+    const enc = new TextEncoder(), d = new Date();
     const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
     const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
     const parts = [], central = [];
@@ -3242,12 +4231,12 @@ button { cursor: pointer; }
     for (const f of files) {
       const name = enc.encode(f.name), data = f.data, crc = crc32(data);
       const lh = new DataView(new ArrayBuffer(30));
-      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
       lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, crc, true);
-      lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+      lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true);
       parts.push(new Uint8Array(lh.buffer), name, data);
       const ch = new DataView(new ArrayBuffer(46));
-      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
       ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
       ch.setUint16(28, name.length, true); ch.setUint32(42, off, true);
       central.push(new Uint8Array(ch.buffer), name);
@@ -3262,34 +4251,27 @@ button { cursor: pointer; }
 
   /* ---------------------------------------------------------------- font building */
   let buildTimer = 0, buildSeq = 0;
-  function famName() {
-    const v = ($('#famName').value || '').replace(/[^A-Za-z0-9 \-]/g, '').trim();
-    return v || 'Rasm';
-  }
+  const famName = () => (($('#famName').value || '').replace(/[^A-Za-z0-9 \-]/g, '').trim()) || 'Rasm';
   function setStat(st, p) {
     S.stat = st;
     const stat = $('#buildStat'), track = $('#buildTrack'), btn = $('#buildBtn'), note = $('#testerNote');
     if (st === 'building') {
       track.style.width = Math.round((p || 0) * 100) + '%';
       stat.textContent = 'BUILDING ' + Math.round((p || 0) * 100) + '%';
-      btn.textContent = 'يُبنى…';
-      note.textContent = 'يُبنى الخط الآن…';
+      btn.textContent = 'يُبنى…'; note.textContent = 'يُبنى الخط الآن…';
     } else if (st === 'ready' && S.font) {
-      const kb = (S.fontBuf.byteLength / 1024).toFixed(1);
       track.style.width = '100%';
-      stat.textContent = S.font.font.glyphs.length + ' GLYPHS · ' + kb + ' KB · fina init medi rlig';
+      stat.textContent = S.font.font.glyphs.length + ' GLYPHS · ' + (S.fontBuf.byteLength / 1024).toFixed(1) + ' KB · fina init medi rlig';
       btn.textContent = 'أعد البناء';
       $('#glyphCount').textContent = AR(S.font.font.glyphs.length);
-      note.textContent = 'الخط الحالي: ' + S.font.family + ' — ' + AR(S.font.font.glyphs.length) + ' شكلاً، بُني على جهازك.';
+      note.textContent = 'الخط الحالي: ' + S.font.family + '، ' + AR(S.font.font.glyphs.length) + ' شكلاً، بُني على جهازك.';
     } else if (st === 'dirty') {
-      stat.textContent = 'CHANGED · REBUILDING…';
-      btn.textContent = 'ابنِ الآن';
+      stat.textContent = 'CHANGED · REBUILDING…'; btn.textContent = 'ابنِ الآن';
     } else if (st === 'nolib') {
       stat.textContent = 'opentype.js not loaded';
       note.textContent = 'تعذّر تحميل مكتبة كتابة الخطوط. المعاينة تعمل، أما ملف الخط فيحتاج اتصالاً.';
     } else if (st === 'error') {
-      stat.textContent = 'ERROR · ' + (p || '');
-      btn.textContent = 'أعد المحاولة';
+      stat.textContent = 'ERROR · ' + (p || ''); btn.textContent = 'أعد المحاولة';
     }
   }
   function scheduleBuild(ms) { clearTimeout(buildTimer); setStat('dirty'); buildTimer = setTimeout(buildNow, ms == null ? 900 : ms); }
@@ -3297,13 +4279,12 @@ button { cursor: pointer; }
     clearTimeout(buildTimer);
     if (!window.opentype) { setStat('nolib'); return null; }
     const seq = ++buildSeq, ver = S.ver;
-    const dna = Object.assign({}, S.dna), m = R.metrics(dna);
+    const dna = Object.assign({}, S.dna), m = R.metrics(dna, JSON.parse(JSON.stringify(S.pp)));
     setStat('building', 0);
     try {
       const res = await R.font.build({ dna, m }, { family: famName() }, (p) => {
         if (seq !== buildSeq || ver !== S.ver) return false;
-        setStat('building', p);
-        return true;
+        setStat('building', p); return true;
       });
       if (seq !== buildSeq || ver !== S.ver) return null;
       const buf = res.font.toArrayBuffer();
@@ -3316,12 +4297,11 @@ button { cursor: pointer; }
       Object.assign(S, { font: res, fontBuf: buf, fontFace: ff, fontVer: ver });
       document.documentElement.style.setProperty('--live', '"' + fam + '"');
       setStat('ready');
+      setTimeout(() => runFontChecks(res, buf, fam, m), 30);
       return res;
     } catch (e) {
       if (e && e.cancelled) return null;
-      console.error(e);
-      setStat('error', e && e.message);
-      return null;
+      console.error(e); setStat('error', e && e.message); return null;
     }
   }
   async function ensureFont() {
@@ -3331,12 +4311,12 @@ button { cursor: pointer; }
   }
 
   /* ---------------------------------------------------------------- change propagation */
-  let rq = 0, tilesT = 0;
+  let rq = 0, slowT = 0;
   function changed(now) {
     S.ver++;
     R.clampDNA(S.dna);
-    M = R.metrics(S.dna);
-    cache = new Map(); rcache = new Map();
+    M = R.metrics(S.dna, S.pp);
+    cache = new Map(); rcache = new Map(); usageVer = -1;
     requestRender();
     scheduleBuild(now ? 40 : 900);
   }
@@ -3345,191 +4325,183 @@ button { cursor: pointer; }
     rq = requestAnimationFrame(() => { rq = 0; renderAll(); });
   }
   function renderAll() {
-    renderHero(); renderAxesValues(); renderSlots(); renderRasm(); renderPreview(); renderMaker(); renderFoot(); renderLogo(); renderFound();
-    clearTimeout(tilesT); tilesT = setTimeout(renderTiles, 140);
+    renderHero(); renderAxesValues(); renderImport(); renderPieces(); renderMatrix(); renderPreview(); renderMaker(); renderFoot(); renderLogo(); renderFound();
+    clearTimeout(slowT); slowT = setTimeout(() => { renderTiles(); renderThumb(); }, 160);
   }
 
   /* ---------------------------------------------------------------- hero */
   function renderHero() {
-    const cv = $('#heroTitle');
-    const { ctx, w, h } = sizeCanvas(cv);
+    const { ctx, w, h } = sizeCanvas($('#heroTitle'));
     drawRun(ctx, wordGlyphs('رسم', 0), { x: 0, y: 0, w, h }, T('--hero-ink'), 'right');
-    const fv = $('#heroForms');
-    const f = sizeCanvas(fv);
-    const names = ['beh', 'beh.init', 'beh.medi', 'beh.fina'];
-    const gl = names.map(G).filter(Boolean);
-    const s = Math.min(f.h * 0.98 / VSPAN(), f.w / (gl.reduce((a, g) => a + g.adv, 0) + M.A * 0.9));
-    const gap = (f.w - gl.reduce((a, g) => a + g.adv * s, 0)) / (gl.length + 1);
+    const f = sizeCanvas($('#heroForms'));
+    const gl = ['beh', 'beh.init', 'beh.medi', 'beh.fina'].map(G).filter(Boolean);
+    const sum = gl.reduce((a, g) => a + g.adv, 0);
+    const s = Math.min(f.h * 0.98 / VSPAN(), f.w / (sum + M.A * 0.9));
+    const gap = (f.w - sum * s) / (gl.length + 1);
     let x = f.w - gap;
     const col = T('--hero-ink');
     for (const g of gl) { x -= g.adv * s; R.drawGlyph(f.ctx, g, S.dna, { x, base: baseAt(f.h, s), s, colorOf: () => col }); x -= gap; }
   }
   function renderFoot() {
-    const cv = $('#footMark');
-    const { ctx, w, h } = sizeCanvas(cv);
+    const { ctx, w, h } = sizeCanvas($('#footMark'));
     drawRun(ctx, wordGlyphs('رسم', 1), { x: 0, y: 0, w, h }, T('--lav-ink'), 'right');
   }
 
-  /* ---------------------------------------------------------------- 01 logo */
-  async function loadLogo(canvas, name, isSample) {
+  /* ---------------------------------------------------------------- 01 template & upload */
+  let thumbURL = null, thumbVer = -1;
+  function renderThumb() {
+    if (thumbVer === S.ver) return;
+    thumbVer = S.ver;
     try {
-      const an = R.analyze.run(canvas);
-      S.an = an; S.logo = canvas; S.logoName = name; S.isSample = !!isSample;
-      // measured style DNA
-      S.measured = Object.assign({}, an.dna);
-      S.dna = R.clampDNA(Object.assign(R.defaultDNA(), an.dna));
-      // pieces found in the logo
-      for (const id in R.slots.overrides) if (S.src[id] === 'logo') { delete R.slots.overrides[id]; delete S.src[id]; }
-      const pieces = R.analyze.autoPieces(an);
-      for (const id in pieces) { if (S.src[id] === 'upload') continue; R.slots.overrides[id] = pieces[id]; S.src[id] = 'logo'; }
-      $('#logoName').textContent = isSample ? 'شعار تجريبي — رسمه المحرك' : name;
-      if (!isSample) {
-        const base = (name || '').replace(/\.[a-z0-9]+$/i, '').replace(/[^A-Za-z0-9 \-]/g, '').trim();
-        if (base) $('#famName').value = base.slice(0, 28);
-      }
-      buildAxes();
-      changed(true);
-      if (!isSample) toast('قيس الشعار: ' + Object.keys(pieces).length + ' قطع أُخذت منه');
-    } catch (e) {
-      console.error(e);
-      toast('تعذّر قياس الصورة: ' + (e.message || e));
-    }
+      const svg = IO.template(M, R.slots.drawn);
+      if (thumbURL) URL.revokeObjectURL(thumbURL);
+      thumbURL = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      $('#tplThumb').src = thumbURL;
+    } catch (e) { console.error(e); }
   }
-  function renderLogo(rect) {
-    const cv = $('#logoCanvas');
-    if (!S.an) return;
-    const stage = $('#stage');
-    const W = Math.max(10, Math.round(stage.getBoundingClientRect().width));
-    const H = Math.round(W * S.an.h / S.an.w);
-    const k = DPR();
-    cv.width = Math.round(W * k); cv.height = Math.round(H * k);
-    cv.style.height = H + 'px';
-    const ctx = cv.getContext('2d');
-    ctx.setTransform(k, 0, 0, k, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(S.logo, 0, 0, W, H);
-    const s = W / S.an.w;
-    R.analyze.overlay(S.an, ctx, s, { skeleton: S.ov.sk, lines: S.ov.lines, det: S.ov.det, skColor: T('--accent'), boxColor: T('--blue'), lineColor: T('--muted') });
-    if (S.crop) {
-      ctx.fillStyle = 'rgba(0,0,0,.28)';
-      ctx.fillRect(0, 0, W, H);
-      if (rect) {
-        const [x0, y0, x1, y1] = rect.map((v) => v * s);
-        ctx.clearRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
-        ctx.drawImage(S.logo, Math.min(x0, x1) / s, Math.min(y0, y1) / s, Math.abs(x1 - x0) / s, Math.abs(y1 - y0) / s, Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
-        ctx.strokeStyle = T('--accent'); ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-        ctx.strokeRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
-        ctx.setLineDash([]);
-      }
-    }
-  }
-  function renderFound() {
-    const an = S.an, el = $('#found');
-    if (!an) { el.innerHTML = ''; return; }
-    const items = [
-      ['السطر', an.hasBaseline],
-      ['الساق', !!R.slots.overrides.stem && S.src.stem === 'logo'],
-      ['النقطة' + (an.dots.length ? ' (' + ({ square: 'مربّعة', circle: 'دائرية', diamond: 'معيّن' }[an.dna.dotShape]) + ')' : ''), an.dots.length > 0],
-      ['الرأس', S.src.head === 'logo'],
-      ['العروة', S.src.loop === 'logo'],
-      ['التباين ' + AR(Math.round(an.contrast * 100)) + '٪', an.contrast > 0],
-      ['الأطراف ' + (an.cap === 'round' ? 'مدوّرة' : 'مسطّحة'), true]
-    ];
-    el.innerHTML = '';
-    for (const [t, ok] of items) { const s = document.createElement('span'); s.className = ok ? 'ok' : ''; s.textContent = (ok ? '✓ ' : '— ') + t; el.appendChild(s); }
+  async function downloadTemplate() {
+    const svg = IO.template(M, R.slots.drawn);
+    await saveFile('rasm-template.svg', svg, 'image/svg+xml');
   }
 
-  // drag & drop / file input
-  async function onLogoFile(file) {
-    if (!file) return;
-    try { const c = await R.analyze.loadFile(file); await loadLogo(c, file.name, false); }
-    catch (e) { toast(e.message || 'تعذّرت قراءة الملف'); }
+  function clearPP(src) {
+    for (const id in S.ppSrc) for (const k in S.ppSrc[id]) if (S.ppSrc[id][k] === src) { delete S.ppSrc[id][k]; if (S.pp[id]) delete S.pp[id][k]; }
   }
-  function initLogoUI() {
-    $('#logoFile').addEventListener('change', (e) => { onLogoFile(e.target.files[0]); e.target.value = ''; });
-    $('#sampleBtn').addEventListener('click', () => loadSample());
-    const stage = $('#stage');
-    ['dragenter', 'dragover'].forEach((ev) => stage.addEventListener(ev, (e) => { e.preventDefault(); stage.classList.add('drag'); }));
-    ['dragleave', 'drop'].forEach((ev) => stage.addEventListener(ev, (e) => { e.preventDefault(); stage.classList.remove('drag'); }));
-    stage.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) onLogoFile(f); });
-    $$('#overlaySeg button').forEach((b) => b.addEventListener('click', () => {
-      const k = b.dataset.k; S.ov[k] = !S.ov[k]; b.setAttribute('aria-pressed', String(S.ov[k])); renderLogo();
-    }));
-    // crop interaction
-    const cv = $('#logoCanvas');
-    let start = null, cur = null;
-    const pt = (e) => { const r = cv.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width, 0, 1) * S.an.w, clamp((e.clientY - r.top) / r.height, 0, 1) * S.an.h]; };
-    cv.addEventListener('pointerdown', (e) => { if (!S.crop || !S.an) return; e.preventDefault(); cv.setPointerCapture(e.pointerId); start = pt(e); cur = start; renderLogo([...start, ...cur]); });
-    cv.addEventListener('pointermove', (e) => { if (!S.crop || !start) return; cur = pt(e); renderLogo([...start, ...cur]); });
-    cv.addEventListener('pointerup', (e) => {
-      if (!S.crop || !start) return;
-      cur = pt(e);
-      const rect = [Math.min(start[0], cur[0]), Math.min(start[1], cur[1]), Math.max(start[0], cur[0]), Math.max(start[1], cur[1])];
-      start = null;
-      if (rect[2] - rect[0] < 4 || rect[3] - rect[1] < 4) { renderLogo(); return; }
-      const id = S.crop;
-      const o = R.analyze.cropForSlot(S.an, rect, id);
-      endCrop();
-      if (!o) { toast('لا يوجد حبر داخل المستطيل.'); return; }
-      R.slots.overrides[id] = o; S.src[id] = 'logo';
-      changed(true);
-      toast('«' + R.slots.byId[id].ar + '» صار من الشعار');
-      const card = document.querySelector('[data-slot="' + id + '"]');
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  function setPP(id, k, v, src) {
+    S.pp[id] = S.pp[id] || {}; S.ppSrc[id] = S.ppSrc[id] || {};
+    S.pp[id][k] = v; S.ppSrc[id][k] = src;
+  }
+
+  function importSVG(text, name, isDemo) {
+    let parsed;
+    try { parsed = IO.parse(text); } catch (e) { toast(e.message || 'تعذّرت قراءة الملف'); return; }
+    const { pieces, report } = IO.toPieces(parsed);
+    const n = Object.keys(pieces).length;
+    S.file = { name, report, count: n, demo: !!isDemo };
+    if (!n) { renderImport(); toast('لم أجد أشكالاً سوداء داخل الإطارات.'); return; }
+    // the file is the whole truth: it replaces every drawing
+    for (const k in R.slots.drawn) delete R.slots.drawn[k];
+    for (const k in R.slots.useDrawn) delete R.slots.useDrawn[k];
+    Object.assign(R.slots.drawn, pieces);
+    adoptDrawings();
+    changed(true);
+    runPieceChecks();
+    if (!isDemo) toast('وصلت ' + AR(n) + ' قطعة. الفحص في القسم الثاني.');
+  }
+  // the pen and the metrics come from the drawings; each drawing's measurements become its piece's
+  // parameters, so the pieces derived from it (and the ones the engine draws) inherit them
+  function adoptDrawings() {
+    const pieces = R.slots.drawn;
+    for (const id in pieces) pieces[id].meas = IO.measure(pieces[id], S.dna.weight);
+    S.drawnDNA = IO.dnaFrom(pieces);
+    Object.assign(S.dna, S.drawnDNA); R.clampDNA(S.dna);
+    for (const id in pieces) pieces[id].meas = IO.measure(pieces[id], S.dna.weight);
+    clearPP('drawn');
+    const fit = IO.fitAll(pieces, R.metrics(S.dna, {}));
+    for (const id in fit.pp) for (const k in fit.pp[id]) if (!(S.ppSrc[id] && S.ppSrc[id][k] === 'user')) setPP(id, k, fit.pp[id][k], 'drawn');
+    if (fit.roundness != null) S.dna.roundness = fit.roundness;
+    S.measured = Object.assign({}, S.dna);
+  }
+  function runPieceChecks() {
+    S.checks = {};
+    const stem = R.slots.drawn.stem;
+    const ctx = { W: M.W, D: M.D, DD: M.DD, stemW: stem && stem.meas ? stem.meas.width : null };
+    for (const id in R.slots.drawn) {
+      try { S.checks[id] = IO.check(id, R.slots.drawn[id], ctx); } catch (e) { S.checks[id] = [{ level: 'warn', msg: 'تعذّر الفحص: ' + e.message }]; }
+    }
+    requestRender();
+  }
+  function renderImport() {
+    const box = $('#importSummary');
+    const chip = $('#svgName');
+    if (!S.file) { chip.textContent = 'لم يُرفع ملف'; chip.className = 'chip'; box.innerHTML = ''; return; }
+    chip.textContent = S.file.demo ? 'ملف تجريبي رسمه المحرك' : S.file.name;
+    chip.className = 'chip ' + (S.file.demo ? '' : 'drawn');
+    const r = S.file.report, drawn = R.slots.drawn;
+    const missing = IO.ORDER.filter((id) => !drawn[id]);
+    const rows = [];
+    rows.push(['ok', 'وصلت ' + AR(S.file.count) + ' قطعة من ١٥']);
+    if (missing.length) rows.push(['info', 'يولّدها المحرك: ' + missing.map((id) => META(id).ar).join('، ')]);
+    if (r.open) rows.push(['warn', AR(r.open) + ' مسار مفتوح لم يُقرأ. أغلقه أو حوّل الخط إلى شكل (Outline Stroke).']);
+    if (r.outlineOnly) rows.push(['warn', AR(r.outlineOnly) + ' شكل بلا تعبئة قُرئ من خطه الخارجي. الأفضل أن تملأه بالأسود.']);
+    if (r.outside) rows.push(['warn', AR(r.outside) + ' شكل خارج الإطارات تُرك.']);
+    if (r.issues.includes('size')) rows.push(['error', 'حجم اللوحة تغيّر عن القالب، فقد تقع القطع في غير إطاراتها.']);
+    if (r.issues.includes('image')) rows.push(['warn', 'في الملف صورة نقطية، والمحرك يقرأ الأشكال المتجهة فقط.']);
+    if (r.issues.includes('clip')) rows.push(['warn', 'في الملف قناع قص يُتجاهل. حرّر الأشكال منه قبل التصدير.']);
+    box.innerHTML = '';
+    const ul = el('ul', 'checks');
+    for (const [lv, t] of rows) { const li = el('li', lv); li.textContent = t; ul.appendChild(li); }
+    box.appendChild(ul);
+  }
+
+  /* demo: a designer's export, simulated so the whole flow can be tried without Illustrator */
+  function demoSVG() {
+    const style = R.clampDNA(Object.assign(R.defaultDNA(), { weight: 96, roundness: 0.85, cap: 'round', dotShape: 'circle', xh: 450, loop: 410, desc: 260 }));
+    const ms = R.metrics(style);
+    const savedD = Object.assign({}, R.slots.drawn), savedO = Object.assign({}, R.slots.overrides);
+    for (const k in R.slots.drawn) delete R.slots.drawn[k];
+    for (const k in R.slots.overrides) delete R.slots.overrides[k];
+    let body = '';
+    try {
+      IO.frames().forEach((fr) => {
+        if (fr.id === 'hamza' || fr.id === 'madda') return;
+        const piece = IO.suggestion(fr.id, ms);
+        const contours = R.font.outline({ adv: piece.w, parts: piece.parts, clip: {} }, style, 0.6);
+        const small = fr.id === 'dot';
+        const gx = small ? fr.x0 + 750 - piece.w / 2 : fr.ref - piece.w, gy = small ? fr.base - 200 : fr.base;
+        body += '<path fill="#000000" d="' + IO.contoursD(contours, (x) => gx + x, (y) => gy - y) + '"/>';
+      });
+    } finally {
+      Object.assign(R.slots.drawn, savedD); Object.assign(R.slots.overrides, savedO);
+    }
+    return IO.template(ms, {}).replace('</svg>', '<g id="demo-drawing">' + body + '</g></svg>');
+  }
+
+  function initStart() {
+    $('#tplBtn').addEventListener('click', downloadTemplate);
+    $('#svgFile').addEventListener('change', async (e) => {
+      const f = e.target.files[0]; e.target.value = '';
+      if (f) importSVG(await f.text(), f.name, false);
     });
-    $('#cropCancel').addEventListener('click', endCrop);
+    const drop = $('#svgDrop');
+    ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop', async (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files[0];
+      if (!f) return;
+      if (!/svg/i.test(f.type) && !/\.svg$/i.test(f.name)) { toast('ارفع ملف SVG المصدَّر من Illustrator.'); return; }
+      importSVG(await f.text(), f.name, false);
+    });
+    $('#demoBtn').addEventListener('click', () => { importSVG(demoSVG(), 'demo', true); toast('حُمّل ملف تجريبي'); });
+    $('#clearDrawn').addEventListener('click', () => {
+      for (const k in R.slots.drawn) delete R.slots.drawn[k];
+      clearPP('drawn'); S.file = null; S.checks = {}; S.drawnDNA = {};
+      changed(true); toast('مُسحت الرسوم. كل القطع يولّدها القلم الآن.');
+    });
   }
-  function startCrop(id) {
-    if (!S.an) { toast('ارفع شعاراً أولاً.'); return; }
-    S.crop = id;
-    $('#cropText').textContent = 'ارسم مستطيلاً حول «' + R.slots.byId[id].ar + '» في الشعار';
-    $('#cropBar').hidden = false;
-    $('#stage').classList.add('cropping');
-    renderLogo();
-    $('#logo').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  function endCrop() { S.crop = null; $('#cropBar').hidden = true; $('#stage').classList.remove('cropping'); renderLogo(); }
 
-  function loadSample() {
-    const c = R.analyze.sampleLogo('نور فلك');
-    loadLogo(c, 'sample', true);
-  }
-
-  /* ---------------------------------------------------------------- 01 axes */
+  /* ---------------------------------------------------------------- 01 pen & grid */
   const AXES = [
-    ['weight', 'الوزن', 'WGHT', 24, 200, 1],
-    ['contrast', 'التباين', 'CNTR', 0, 0.85, 0.01],
-    ['nibAngle', 'زاوية القلم', 'ANGL', 0, 180, 1],
-    ['roundness', 'الاستدارة', 'ROND', 0, 1, 0.01],
-    ['alif', 'الألف', 'ALIF', 500, 900, 1],
-    ['xh', 'السنّ', 'XHGT', 240, 720, 1],
-    ['loop', 'الرأس', 'LOOP', 150, 700, 1],
-    ['desc', 'النزول', 'DESC', 120, 450, 1],
-    ['width', 'العرض', 'WDTH', 0.6, 1.8, 0.01],
-    ['spacing', 'التباعد', 'SPAC', 0.4, 2.5, 0.01],
-    ['slant', 'الميل', 'SLNT', -20, 20, 1],
-    ['dotSize', 'النقطة', 'DOTS', 0.8, 2.6, 0.01]
+    ['weight', 'الوزن', 'WGHT', 24, 200, 1], ['contrast', 'التباين', 'CNTR', 0, 0.85, 0.01], ['nibAngle', 'زاوية القلم', 'ANGL', 0, 180, 1],
+    ['roundness', 'الاستدارة', 'ROND', 0, 1, 0.01], ['alif', 'الألف', 'ALIF', 400, 900, 1], ['xh', 'السنّ', 'XHGT', 200, 720, 1],
+    ['loop', 'الرأس', 'LOOP', 150, 700, 1], ['desc', 'النزول', 'DESC', 120, 450, 1], ['width', 'العرض', 'WDTH', 0.6, 1.8, 0.01],
+    ['spacing', 'التباعد', 'SPAC', 0.4, 2.5, 0.01], ['slant', 'الميل', 'SLNT', -20, 20, 1], ['dotSize', 'النقطة', 'DOTS', 0.8, 2.6, 0.01]
   ];
   const CHOICES = [
     ['cap', 'الأطراف', [['butt', 'مسطّحة'], ['round', 'مدوّرة'], ['square', 'مربّعة']]],
     ['dotShape', 'شكل النقطة', [['square', 'مربّعة'], ['circle', 'دائرية'], ['diamond', 'معيّن']]],
-    ['toothStyle', 'السنّ', [['stub', 'قائم'], ['peak', 'مدبّب'], ['bump', 'مقوّس']]],
     ['nib', 'رأس القلم', [['round', 'مستدير'], ['flat', 'عريض']]]
   ];
-  const fmt = (k, v) => (k === 'contrast' || k === 'roundness' || k === 'width' || k === 'spacing' || k === 'dotSize') ? (+v).toFixed(2) : String(Math.round(v));
+  const fmt = (k, v) => (['contrast', 'roundness', 'width', 'spacing', 'dotSize'].includes(k)) ? (+v).toFixed(2) : String(Math.round(v));
   function buildAxes() {
-    const box = $('#axes');
-    box.innerHTML = '';
+    const box = $('#axes'); box.innerHTML = '';
     for (const [k, nm, tg, mn, mx, st] of AXES) {
-      const row = document.createElement('div');
-      row.className = 'axis'; row.dataset.k = k;
+      const row = el('div', 'axis'); row.dataset.k = k;
       row.innerHTML = '<span class="nm"></span><span class="tg mono"></span><input type="range"><output class="num"></output>';
-      row.querySelector('.nm').textContent = nm;
-      row.querySelector('.tg').textContent = tg;
+      row.querySelector('.nm').textContent = nm; row.querySelector('.tg').textContent = tg;
       const inp = row.querySelector('input');
       Object.assign(inp, { min: mn, max: mx, step: st, id: 'ax-' + k });
-      inp.setAttribute('aria-label', nm);
-      inp.value = S.dna[k];
+      inp.setAttribute('aria-label', nm); inp.value = S.dna[k];
       inp.addEventListener('input', () => {
         S.dna[k] = +inp.value;
         if (k === 'desc') S.dna.deep = Math.round(Math.max(S.dna.desc + 40, S.dna.desc * 1.3));
@@ -3537,44 +4509,118 @@ button { cursor: pointer; }
       });
       box.appendChild(row);
     }
-    const cbox = $('#choices');
-    cbox.innerHTML = '';
+    const cbox = $('#choices'); cbox.innerHTML = '';
     for (const [k, nm, opts] of CHOICES) {
-      const row = document.createElement('div');
-      row.className = 'choice';
-      const lab = document.createElement('span'); lab.className = 'nm'; lab.textContent = nm;
-      const seg = document.createElement('div'); seg.className = 'seg'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', nm);
-      for (const [v, t] of opts) {
-        const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.dataset.v = v;
-        b.addEventListener('click', () => { S.dna[k] = v; changed(false); });
-        seg.appendChild(b);
-      }
-      seg.dataset.k = k;
-      row.append(lab, seg);
+      const row = el('div', 'choice');
+      const seg = el('div', 'seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', nm); seg.dataset.k = k;
+      for (const [v, t] of opts) { const b = el('button', '', t); b.type = 'button'; b.dataset.v = v; b.addEventListener('click', () => { S.dna[k] = v; changed(false); }); seg.appendChild(b); }
+      row.append(el('span', 'nm', nm), seg);
       cbox.appendChild(row);
     }
     renderAxesValues();
   }
   function renderAxesValues() {
     for (const row of $$('#axes .axis')) {
-      const k = row.dataset.k, v = S.dna[k];
-      const inp = row.querySelector('input');
+      const k = row.dataset.k, v = S.dna[k], inp = row.querySelector('input');
       if (document.activeElement !== inp) inp.value = v;
       row.querySelector('output').textContent = fmt(k, v);
       const mv = S.measured[k];
       row.classList.toggle('measured', mv != null && Math.abs(mv - v) < 1e-6 + (Math.abs(mv) > 2 ? 0.5 : 0.005));
     }
-    for (const seg of $$('#choices .seg')) {
-      const k = seg.dataset.k;
-      for (const b of seg.children) b.setAttribute('aria-pressed', String(S.dna[k] === b.dataset.v));
-    }
+    for (const seg of $$('#choices .seg')) for (const b of seg.children) b.setAttribute('aria-pressed', String(S.dna[seg.dataset.k] === b.dataset.v));
   }
 
-  /* ---------------------------------------------------------------- 02 slots */
+  /* ---------------------------------------------------------------- 01 logo assistant (optional) */
+  async function loadLogo(canvas, name) {
+    try {
+      const an = R.analyze.run(canvas);
+      S.an = an; S.logo = canvas;
+      Object.assign(S.dna, an.dna, S.drawnDNA);        // the drawings keep the last word on their own measures
+      for (const id in R.slots.overrides) if (S.src[id] === 'logo') { delete R.slots.overrides[id]; delete S.src[id]; }
+      const pieces = R.analyze.autoPieces(an);
+      for (const id in pieces) { R.slots.overrides[id] = pieces[id]; S.src[id] = 'logo'; }
+      $('#logoName').textContent = name;
+      $('#logoFold').open = true;
+      S.measured = Object.assign({}, S.dna);
+      changed(true);
+      toast('قيس الشعار: الأشكال الرمادية في القالب على مقاس قلمه الآن.');
+    } catch (e) { console.error(e); toast('تعذّر قياس الصورة: ' + (e.message || e)); }
+  }
+  function renderLogo(rect) {
+    const cv = $('#logoCanvas');
+    $('#stage').hidden = !S.an; $('#overlaySeg').hidden = !S.an;
+    if (!S.an || !$('#logoFold').open) return;
+    const stage = $('#stage');
+    const W = Math.max(10, Math.round(stage.getBoundingClientRect().width));
+    const H = Math.round(W * S.an.h / S.an.w), k = DPR();
+    cv.width = Math.round(W * k); cv.height = Math.round(H * k); cv.style.height = H + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(k, 0, 0, k, 0, 0); ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(S.logo, 0, 0, W, H);
+    const s = W / S.an.w;
+    R.analyze.overlay(S.an, ctx, s, { skeleton: S.ov.sk, lines: S.ov.lines, det: S.ov.det, skColor: T('--accent'), boxColor: T('--blue'), lineColor: T('--muted') });
+    if (S.crop) {
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(0, 0, W, H);
+      if (rect) {
+        const [x0, y0, x1, y1] = rect.map((v) => v * s);
+        const rx = Math.min(x0, x1), ry = Math.min(y0, y1), rw = Math.abs(x1 - x0), rh = Math.abs(y1 - y0);
+        ctx.clearRect(rx, ry, rw, rh);
+        ctx.drawImage(S.logo, rx / s, ry / s, rw / s, rh / s, rx, ry, rw, rh);
+        ctx.strokeStyle = T('--accent'); ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(rx, ry, rw, rh); ctx.setLineDash([]);
+      }
+    }
+  }
+  function renderFound() {
+    const an = S.an, box = $('#found');
+    if (!an) { box.innerHTML = ''; return; }
+    const items = [['السطر', an.hasBaseline], ['الساق', S.src.stem === 'logo'], ['النقطة', an.dots.length > 0], ['الرأس', S.src.head === 'logo'], ['العروة', S.src.loop === 'logo'],
+      ['التباين ' + AR(Math.round(an.contrast * 100)) + '٪', an.contrast > 0], ['الأطراف ' + (an.cap === 'round' ? 'مدوّرة' : 'مسطّحة'), true]];
+    box.innerHTML = '';
+    for (const [t, ok] of items) box.appendChild(el('span', ok ? 'ok' : '', (ok ? '✓ ' : '— ') + t));
+  }
+  function initLogo() {
+    $('#logoFile').addEventListener('change', async (e) => {
+      const f = e.target.files[0]; e.target.value = '';
+      if (!f) return;
+      try { loadLogo(await R.analyze.loadFile(f), f.name); } catch (err) { toast(err.message || 'تعذّرت قراءة الملف'); }
+    });
+    $('#logoFold').addEventListener('toggle', () => renderLogo());
+    $$('#overlaySeg button').forEach((b) => b.addEventListener('click', () => { const k = b.dataset.k; S.ov[k] = !S.ov[k]; b.setAttribute('aria-pressed', String(S.ov[k])); renderLogo(); }));
+    const cv = $('#logoCanvas');
+    let start = null;
+    const pt = (e) => { const r = cv.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width, 0, 1) * S.an.w, clamp((e.clientY - r.top) / r.height, 0, 1) * S.an.h]; };
+    cv.addEventListener('pointerdown', (e) => { if (!S.crop || !S.an) return; e.preventDefault(); cv.setPointerCapture(e.pointerId); start = pt(e); renderLogo([...start, ...start]); });
+    cv.addEventListener('pointermove', (e) => { if (S.crop && start) renderLogo([...start, ...pt(e)]); });
+    cv.addEventListener('pointerup', (e) => {
+      if (!S.crop || !start) return;
+      const cur = pt(e);
+      const rect = [Math.min(start[0], cur[0]), Math.min(start[1], cur[1]), Math.max(start[0], cur[0]), Math.max(start[1], cur[1])];
+      start = null;
+      if (rect[2] - rect[0] < 4 || rect[3] - rect[1] < 4) { renderLogo(); return; }
+      const id = S.crop, o = R.analyze.cropForSlot(S.an, rect, id);
+      endCrop();
+      if (!o) { toast('لا يوجد حبر داخل المستطيل.'); return; }
+      R.slots.overrides[id] = o; S.src[id] = 'logo';
+      const fit = R.slots.fitParams(id, o, M);
+      for (const k in fit) if (!(S.ppSrc[id] && S.ppSrc[id][k] === 'drawn')) setPP(id, k, fit[k], 'logo');
+      changed(true);
+      toast('«' + META(id).ar + '» أُخذت من الشعار' + (R.slots.drawn[id] ? '، ورسمك ما زال مقدَّماً عليها' : ''));
+      const card = $('[data-slot="' + id + '"]'); if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    $('#cropCancel').addEventListener('click', endCrop);
+  }
+  function startCrop(id) {
+    if (!S.an) { toast('افتح «مساعد الشعار» وارفع شعاراً أولاً.'); return; }
+    S.crop = id; $('#logoFold').open = true;
+    $('#cropText').textContent = 'ارسم مستطيلاً حول «' + META(id).ar + '» في الشعار';
+    $('#cropBar').hidden = false; $('#stage').classList.add('cropping');
+    renderLogo(); $('#logoFold').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function endCrop() { S.crop = null; $('#cropBar').hidden = true; $('#stage').classList.remove('cropping'); renderLogo(); }
+
+  /* ---------------------------------------------------------------- 02 pieces */
   function canonPiece(id) {
-    const m = M;
-    if (id === 'conn') return { w: m.W * 5, parts: [{ type: 'stroke', pts: [[0, m.b], [m.W * 5, m.b]], caps: ['butt', 'butt'], slot: 'conn' }] };
-    const p = {};
+    const m = M, p = {};
     if (id === 'stem') p.free = true;
     if (id === 'basin') p.full = true;
     if (id === 'cup') { p.top = m.t; p.topCap = m.cap; }
@@ -3582,132 +4628,336 @@ button { cursor: pointer; }
     if (id === 'hamza') p.scale = 0.9;
     return R.slots.piece(id, m, p);
   }
-  function statusOf(id) {
-    if (id === 'conn') return ['gen', 'من القلم'];
-    if (id === 'hamza' && !R.slots.overrides.hamza && R.slots.overrides.ain) return ['logo', 'من رأس العين'];
-    const s = S.src[id];
-    if (R.slots.overrides[id] && s === 'logo') return ['logo', 'من الشعار'];
-    if (R.slots.overrides[id] && s === 'upload') return ['upload', 'مرفوع'];
-    return ['gen', 'مولّد'];
-  }
-  function slotCard(meta, small) {
-    const el = document.createElement('article');
-    el.className = 'slot'; el.dataset.slot = meta.id;
-    el.innerHTML = '<div class="card-top" style="margin:0"><span class="label"><b></b><span class="mono"></span></span><span class="chip"></span></div>' +
-      '<canvas role="img"></canvas><div class="meta"><span class="letters"></span></div><p class="rule"></p><div class="acts"></div>';
-    el.querySelector('.label b').textContent = (meta.n ? AR(meta.n) + ' ' : '') + meta.ar;
-    el.querySelector('.label .mono').textContent = meta.en;
-    el.querySelector('canvas').setAttribute('aria-label', 'الشكل: ' + meta.ar);
-    el.querySelector('.letters').textContent = meta.letters || '';
-    el.querySelector('.rule').textContent = meta.rule;
-    const acts = el.querySelector('.acts');
-    if (meta.id !== 'conn') {
-      const mk = (t, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small' + (cls ? ' ' + cls : ''); b.textContent = t; b.addEventListener('click', fn); acts.appendChild(b); return b; };
-      mk('قصّ من الشعار', () => startCrop(meta.id));
-      mk('رفع صورة', () => { S.uploadSlot = meta.id; $('#slotFile').click(); });
-      const rb = mk('إعادة التوليد', () => { delete R.slots.overrides[meta.id]; delete S.src[meta.id]; changed(true); });
-      rb.dataset.reset = '1';
+  let usageVer = -1, usage = {};
+  function getUsage() {
+    if (usageVer === S.ver) return usage;
+    usage = {};
+    for (const spec of INV) {
+      const g = G(spec.name); if (!g) continue;
+      const seen = new Set();
+      for (const p of g.parts) if (p.slot && !seen.has(p.slot)) { seen.add(p.slot); (usage[p.slot] = usage[p.slot] || []).push(spec.name); }
     }
-    if (!small) el.querySelector('canvas').addEventListener('click', () => { setHL(meta.id); $('#rasm').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-    return el;
+    usageVer = S.ver;
+    return usage;
   }
-  function buildSlots() {
-    const a = $('#slots'), b = $('#smallSlots');
-    a.innerHTML = ''; b.innerHTML = '';
-    for (const meta of R.slots.list) a.appendChild(slotCard(meta, false));
-    for (const meta of R.slots.small) b.appendChild(slotCard(meta, true));
-    $('#slotFile').addEventListener('change', async (e) => {
-      const f = e.target.files[0]; e.target.value = '';
-      const id = S.uploadSlot; if (!f || !id) return;
-      try {
-        const c = await R.analyze.loadFile(f);
-        const crop = R.analyze.maskFromCanvas(c);
-        if (!crop) { toast('لا يوجد حبر في الصورة.'); return; }
-        R.slots.overrides[id] = R.slots.fitUpload(id, crop.canvas, M);
-        S.src[id] = 'upload';
-        changed(true);
-        toast('رُفع «' + R.slots.byId[id].ar + '»');
-      } catch (err) { toast(err.message || 'تعذّرت قراءة الصورة'); }
-    });
+  function sampleOf(id, n) {
+    const out = [], bases = new Set();
+    for (const name of (getUsage()[id] || [])) {
+      const base = name.split('.')[0];
+      if (bases.has(base) || /^(digit|period|colon|comma|semicolon|question|exclam|hyphen|dotless|noonGhunna)/.test(name)) continue;
+      bases.add(base); out.push(name);
+      if (out.length >= n) break;
+    }
+    return out;
   }
-  function renderSlots() {
-    const accent = T('--accent'), ink = T('--ink');
-    for (const el of $$('.slot')) {
-      const id = el.dataset.slot;
-      const small = el.parentElement.id === 'smallSlots';
-      const cv = el.querySelector('canvas');
-      const { ctx, w, h } = sizeCanvas(cv);
-      // baseline
+  function statusOf(id) {
+    const d = R.slots.drawn[id], meta = META(id);
+    if (d && R.slots.useDrawn[id] !== false) {
+      const items = S.checks[id] || [];
+      if (items.some((x) => x.level === 'error')) return ['error', 'رسمك: خطأ'];
+      if (items.some((x) => x.level === 'warn')) return ['warn', 'رسمك: تنبيه'];
+      return ['drawn', 'رسمك ✓'];
+    }
+    if (d) return ['gen', 'رسمك موقوف'];
+    if (R.slots.overrides[id] && S.src[id] === 'logo') return ['logo', 'من الشعار'];
+    if (id === 'hamza' && R.slots.drawn.ain) return ['derived', 'من رأس العين'];
+    if (meta.role === 'derived') return ['derived', 'مشتقة من ' + META(meta.parent).ar];
+    return ['gen', 'يولّدها القلم'];
+  }
+  function buildTree() {
+    const box = $('#tree'); box.innerHTML = '';
+    const roots = R.slots.list.filter((s) => s.role === 'root');
+    for (const r of roots) {
+      const br = el('div', 'branch');
+      const node = (s, root) => { const b = el('button', 'node' + (root ? ' root' : ''), s.ar); b.type = 'button'; b.dataset.slot = s.id; b.addEventListener('click', () => { const c = $('#slots [data-slot="' + s.id + '"]'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); return b; };
+      br.appendChild(node(r, true));
+      const kids = (R.slots.children[r.id] || []).map((k) => META(k));
+      if (r.id === 'arc') kids.push(META('hamza'));
+      if (kids.length) { br.appendChild(el('span', 'arrow', '←')); kids.forEach((k) => br.appendChild(node(k, false))); }
+      box.appendChild(br);
+    }
+  }
+  function buildPieces() {
+    buildTree();
+    const box = $('#slots'); box.innerHTML = '';
+    for (const id of IO.ORDER) {
+      const meta = META(id);
+      const card = el('article', 'slot'); card.dataset.slot = id;
+      card.innerHTML = '<div class="card-top" style="margin:0"><span class="label"><b></b><span class="mono"></span></span><span class="chip"></span></div>' +
+        '<canvas class="piece-cv" role="img"></canvas><p class="lineage"></p><ul class="checks"></ul><canvas class="use-cv" role="img"></canvas><p class="usage mono"></p><div class="acts"></div>';
+      card.querySelector('.label b').textContent = (meta.n ? AR(meta.n) + ' ' : '') + meta.ar;
+      card.querySelector('.label .mono').textContent = meta.en;
+      card.querySelector('.piece-cv').setAttribute('aria-label', 'القطعة: ' + meta.ar);
+      card.querySelector('.use-cv').setAttribute('aria-label', 'حروف تستعمل ' + meta.ar);
+      const acts = card.querySelector('.acts');
+      const mk = (t, fn, key) => { const b = el('button', 'btn small', t); b.type = 'button'; b.dataset.act = key; b.addEventListener('click', fn); acts.appendChild(b); return b; };
+      mk('أنزلها إلى السطر', () => snapPiece(id), 'snap');
+      mk('استعمل المولّدة', () => { R.slots.useDrawn[id] = R.slots.useDrawn[id] === false; changed(true); }, 'toggle');
+      mk('قصّ من الشعار', () => startCrop(id), 'crop');
+      mk('أين تُستعمل', () => { setHL(id); $('#recipes').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 'where');
+      box.appendChild(card);
+    }
+  }
+  function snapPiece(id) {
+    const d = R.slots.drawn[id]; if (!d) return;
+    const dy = -d.bbox.y0;
+    const shapes = d.shapes.map((sh) => ({ rule: sh.rule, cmds: sh.cmds.map((c) => c[0] === 'Z' ? c : [c[0]].concat(c.slice(1).map((v, i) => i % 2 ? v + dy : v))) }));
+    R.slots.drawn[id] = IO.makePiece(id, shapes, null, d.placeU);
+    adoptDrawings();
+    changed(true); runPieceChecks();
+    toast('أُنزلت «' + META(id).ar + '» إلى السطر');
+  }
+  function renderPieces() {
+    const ink = T('--ink'), accent = T('--accent'), rest = T('--rest'), line = T('--line'), band = T('--band');
+    for (const card of $$('#slots .slot')) {
+      const id = card.dataset.slot, meta = META(id);
+      const d = R.slots.drawn[id], using = d && R.slots.useDrawn[id] !== false;
+      const [cls, txt] = statusOf(id);
+      const chip = card.querySelector('.chip'); chip.className = 'chip ' + cls; chip.textContent = txt;
+      card.classList.toggle('is-hl', S.hl === id);
+      // the piece
+      const { ctx, w, h } = sizeCanvas(card.querySelector('.piece-cv'));
       let piece;
       try { piece = canonPiece(id); } catch (e) { console.error(e); continue; }
-      const g = { adv: piece.w, parts: piece.parts, clip: {} };
       const b = R.partBounds(piece.parts, S.dna);
-      if (!isFinite(b.u0)) continue;
-      const pw = Math.max(1, b.u1 - b.u0), ph = Math.max(1, b.y1 - b.y0);
-      // as large as the card allows, but never larger than a stem at ~60% of the card
-      const s = Math.min(w * 0.8 / pw, h * 0.8 / ph, h / (M.A * (small ? 0.42 : 1.05)));
-      const base = h / 2 + ((b.y0 + b.y1) / 2) * s;
-      ctx.strokeStyle = T('--line'); ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(0, Math.round(base) + 0.5); ctx.lineTo(w, Math.round(base) + 0.5); ctx.stroke(); ctx.setLineDash([]);
-      const uc = (b.u0 + b.u1) / 2;
-      R.drawGlyph(ctx, g, S.dna, { x: w / 2 - (piece.w - uc) * s, base, s, colorOf: (p) => (p.slot === id || p.slot === 'conn' && id === 'conn') ? accent : ink });
-      const [cls, txt] = statusOf(id);
-      const chip = el.querySelector('.chip'); chip.className = 'chip ' + cls; chip.textContent = txt;
-      const rb = el.querySelector('[data-reset]'); if (rb) rb.disabled = !R.slots.overrides[id];
-      el.classList.toggle('is-hl', S.hl === id);
+      if (isFinite(b.u0)) {
+        const small = !meta.role;
+        const pw = Math.max(1, b.u1 - b.u0), ph = Math.max(1, b.y1 - b.y0);
+        const s = Math.min(w * 0.8 / pw, h * 0.8 / ph, h / (M.A * (small ? 0.42 : 1.05)));
+        const base = small ? h / 2 + ((b.y0 + b.y1) / 2) * s : h / 2 + ((b.y0 + b.y1) / 2) * s;
+        if (!small) {
+          ctx.fillStyle = band; ctx.fillRect(0, base - M.W * s, w, M.W * s);
+          ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, Math.round(base) + 0.5); ctx.lineTo(w, Math.round(base) + 0.5); ctx.stroke();
+        }
+        const col = using ? ink : (R.slots.overrides[id] && S.src[id] === 'logo' ? accent : rest);
+        R.drawGlyph(ctx, { adv: piece.w, parts: piece.parts, clip: {} }, S.dna, { x: w / 2 - (piece.w - (b.u0 + b.u1) / 2) * s, base, s, colorOf: () => col });
+      }
+      // lineage
+      let lin = meta.role === 'root' ? 'جذر' : meta.role === 'derived' ? 'مشتقة من «' + META(meta.parent).ar + '»' : 'قطعة صغيرة';
+      if (meta.role === 'derived' && !using && R.slots.drawn[meta.parent]) lin += '، وترث مقاسات رسمك لها';
+      if (meta.role === 'root' && R.slots.children[id] && using) lin += '، ومنها: ' + R.slots.children[id].map((k) => META(k).ar).join('، ');
+      card.querySelector('.lineage').textContent = lin + '. ' + meta.rule + '.';
+      // checks
+      const ul = card.querySelector('.checks'); ul.innerHTML = '';
+      if (using) {
+        const items = S.checks[id] || [];
+        if (!items.length) ul.appendChild(el('li', 'ok', !meta.role ? 'سليمة: حجمها مناسب لسماكة القلم'
+          : ['cup', 'arc', 'tail'].includes(id) ? 'سليمة: تعبر الشريط وتنزل تحت السطر، والسماكة متسقة'
+          : 'سليمة: على السطر، داخل الشريط، والسماكة متسقة'));
+        for (const it of items) ul.appendChild(el('li', it.level, it.msg));
+      } else if (!d) {
+        ul.appendChild(el('li', 'info', 'غير مرسومة. ارسمها في إطار «' + meta.ar + '» في القالب، أو اتركها للمحرك.'));
+      }
+      // letters using it
+      const u = sizeCanvas(card.querySelector('.use-cv'));
+      const names = sampleOf(id, 5), gl = names.map(G).filter(Boolean);
+      const cell = u.w / 5;
+      const sf = Math.min(u.h * 0.98 / VSPAN(), cell * 0.85 / Math.max(1, ...gl.map((g) => g.adv)));
+      gl.forEach((g, i) => drawCentered(u.ctx, g, u.w, u.h, sf, (p) => p.slot === id ? accent : rest, u.w - cell * (i + 0.5)));
+      const count = (getUsage()[id] || []).length;
+      card.querySelector('.usage').textContent = count ? 'USED IN ' + count + ' GLYPHS' : '';
+      // actions
+      const show = (key, v) => { const bt = card.querySelector('[data-act="' + key + '"]'); if (bt) bt.hidden = !v; return bt; };
+      show('snap', using && (S.checks[id] || []).some((x) => x.fix === 'snap'));
+      const tg = show('toggle', !!d); if (tg) tg.textContent = using ? 'استعمل المولّدة' : 'استعمل رسمي';
+      show('crop', !!S.an && !!meta.role);
+      show('where', !!meta.role);
     }
   }
 
-  /* ---------------------------------------------------------------- 03 rasm */
-  function buildRasm() {
-    const seg = $('#hlSeg');
-    seg.innerHTML = '';
-    const opts = [[null, 'الكل']].concat(R.slots.list.map((s) => [s.id, s.ar]));
-    for (const [id, t] of opts) {
-      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.dataset.id = id || '';
-      b.addEventListener('click', () => setHL(id));
-      seg.appendChild(b);
+  /* ---------------------------------------------------------------- 03 recipes */
+  const FORMS = ['isol', 'init', 'medi', 'fina'];
+  const FORM_AR = { isol: 'منفصل', init: 'أوّل', medi: 'وسط', fina: 'آخر' };
+  function formulaOf(built) {
+    return R.recipeOf(built).map((it) => (META(it.id) ? META(it.id).short : it.id) + (it.n > 1 ? '×' + AR(it.n) : '')).join(' + ');
+  }
+  // the recipe as text with a joint mark on each side that connects (right = to the letter before)
+  function setFormula(node, built, form) {
+    node.textContent = '';
+    if (!built) return;
+    const jr = form === 'fina' || form === 'medi', jl = form === 'init' || form === 'medi';
+    const mark = (side) => { const i = el('i', 'j'); i.title = side; i.setAttribute('aria-hidden', 'true'); return i; };
+    if (jr) node.appendChild(mark('يتصل بما قبله'));
+    node.appendChild(document.createTextNode(formulaOf(built)));
+    if (jl) node.appendChild(mark('يتصل بما بعده'));
+  }
+  function buildMatrix() {
+    const seg = $('#hlSeg'); seg.innerHTML = '';
+    for (const [id, t] of [[null, 'الكل']].concat(R.slots.list.map((s) => [s.id, s.ar]))) {
+      const b = el('button', '', t); b.type = 'button'; b.dataset.id = id || '';
+      b.addEventListener('click', () => setHL(id)); seg.appendChild(b);
     }
-    const grid = $('#rasmGrid');
-    grid.innerHTML = '';
+    const box = $('#matrix'); box.innerHTML = '';
+    const head = el('div', 'mx-row mx-head'); head.setAttribute('role', 'row');
+    head.appendChild(el('span', '', ''));
+    FORMS.forEach((f) => head.appendChild(el('span', 'mono', FORM_AR[f])));
+    box.appendChild(head);
     for (const [key, ch] of R.rasm18) {
       const l = R.letters.find((x) => x.rasm === key);
       const fam = R.letters.filter((x) => x.rasm === key && x.uni < 0x660).map((x) => String.fromCodePoint(x.uni)).join(' ');
-      const el = document.createElement('div');
-      el.className = 'rcard'; el.dataset.key = key; el.dataset.join = l.join;
-      el.innerHTML = '<canvas class="big" role="img"></canvas><canvas class="forms" role="img"></canvas><div class="cap"><b></b><span></span></div>';
-      el.querySelector('.cap b').textContent = ch;
-      el.querySelector('.cap span').textContent = fam;
-      el.querySelector('canvas.big').setAttribute('aria-label', 'الهيكل ' + ch);
-      el.querySelector('canvas.forms').setAttribute('aria-label', 'مواضع ' + ch);
-      grid.appendChild(el);
+      const row = el('div', 'mx-row'); row.dataset.key = key; row.setAttribute('role', 'row');
+      const nm = el('div', 'mx-name'); nm.append(el('b', '', ch), el('span', '', fam)); row.appendChild(nm);
+      const forms = R.formsOf(l.join);
+      for (const f of FORMS) {
+        const c = el('div', 'mx-cell'); c.dataset.form = f; c.setAttribute('role', 'cell');
+        if (forms.includes(f)) { const cv = el('canvas'); cv.setAttribute('aria-label', ch + ' ' + FORM_AR[f]); c.append(cv, el('p', 'mx-f')); }
+        else { c.classList.add('none'); c.appendChild(el('p', 'mx-f', 'لا يتصل بما بعده')); }
+        row.appendChild(c);
+      }
+      box.appendChild(row);
     }
   }
-  function setHL(id) {
-    S.hl = id || null;
+  function setHL(id) { S.hl = id || null; renderMatrix(); renderPieces(); renderPreview(); }
+  function renderMatrix() {
     for (const b of $$('#hlSeg button')) b.setAttribute('aria-pressed', String((b.dataset.id || null) === S.hl));
-    renderRasm(); renderSlots();
-  }
-  function renderRasm() {
     const accent = T('--accent'), rest = T('--rest'), ink = T('--ink');
     const colorOf = (p) => !S.hl ? ink : (p.slot === S.hl ? accent : rest);
-    for (const el of $$('.rcard')) {
-      const key = el.dataset.key, join = el.dataset.join;
-      const big = sizeCanvas(el.querySelector('canvas.big'));
-      const s = big.h * 0.98 / VSPAN();
-      drawCentered(big.ctx, RG(key, 'isol'), big.w, big.h, s, colorOf);
-      const fv = sizeCanvas(el.querySelector('canvas.forms'));
-      const forms = R.formsOf(join);
-      const gl = forms.map((f) => RG(key, f)).filter(Boolean);
-      const cell = fv.w / 4;
-      const sf = Math.min(fv.h * 0.98 / VSPAN(), cell * 0.8 / Math.max(...gl.map((g) => g.adv), 1));
-      gl.forEach((g, i) => drawCentered(fv.ctx, g, fv.w, fv.h, sf, colorOf, fv.w - cell * (i + 0.5)));
+    let total = 0, uses = 0;
+    for (const row of $$('#matrix .mx-row[data-key]')) {
+      const key = row.dataset.key;
+      for (const c of $$('.mx-cell', row)) {
+        if (c.classList.contains('none')) continue;
+        const f = c.dataset.form, g = RG(key, f);
+        total++;
+        const cv = c.querySelector('canvas');
+        const { ctx, w, h } = sizeCanvas(cv);
+        drawCentered(ctx, g, w, h, h * 0.98 / VSPAN(), colorOf);
+        const items = g ? R.recipeOf(g) : [];
+        const has = !!S.hl && items.some((it) => it.id === S.hl);
+        if (has) uses++;
+        c.classList.toggle('uses', has);
+        setFormula(c.querySelector('.mx-f'), g, f);
+      }
     }
-    for (const b of $$('#hlSeg button')) b.setAttribute('aria-pressed', String((b.dataset.id || null) === S.hl));
+    $('#coverage').textContent = S.hl ? '«' + META(S.hl).ar + '» في ' + AR(uses) + ' وصفة من ' + AR(total) + '.'
+      : AR(total) + ' وصفة، كلها من القطع الاثنتي عشرة والوصلة. الشَّرطة على جانب الوصفة تعني أن الحرف يتصل من تلك الجهة.';
   }
 
-  /* ---------------------------------------------------------------- 04 glyph set */
-  const FORM_AR = { isol: 'منفصل', init: 'أوّل', medi: 'وسط', fina: 'آخر' };
+  /* ---------------------------------------------------------------- 04 tests */
+  function contoursToPolys(contours) {
+    const polys = [];
+    for (const c of contours) {
+      const P = [c.start.slice()];
+      let cur = c.start;
+      for (const sg of c.segs) {
+        if (sg.c1) R.geom.cubic(cur, sg.c1, sg.c2, sg.p, P, 8); else P.push(sg.p.slice());
+        cur = sg.p;
+      }
+      polys.push(P);
+    }
+    return polys;
+  }
+  function joinCheck(res, m) {
+    const bad = [];
+    const W = m.W;
+    for (const spec of INV) {
+      const name = spec.name, f = spec.form;
+      const jr = f === 'fina' || f === 'medi', jl = f === 'init' || f === 'medi';
+      if (!jr && !jl && name !== 'tatweel') continue;
+      const built = res.built[name], polys = contoursToPolys(res.outlines[name] || []);
+      if (!built || !polys.length) continue;
+      const covered = (x) => R.geom.spanAt(polys, x, true).some((s) => s[0] <= W * 0.2 && s[1] >= W * 0.8);
+      if ((jr || name === 'tatweel') && !covered(built.adv - 3)) bad.push(name);
+      else if ((jl || name === 'tatweel') && !covered(3)) bad.push(name);
+    }
+    return bad;
+  }
+  function shapingCheck(fam, res) {
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = '100px "' + fam + '"';
+    const words = ['بسم', 'سلام', 'محمد', 'لا', 'عين', 'كتب'];
+    const off = [];
+    for (const wd of words) {
+      const expect = R.shapeText(wd, 0).reduce((a, g) => a + (res.built[g.name] ? res.built[g.name].adv : 0), 0) / 10;
+      const got = c.measureText(wd).width;
+      if (Math.abs(got - expect) > Math.max(1.5, expect * 0.01)) off.push(wd);
+    }
+    return off.length ? ['warn', 'المتصفح شكّل ' + off.join('، ') + ' بعرض غير المتوقع'] : ['ok', 'التشكيل في المتصفح: الكلمات المرجعية تطابق الوصفات'];
+  }
+  function collisionCheck(res, m) {
+    const s = 0.06, top = m.A + 420, bottom = -(m.DD + 420), PAD = Math.round(m.A * 0.8 * s);
+    const H = Math.ceil((top - bottom) * s) + 2;
+    const masks = {};
+    const maskOf = (name) => {
+      if (masks[name]) return masks[name];
+      const g = res.built[name]; if (!g) return null;
+      const w = Math.max(2, Math.ceil(g.adv * s) + PAD * 2);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = H;
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      R.drawGlyph(ctx, g, m.dna, { x: PAD, base: top * s + 1, s, colorOf: () => '#000' });
+      const d = ctx.getImageData(0, 0, w, H).data, a = new Uint8Array(w * H);
+      for (let i = 0, j = 3; i < a.length; i++, j += 4) a[i] = d[j] > 110 ? 1 : 0;
+      return (masks[name] = { a, w, adv: g.adv * s });
+    };
+    const bandTop = Math.floor((top - m.W * 1.2) * s), bandBot = Math.ceil((top + m.W * 0.2) * s) + 2;
+    const base = R.letters.filter((l) => l.uni < 0x660);
+    const hits = [];
+    let pairs = 0;
+    for (const a of base) for (const b of base) {
+      const txt = String.fromCodePoint(a.uni) + String.fromCodePoint(b.uni);
+      const seq = R.shapeText(txt, 0);
+      if (seq.length !== 2) continue;
+      const L = maskOf(seq[1].name), Rm = maskOf(seq[0].name);   // visual: second glyph on the left
+      if (!L || !Rm) continue;
+      pairs++;
+      const shift = Math.round(L.adv);                             // right glyph's origin = left glyph's origin + its advance
+      const joined = /\.(init|medi)$/.test(seq[0].name) && /\.(fina|medi)$/.test(seq[1].name);
+      let n = 0;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < Rm.w; x++) {
+          const lx = x + shift;
+          if (lx >= L.w) break;
+          if (!Rm.a[y * Rm.w + x] || !L.a[y * L.w + lx]) continue;
+          if (joined && Math.abs(x - PAD) <= 2 && y >= bandTop && y <= bandBot) continue;   // the joint itself
+          n++;
+        }
+      }
+      if (n > 2) hits.push({ txt, n });
+    }
+    hits.sort((p, q) => q.n - p.n);
+    return { list: hits, pairs };
+  }
+  async function runFontChecks(res, buf, fam, m) {
+    const items = [];
+    try {
+      const empty = INV.filter((sp) => !(sp.kind === 'extra' && sp.extra.kind === 'space') && !(res.outlines[sp.name] || []).length).map((sp) => sp.name);
+      items.push(empty.length ? ['error', 'أشكال بلا رسم: ' + empty.slice(0, 6).join('، ')] : ['ok', 'كل الأشكال مرسومة: ' + AR(INV.length) + ' شكلاً']);
+      const parsed = opentype.parse(buf.slice(0));
+      const missing = R.letters.filter((l) => !parsed.charToGlyphIndex(String.fromCodePoint(l.uni))).map((l) => String.fromCodePoint(l.uni));
+      items.push(missing.length ? ['error', 'حروف بلا خريطة يونيكود: ' + missing.join(' ')] : ['ok', 'خريطة يونيكود: ' + AR(R.letters.length) + ' حرفاً، وأشكال العرض القديمة']);
+      const feats = parsed.tables.gsub ? Array.from(new Set(parsed.tables.gsub.features.map((f) => f.tag))) : [];
+      const lack = ['fina', 'init', 'medi', 'rlig'].filter((f) => !feats.includes(f));
+      items.push(lack.length ? ['error', 'ميزات ناقصة: ' + lack.join(', ')] : ['ok', 'البرمجة: المواضع الأربعة ولام ألف (fina · init · medi · rlig)']);
+      const bad = joinCheck(res, m);
+      items.push(bad.length ? ['warn', 'وصل غير مكتمل عند الحافة: ' + bad.slice(0, 6).join('، ')] : ['ok', 'الوصل: كل شكل متصل يغطي الشريط عند حافته']);
+      items.push(shapingCheck(fam, res));
+      const hits = collisionCheck(res, m);
+      S.collisions = hits.list;
+      items.push(hits.list.length ? ['warn', 'تداخل في ' + AR(hits.list.length) + ' زوجاً من ' + AR(hits.pairs)] : ['ok', 'التداخل: لا يتداخل أي حرفين متجاورين (' + AR(hits.pairs) + ' زوجاً)']);
+    } catch (e) { console.error(e); items.push(['warn', 'تعذّر إكمال الفحص: ' + e.message]); }
+    S.report = items;
+    renderReport();
+  }
+  function renderReport() {
+    const box = $('#report'); box.innerHTML = '';
+    if (!S.report) return;
+    const ul = el('ul', 'checks big');
+    for (const [lv, t] of S.report) ul.appendChild(el('li', lv, t));
+    box.appendChild(ul);
+    const cbox = $('#collide'); cbox.innerHTML = '';
+    if (!S.collisions.length) return;
+    cbox.appendChild(el('p', 'hint', 'أكثر الأزواج تداخلاً:'));
+    const row = el('div', 'pairs');
+    for (const h of S.collisions.slice(0, 8)) {
+      const fig = el('figure', 'pair');
+      const cv = el('canvas'); fig.appendChild(cv); fig.appendChild(el('figcaption', '', h.txt));
+      row.appendChild(fig);
+      requestAnimationFrame(() => { const { ctx, w, h: hh } = sizeCanvas(cv); drawRun(ctx, wordGlyphs(h.txt, 0), { x: 0, y: 0, w, h: hh }, T('--ink'), 'center'); });
+    }
+    cbox.appendChild(row);
+  }
+
+  /* glyph set */
   function charOf(spec) {
     if (spec.kind === 'letter') return String.fromCodePoint(spec.letter.uni);
     if (spec.kind === 'lig') return 'لا';
@@ -3715,15 +4965,12 @@ button { cursor: pointer; }
     return '';
   }
   function buildTiles() {
-    const box = $('#tiles');
-    box.innerHTML = '';
+    const box = $('#tiles'); box.innerHTML = '';
     for (const spec of INV) {
-      if (spec.kind === 'extra' && (spec.extra.kind === 'space')) continue;
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'tile'; b.dataset.name = spec.name;
-      b.setAttribute('role', 'listitem');
-      b.setAttribute('aria-label', charOf(spec) + ' ' + (FORM_AR[spec.form] || '') + ' — ' + spec.name);
-      b.appendChild(document.createElement('canvas'));
+      if (spec.kind === 'extra' && spec.extra.kind === 'space') continue;
+      const b = el('button', 'tile'); b.type = 'button'; b.dataset.name = spec.name; b.setAttribute('role', 'listitem');
+      b.setAttribute('aria-label', charOf(spec) + ' ' + (FORM_AR[spec.form] || '') + '، ' + spec.name);
+      b.appendChild(el('canvas'));
       b.addEventListener('click', () => { S.sel = spec.name; renderPreview(); for (const t of $$('.tile')) t.setAttribute('aria-pressed', String(t.dataset.name === S.sel)); });
       box.appendChild(b);
     }
@@ -3732,156 +4979,123 @@ button { cursor: pointer; }
     const ink = T('--ink');
     for (const t of $$('.tile')) {
       const { ctx, w, h } = sizeCanvas(t.querySelector('canvas'));
-      const g = G(t.dataset.name);
-      drawCentered(ctx, g, w, h, h * 0.92 / (VSPAN() + 200), () => ink);
+      drawCentered(ctx, G(t.dataset.name), w, h, h * 0.92 / (VSPAN() + 200), () => ink);
       t.setAttribute('aria-pressed', String(t.dataset.name === S.sel));
     }
   }
-  function recipeText(g) {
-    const seen = [];
-    for (const p of g.parts) if (p.slot && !seen.includes(p.slot)) seen.push(p.slot);
-    return seen.map((id) => (R.slots.byId[id] ? R.slots.byId[id].ar : id)).join(' + ');
-  }
   function renderPreview() {
-    const spec = SPEC[S.sel] || SPEC.beh;
-    const g = G(spec.name);
+    const spec = SPEC[S.sel] || SPEC.beh, g = G(spec.name);
     $('#pvTitle').textContent = charOf(spec);
     $('#pvName').textContent = spec.name;
     $('#pvForm').textContent = FORM_AR[spec.form] || spec.form;
-    const cv = $('#pvCanvas');
-    const { ctx, w, h } = sizeCanvas(cv);
+    const { ctx, w, h } = sizeCanvas($('#pvCanvas'));
     if (!g) return;
-    let s = h * 0.9 / (VSPAN() + 120);
-    s = Math.min(s, w * 0.7 / Math.max(g.adv, 1));
-    const base = baseAt(h, s);
-    const x = (w - g.adv * s) / 2;
+    const s = Math.min(h * 0.9 / (VSPAN() + 120), w * 0.7 / Math.max(g.adv, 1));
+    const base = baseAt(h, s), x = (w - g.adv * s) / 2;
     const line = T('--line'), muted = T('--muted');
-    ctx.font = '10.5px "IBM Plex Mono", monospace';
-    ctx.direction = 'ltr'; ctx.textAlign = 'left';
+    ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.direction = 'ltr'; ctx.textAlign = 'left';
     ctx.fillStyle = muted; ctx.strokeStyle = line; ctx.lineWidth = 1;
-    const H = (y, label) => { const Y = Math.round(base - y * s) + 0.5; ctx.beginPath(); ctx.moveTo(0, Y); ctx.lineTo(w, Y); ctx.stroke(); ctx.fillText(label, 6, Y - 4); };
-    H(0, 'BASE 0'); H(M.X, 'TOOTH ' + M.X); H(M.A, 'ALIF ' + M.A); H(-M.D, 'DESC −' + M.D);
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, h); ctx.moveTo(Math.round(x + g.adv * s) + 0.5, 0); ctx.lineTo(Math.round(x + g.adv * s) + 0.5, h); ctx.stroke();
-    ctx.setLineDash([]);
+    const Hl = (y, label) => { const Y = Math.round(base - y * s) + 0.5; ctx.beginPath(); ctx.moveTo(0, Y); ctx.lineTo(w, Y); ctx.stroke(); ctx.fillText(label, 6, Y - 4); };
+    Hl(0, 'BASE 0'); Hl(M.X, 'TOOTH ' + Math.round(M.X)); Hl(M.A, 'ALIF ' + Math.round(M.A)); Hl(-M.D, 'DESC −' + Math.round(M.D));
+    ctx.setLineDash([3, 3]); ctx.beginPath();
+    ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, h); ctx.moveTo(Math.round(x + g.adv * s) + 0.5, 0); ctx.lineTo(Math.round(x + g.adv * s) + 0.5, h);
+    ctx.stroke(); ctx.setLineDash([]);
     const ink = T('--ink'), accent = T('--accent');
     R.drawGlyph(ctx, g, S.dna, { x, base, s, colorOf: (p) => (S.hl && p.slot === S.hl) ? accent : ink });
-    const info = $('#pvInfo');
     const pf = (() => {
-      if (spec.kind === 'letter') { const arr = R.presentation[spec.letter.name]; if (!arr) return null; const i = R.pfOrder.indexOf(spec.form); return arr[i]; }
+      if (spec.kind === 'letter') { const arr = R.presentation[spec.letter.name]; return arr ? arr[R.pfOrder.indexOf(spec.form)] : null; }
       if (spec.kind === 'lig') return spec.form === 'fina' ? spec.lig.pf[1] : spec.lig.pf[0];
       return null;
     })();
     const uni = spec.kind === 'letter' ? spec.letter.uni : spec.kind === 'extra' ? spec.extra.uni : null;
     const hex = (v) => 'U+' + v.toString(16).toUpperCase().padStart(4, '0');
-    const rows = [
-      ['العرض', String(g.adv)],
-      ['يونيكود', uni != null ? hex(uni) + (pf ? ' · ' + hex(pf) : '') : (pf ? hex(pf) : '—')],
-      ['الوصفة', recipeText(g) || '—']
-    ];
-    info.innerHTML = '';
-    for (const [k, v] of rows) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; if (k !== 'الوصفة') dd.className = 'mono'; info.append(dt, dd); }
+    const rows = [['العرض', String(g.adv)], ['يونيكود', uni != null ? hex(uni) + (pf ? ' · ' + hex(pf) : '') : (pf ? hex(pf) : '—')]];
+    const info = $('#pvInfo'); info.innerHTML = '';
+    for (const [k, v] of rows) info.append(el('dt', '', k), el('dd', 'mono', v));
+    const fd = el('dd', 'formula'); setFormula(fd, g, spec.form);
+    if (!fd.textContent) fd.textContent = '—';
+    info.append(el('dt', '', 'الوصفة'), fd);
   }
 
-  /* feature cards */
+  /* OpenType feature cards */
   const RASM_MAP = { 'ب': 'ٮ', 'ت': 'ٮ', 'ث': 'ٮ', 'ن': 'ں', 'ي': 'ى', 'ئ': 'ى', 'ج': 'ح', 'خ': 'ح', 'ذ': 'د', 'ز': 'ر', 'ش': 'س', 'ض': 'ص', 'ظ': 'ط', 'غ': 'ع', 'ف': 'ڡ', 'ق': 'ٯ', 'ة': 'ه', 'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ؤ': 'و' };
   const FEATS = [
     { id: 'ctx', ar: 'الأشكال السياقية', tag: 'init · medi · fina', on: 'بيت سعيد', ff: '"init" 0, "medi" 0, "fina" 0' },
     { id: 'rlig', ar: 'لام ألف', tag: 'rlig', on: 'سلام لا', ff: '"rlig" 0' },
     { id: 'kash', ar: 'الكشيدة', tag: 'U+0640', on: 'مـحـمـد', off: 'محمد' },
-    { id: 'rasm', ar: 'الهيكل بلا نقاط', tag: 'U+066E · U+06A1', on: 'تشبيه', off: null },
+    { id: 'rasm', ar: 'الهيكل بلا نقاط', tag: 'U+066E · U+06A1', on: 'تشبيه' },
     { id: 'digits', ar: 'الأرقام والعلامات', tag: 'U+0660–0669', on: '١٤٤٧ ، ؟', fixed: true },
     { id: 'pf', ar: 'أشكال العرض', tag: 'U+FE70–FEFC', on: 'ﺭﺳﻢ', fixed: true }
   ];
   function buildFeats() {
-    const box = $('#feats');
-    box.innerHTML = '';
+    const box = $('#feats'); box.innerHTML = '';
     for (const f of FEATS) {
-      const el = document.createElement('div');
-      el.className = 'feat'; el.dataset.id = f.id;
-      el.innerHTML = '<div class="card-top" style="margin:0"><span class="label"><b></b><span class="mono" style="text-transform:none"></span></span></div><div class="sample" dir="rtl"></div>';
-      el.querySelector('b').textContent = f.ar;
-      el.querySelector('.mono').textContent = f.tag;
+      const card = el('div', 'feat'); card.dataset.id = f.id;
+      card.innerHTML = '<div class="card-top" style="margin:0"><span class="label"><b></b><span class="mono" style="text-transform:none"></span></span></div><div class="sample" dir="rtl"></div>';
+      card.querySelector('b').textContent = f.ar; card.querySelector('.mono').textContent = f.tag;
       if (!f.fixed) {
-        const sw = document.createElement('button');
-        sw.type = 'button'; sw.className = 'switch'; sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', 'true');
-        sw.setAttribute('aria-label', f.ar);
+        const sw = el('button', 'switch'); sw.type = 'button'; sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', 'true'); sw.setAttribute('aria-label', f.ar);
         sw.addEventListener('click', () => { S.feat[f.id] = !S.feat[f.id]; sw.setAttribute('aria-checked', String(S.feat[f.id])); renderFeats(); });
-        el.querySelector('.card-top').appendChild(sw);
+        card.querySelector('.card-top').appendChild(sw);
       }
-      box.appendChild(el);
+      box.appendChild(card);
     }
     renderFeats();
   }
   function renderFeats() {
     for (const f of FEATS) {
-      const el = $('.feat[data-id="' + f.id + '"] .sample');
+      const smp = $('.feat[data-id="' + f.id + '"] .sample');
       const on = f.fixed ? true : S.feat[f.id];
       let txt = f.on;
       if (!on && f.off) txt = f.off;
       if (f.id === 'rasm' && !on) txt = Array.from(f.on).map((c) => RASM_MAP[c] || c).join('');
-      el.textContent = txt;
-      el.style.fontFeatureSettings = (!on && f.ff) ? f.ff : 'normal';
+      smp.textContent = txt;
+      smp.style.fontFeatureSettings = (!on && f.ff) ? f.ff : 'normal';
     }
   }
 
-  /* ---------------------------------------------------------------- 05 tester */
+  /* ---------------------------------------------------------------- 05 tester, 06 maker */
   function initTester() {
     const r = $('#sizeRange'), out = $('#sizeOut'), t = $('#testerText');
     const apply = () => { t.style.fontSize = r.value + 'px'; out.textContent = r.value; };
     r.addEventListener('input', apply); apply();
     for (const b of $$('#presets button')) b.addEventListener('click', () => { t.textContent = b.dataset.t; });
   }
-
-  /* ---------------------------------------------------------------- 06 logo maker */
-  const MK = {
-    ink: () => [T('--ink'), T('--field')], accent: () => [T('--accent'), T('--field')],
-    hero: () => ['#191919', '#ffcf96'], night: () => ['#f3efe9', '#191919']
-  };
+  const MK = { ink: () => [T('--ink'), T('--field')], accent: () => [T('--accent'), T('--field')], hero: () => ['#191919', '#ffcf96'], night: () => ['#f3efe9', '#191919'] };
   function renderMaker() {
-    const cv = $('#mkCanvas');
-    const r = cv.getBoundingClientRect();
+    const cv = $('#mkCanvas'), r = cv.getBoundingClientRect();
     const h = Math.round(Math.max(160, r.width * 0.46));
     const { ctx, w } = sizeCanvas(cv, h);
     cv.style.height = h + 'px';
     const [fg, bg] = MK[S.mkColor]();
     ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-    const word = $('#mkWord').value.trim() || 'رسم';
-    const k = +$('#mkKash').value;
-    drawRun(ctx, wordGlyphs(word, k), { x: w * 0.06, y: h * 0.06, w: w * 0.88, h: h * 0.88 }, fg, 'center');
+    drawRun(ctx, wordGlyphs($('#mkWord').value.trim() || 'رسم', +$('#mkKash').value), { x: w * 0.06, y: h * 0.06, w: w * 0.88, h: h * 0.88 }, fg, 'center');
   }
   function initMaker() {
     $('#mkWord').addEventListener('input', renderMaker);
     $('#mkKash').addEventListener('input', () => { $('#mkKashOut').textContent = $('#mkKash').value; renderMaker(); });
-    for (const b of $$('#mkColor button')) b.addEventListener('click', () => {
-      S.mkColor = b.dataset.c;
-      for (const x of $$('#mkColor button')) x.setAttribute('aria-pressed', String(x === b));
-      renderMaker();
-    });
+    for (const b of $$('#mkColor button')) b.addEventListener('click', () => { S.mkColor = b.dataset.c; for (const x of $$('#mkColor button')) x.setAttribute('aria-pressed', String(x === b)); renderMaker(); });
     $('#mkSvg').addEventListener('click', async () => {
       const res = await ensureFont(); if (!res) return;
       const [fg, bg] = MK[S.mkColor]();
-      const word = $('#mkWord').value.trim() || 'رسم';
-      const svg = R.textToSVG(res, word, { size: 400, kashida: +$('#mkKash').value, color: fg, bg: S.mkColor === 'ink' || S.mkColor === 'accent' ? null : bg });
+      const svg = R.textToSVG(res, $('#mkWord').value.trim() || 'رسم', { size: 400, kashida: +$('#mkKash').value, color: fg, bg: S.mkColor === 'hero' || S.mkColor === 'night' ? bg : null });
       await saveFile(famName() + '-logo.svg', svg, 'image/svg+xml');
     });
     $('#mkPng').addEventListener('click', async () => {
-      const word = $('#mkWord').value.trim() || 'رسم';
-      const gl = wordGlyphs(word, +$('#mkKash').value);
-      const total = gl.reduce((a, g) => a + g.adv, 0);
-      const s = 0.9, pad = 120;
+      const gl = wordGlyphs($('#mkWord').value.trim() || 'رسم', +$('#mkKash').value);
+      const total = gl.reduce((a, g) => a + g.adv, 0), s = 0.9, pad = 120;
       const c = document.createElement('canvas');
       c.width = Math.round(total * s + pad * 2); c.height = Math.round(VSPAN() * s + pad * 2);
       const ctx = c.getContext('2d');
       const [fg, bg] = MK[S.mkColor]();
       if (S.mkColor === 'hero' || S.mkColor === 'night') { ctx.fillStyle = bg; ctx.fillRect(0, 0, c.width, c.height); }
       drawRun(ctx, gl, { x: pad, y: pad, w: c.width - pad * 2, h: c.height - pad * 2 }, fg, 'center', s);
-      const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
+      const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
       if (blob) await saveFile(famName() + '-logo.png', blob, 'image/png');
     });
   }
 
-  /* ---------------------------------------------------------------- export */
+  /* ---------------------------------------------------------------- 07 export */
   async function downloadFont() {
     const res = await ensureFont();
     if (!res || !S.fontBuf) return;
@@ -3889,24 +5103,16 @@ button { cursor: pointer; }
     const otf = new Uint8Array(S.fontBuf.slice(0));
     const dl = await downloadsNS();
     if (dl) {
-      const readme = 'Rasm — ' + res.family + '\r\n\r\n' +
-        'هذا خط OpenType ‏(.otf) وُلّد على جهازك بمحرك «رسم».\r\n' +
-        'التثبيت: افتح الملف ' + fam + '-Regular.otf ثم اختر «تثبيت».\r\n\r\n' +
-        'Install: open ' + fam + '-Regular.otf and choose Install.\r\n' +
-        'Glyphs: ' + res.font.glyphs.length + ' · Features: init, medi, fina, rlig (script arab).\r\n';
-      const zip = makeZip([{ name: fam + '-Regular.otf', data: otf }, { name: 'README.txt', data: new TextEncoder().encode(readme) }]);
-      await saveFile(fam + '-font.zip', zip, 'application/zip');
-    } else {
-      await saveFile(fam + '-Regular.otf', new Blob([otf], { type: 'font/otf' }), 'font/otf');
-    }
+      const readme = 'Rasm — ' + res.family + '\r\n\r\nهذا خط OpenType ‏(.otf) بُني على جهازك بمحرك «رسم».\r\nالتثبيت: افتح الملف ' + fam + '-Regular.otf ثم اختر «تثبيت».\r\n\r\nInstall: open ' + fam + '-Regular.otf and choose Install.\r\nGlyphs: ' + res.font.glyphs.length + ' · Features: init, medi, fina, rlig (script arab).\r\n';
+      await saveFile(fam + '-font.zip', makeZip([{ name: fam + '-Regular.otf', data: otf }, { name: 'README.txt', data: new TextEncoder().encode(readme) }]), 'application/zip');
+    } else await saveFile(fam + '-Regular.otf', new Blob([otf], { type: 'font/otf' }), 'font/otf');
   }
   async function saveProject() {
+    const drawn = {};
+    for (const id in R.slots.drawn) drawn[id] = { shapes: R.slots.drawn[id].shapes, placeU: R.slots.drawn[id].placeU };
     const slots = {};
-    for (const id in R.slots.overrides) {
-      const o = R.slots.overrides[id];
-      try { slots[id] = { png: o.img.toDataURL('image/png'), wu: o.wu, hu: o.hu, y0: o.y0, source: S.src[id] || 'upload' }; } catch (e) { /* skip */ }
-    }
-    const data = JSON.stringify({ app: 'rasm', v: 1, family: famName(), dna: S.dna, measured: S.measured, slots }, null, 1);
+    for (const id in R.slots.overrides) { const o = R.slots.overrides[id]; try { slots[id] = { png: o.img.toDataURL('image/png'), wu: o.wu, hu: o.hu, y0: o.y0, source: S.src[id] || 'upload' }; } catch (e) { /* skip */ } }
+    const data = JSON.stringify({ app: 'rasm', v: 2, family: famName(), dna: S.dna, measured: S.measured, drawnDNA: S.drawnDNA, pp: S.pp, ppSrc: S.ppSrc, useDrawn: R.slots.useDrawn, drawn, slots });
     await saveFile(famName() + '-rasm.json', data, 'application/json');
   }
   async function loadProject(file) {
@@ -3914,66 +5120,56 @@ button { cursor: pointer; }
       const j = JSON.parse(await file.text());
       if (!j || j.app !== 'rasm') throw new Error('هذا ليس ملف مشروع من «رسم».');
       S.dna = R.clampDNA(Object.assign(R.defaultDNA(), j.dna || {}));
-      S.measured = j.measured || {};
+      S.measured = j.measured || {}; S.drawnDNA = j.drawnDNA || {}; S.pp = j.pp || {}; S.ppSrc = j.ppSrc || {};
       if (j.family) $('#famName').value = j.family;
+      for (const k in R.slots.drawn) delete R.slots.drawn[k];
+      for (const k in R.slots.useDrawn) delete R.slots.useDrawn[k];
+      Object.assign(R.slots.useDrawn, j.useDrawn || {});
+      for (const id in (j.drawn || {})) { const d = IO.makePiece(id, j.drawn[id].shapes, null, j.drawn[id].placeU); d.meas = IO.measure(d, S.dna.weight); R.slots.drawn[id] = d; }
       for (const id in R.slots.overrides) delete R.slots.overrides[id];
       S.src = {};
-      const jobs = Object.entries(j.slots || {}).map(([id, o]) => new Promise((res) => {
+      await Promise.all(Object.entries(j.slots || {}).map(([id, o]) => new Promise((res) => {
         const img = new Image();
-        img.onload = () => {
-          const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
-          c.getContext('2d').drawImage(img, 0, 0);
-          R.slots.overrides[id] = { img: c, wu: o.wu, hu: o.hu, y0: o.y0, source: o.source };
-          S.src[id] = o.source === 'logo' ? 'logo' : 'upload';
-          res();
-        };
-        img.onerror = () => res();
-        img.src = o.png;
-      }));
-      await Promise.all(jobs);
-      buildAxes();
-      changed(true);
+        img.onload = () => { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); R.slots.overrides[id] = { img: c, wu: o.wu, hu: o.hu, y0: o.y0, source: o.source }; S.src[id] = o.source === 'logo' ? 'logo' : 'upload'; res(); };
+        img.onerror = () => res(); img.src = o.png;
+      })));
+      S.file = Object.keys(R.slots.drawn).length ? { name: file.name, report: { open: 0, outlineOnly: 0, outside: 0, issues: [] }, count: Object.keys(R.slots.drawn).length } : null;
+      buildAxes(); changed(true); runPieceChecks();
       toast('فُتح المشروع');
     } catch (e) { toast(e.message || 'تعذّر فتح الملف'); }
   }
   function initExport() {
     $('#nameForm').addEventListener('submit', (e) => { e.preventDefault(); downloadFont(); });
     $('#navDownload').addEventListener('click', downloadFont);
-    $('#famName').addEventListener('change', () => { scheduleBuild(300); });
+    $('#famName').addEventListener('change', () => scheduleBuild(300));
     $('#saveProject').addEventListener('click', saveProject);
     $('#loadProject').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) loadProject(f); });
     $('#buildBtn').addEventListener('click', () => buildNow());
+    $('#resetDNA').addEventListener('click', () => { Object.assign(S.dna, S.measured); changed(true); });
     downloadsNS().then((dl) => {
-      $('#exportNote').textContent = dl
-        ? 'اسم الخط بالحروف اللاتينية. في هذه الصفحة يُحفظ الخط داخل ملف ZIP فيه ملف ‎.otf‎.'
-        : 'اسم الخط بالحروف اللاتينية. يُحفظ الخط مباشرة بصيغة ‎.otf‎.';
+      $('#exportNote').textContent = dl ? 'اسم الخط بالحروف اللاتينية. في هذه الصفحة يصلك الخط داخل ملف ZIP، وفيه ملف الخط بصيغة OTF.' : 'اسم الخط بالحروف اللاتينية. يُحفظ الخط مباشرة بصيغة OTF.';
     });
   }
 
-  /* ---------------------------------------------------------------- theme */
+  /* ---------------------------------------------------------------- theme & boot */
   function initTheme() {
     $('#themeBtn').addEventListener('click', () => {
       const root = document.documentElement;
       const cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
-      requestRender(); clearTimeout(tilesT); tilesT = setTimeout(renderTiles, 60);
     });
-    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { requestRender(); }); } catch (e) { /* old browsers */ }
-    new MutationObserver(() => requestRender()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { thumbVer = -1; requestRender(); }); } catch (e) { /* old browsers */ }
+    new MutationObserver(() => { requestRender(); clearTimeout(slowT); slowT = setTimeout(renderTiles, 60); renderReport(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   }
-
-  /* ---------------------------------------------------------------- boot */
   function boot() {
-    const nGlyphs = INV.length + 1;
-    $('#pipelineCount').textContent = '١٢ ← ١٨ ← ' + AR(nGlyphs);
-    $('#glyphCount').textContent = AR(nGlyphs);
-    buildAxes(); buildSlots(); buildRasm(); buildTiles(); buildFeats();
-    initLogoUI(); initTester(); initMaker(); initExport(); initTheme();
-    setHL(null);
+    $('#pipelineCount').textContent = '١٥ ← ٦٤ ← ' + AR(INV.length + 1);
+    $('#glyphCount').textContent = AR(INV.length + 1);
+    buildAxes(); buildPieces(); buildMatrix(); buildTiles(); buildFeats();
+    initStart(); initLogo(); initTester(); initMaker(); initExport(); initTheme();
     let rt = 0;
-    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { requestRender(); }, 120); });
+    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(requestRender, 120); });
     if (!window.opentype) setStat('nolib');
-    loadSample();
+    importSVG(demoSVG(), 'demo', true);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => requestRender());
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

@@ -113,14 +113,14 @@
   RX.alef = (b, m, f) => {
     const fin = f === 'fina';
     const s = b.P('stem', 0, 0, { free: !fin });
-    if (fin) b.entry = { u: s.cx, dir: 'up' };
+    if (fin) b.entry = { u: s.cx, dir: s.drawn ? 'flat' : 'up' };
     b.anc.above = [s.cx, m.A + m.mg * 0.7];
     b.anc.below = [s.cx, -m.mg * 0.7];
   };
 
   function tooth(b, m, f) {
     const t = b.P('tooth', 0, 0);
-    const dir = m.pc.tooth.style === 'stub' && !t.image ? 'up' : 'flat';
+    const dir = m.pc.tooth.style === 'stub' && !t.image && !t.drawn ? 'up' : 'flat';
     b.exit = { u: t.cx, dir };
     if (f === 'medi') b.entry = { u: t.cx, dir };
     b.anc.above = [t.cx, m.X + m.mg];
@@ -132,7 +132,7 @@
   RX.beh = (b, m, f) => {
     if (joinsL(f)) return tooth(b, m, f);
     const p = b.P('basin', 0, 0, { full: true });
-    if (f === 'fina') b.entry = { u: p.image ? p.w * 0.1 : m.h, dir: p.image ? 'flat' : 'up' };
+    if (f === 'fina') b.entry = { u: (p.image || p.drawn) ? Math.min(p.w * 0.1, m.W * 0.5) : m.h, dir: (p.image || p.drawn) ? 'flat' : 'up' };
     b.anc.above = [p.w * 0.5, m.W + m.mg * 0.55];
     b.anc.below = [p.w * 0.5, -m.mg];
   };
@@ -152,7 +152,7 @@
     if (joinsL(f)) return tooth(b, m, f);
     const fin = f === 'fina';
     const c = cupArm(b, m, 0, fin ? m.b + (m.t - m.b) * 0.62 : m.t);
-    if (fin) b.entry = { u: m.h, dir: 'up' };
+    if (fin) b.entry = { u: m.h, dir: c.drawn ? 'flat' : 'up' };
     b.anc.above = [c.w * 0.5, m.W + m.mg * 0.45];
     b.anc.below = [c.w * 0.5, m.d - m.h - m.mg];
   };
@@ -161,7 +161,7 @@
     if (joinsL(f)) return tooth(b, m, f);
     const fin = f === 'fina';
     const y = b.P('cup', 0, 0, { variant: 'yeh', top: fin ? m.b + (m.t - m.b) * 0.55 : m.t, topCap: m.cap });
-    if (fin) b.entry = { u: m.h, dir: 'up' };
+    if (fin) b.entry = { u: m.h, dir: y.drawn ? 'flat' : 'up' };
     b.anc.above = [m.h + m.W * 0.3, m.X + m.mg * 0.6];
     b.anc.below = [y.cx, m.d - m.h - m.mg * 0.8];
   };
@@ -171,7 +171,7 @@
     const t0 = b.P('tooth', 0, 0);
     const c0 = t0.cx, c1 = c0 + sg, c2 = c0 + 2 * sg;
     b.P('tooth', c1 - t0.cx, 0);
-    b.base(c0, c2, !joinsR(f) && m.pc.tooth.style === 'stub' && !t0.image);
+    b.base(c0, c2, !joinsR(f) && m.pc.tooth.style === 'stub' && !t0.image && !t0.drawn);
     if (f === 'isol' || f === 'fina') cupArm(b, m, c2 - m.h, m.t);
     else { b.P('tooth', c2 - t0.cx, 0); b.exit = { u: c2, dir: 'flat' }; }
     if (joinsR(f)) b.entry = { u: c0, dir: 'flat' };
@@ -200,7 +200,7 @@
   RX.ain = (b, m, f) => {
     if (f === 'init') {
       const a = b.P('ain', 0, 0, { botEnd: m.h, botCap: m.cap });
-      b.exit = { u: a.w - m.h, dir: a.image ? 'flat' : 'up' };
+      b.exit = { u: a.leftU != null ? a.leftU : a.w - m.h, dir: (a.image || a.drawn) ? 'flat' : 'up' };
       b.anc.above = [a.w * 0.5, m.X + m.mg];
       return;
     }
@@ -217,7 +217,7 @@
     const rh = m.rr('ain', (top - m.b) / 2);
     const a = b.P('ain', 0, 0, { botEnd: m.h + hw * 0.22, botCap: m.cap });
     const leg = Math.max(m.W * 0.9, rh * 0.6 + m.W * 0.5);
-    b.P('arc', 0, 0, { from: 'side', su: a.w - m.h, leg, w, endU: m.h + w * 0.04 });
+    b.P('arc', 0, 0, { from: 'side', su: a.leftU != null ? a.leftU : a.w - m.h, leg, w, endU: m.h + w * 0.04 });
     b.anc.above = [a.w * 0.5, m.X + m.mg];
   };
 
@@ -248,15 +248,16 @@
   RX.dal = (b, m, f) => {
     // declared rule: الدال = خط الكاف على السطر
     const w = m.Dw;
-    b.P('kaf', 0, 0, { variant: 'dal' });
-    if (f === 'fina') b.entry = { u: m.h, dir: 'flat' };
+    const k = b.P('kaf', 0, 0, { variant: 'dal' });
+    if (k.drawn) b.S([[k.cx, m.b], [k.cx + w * 0.72, m.b]], 0, { slot: 'kaf', caps: ['butt', m.cap] });
+    if (f === 'fina') b.entry = { u: k.drawn ? k.cx : m.h, dir: 'flat' };
     b.anc.above = [w * 0.46, m.X + m.mg];
   };
 
   RX.reh = (b, m, f) => {
     if (f === 'fina') {
-      b.P('tail', 0, 0, { top: m.b, topCap: 'butt', joinTop: true });
-      b.entry = { u: m.h, dir: 'down' };
+      const t = b.P('tail', 0, 0, { top: m.b, topCap: 'butt', joinTop: true });
+      b.entry = { u: m.h, dir: t.drawn ? 'flat' : 'down' };
       b.anc.above = [m.h + m.W * 0.3, m.W + m.mg];
     } else {
       b.P('tail', 0, 0, { top: m.t });
@@ -297,7 +298,7 @@
   RX.kaf = (b, m, f) => {
     if (joinsL(f)) {
       const k = b.P('kaf', 0, 0);
-      b.exit = { u: k.cx, dir: k.image ? 'flat' : 'up' };
+      b.exit = { u: k.cx, dir: (k.image || k.drawn) ? 'flat' : 'up' };
       if (f === 'medi') b.entry = { u: k.cx, dir: 'flat' };
       return;
     }
@@ -314,21 +315,21 @@
   RX.lam = (b, m, f) => {
     const s = b.P('stem', 0, 0);
     if (f === 'isol' || f === 'fina') b.P('cup', s.cx - m.h, 0, { top: m.b, w: m.Cw * 1.04 });
-    if (joinsL(f)) b.exit = { u: s.cx, dir: 'up' };
-    if (joinsR(f)) b.entry = { u: s.cx, dir: f === 'fina' ? 'flat' : 'up' };
+    if (joinsL(f)) b.exit = { u: s.cx, dir: s.drawn ? 'flat' : 'up' };
+    if (joinsR(f)) b.entry = { u: s.cx, dir: (f === 'fina' || s.drawn) ? 'flat' : 'up' };
     b.anc.above = [s.cx, m.A + m.mg];
   };
 
   RX.heh = (b, m, f) => {
     if (f === 'fina') {
       const e = b.P('heh', 0, 0, { fina: true });
-      b.entry = { u: m.h, dir: 'up' };
+      b.entry = { u: m.h, dir: e.drawn ? 'flat' : 'up' };
       b.anc.above = [e.w * 0.62, m.L + m.mg * 0.9];
       return;
     }
     const e = b.P('heh', 0, 0);
-    if (joinsL(f)) b.exit = { u: e.w - m.h, dir: e.image ? 'flat' : 'up' };
-    if (f === 'medi') b.entry = { u: m.h, dir: e.image ? 'flat' : 'up' };
+    if (joinsL(f)) b.exit = { u: e.w - m.h, dir: (e.image || e.drawn) ? 'flat' : 'up' };
+    if (f === 'medi') b.entry = { u: m.h, dir: (e.image || e.drawn) ? 'flat' : 'up' };
     b.anc.above = [e.w * 0.5, m.Eh + m.mg];
   };
 
@@ -340,6 +341,17 @@
     // لام ألف = ساقان ووصلة: the lam stands, the alef leans out from the shared foot
     const La = Math.max(0.46 * m.A * m.wf, 3.8 * m.W);
     const foot = La * 0.42;
+    if (R.slots.hasDrawn('stem')) {
+      const lam = b.P('stem', 0, 0, {});
+      const lean = Math.atan((La - m.h - foot) / Math.max(1, m.a - m.b)) * 180 / Math.PI;
+      const al = R.slots.piece('stem', m, { lean });
+      for (const part of al.parts) b.parts.push(R.shiftPart(part, foot - al.cx, 0));
+      b.S([[lam.cx, m.b], [foot, m.b]], 0, { slot: 'conn', caps: ['butt', 'butt'] });
+      if (f === 'fina') b.entry = { u: lam.cx, dir: 'flat' };
+      b.anc.above = [La - m.h, m.A + m.mg * 0.7];
+      b.anc.below = [foot + (La - foot) * 0.25, -m.mg * 0.7];
+      return;
+    }
     const lean = Math.tan(m.pc.stem.lean * Math.PI / 180) * (m.a - m.b);
     b.S([[m.h + lean, m.a], [m.h, m.b], [foot, m.b], [La - m.h + lean, m.a]], [0, m.rr('stem', m.W * 1.4), m.rr('stem', m.W * 1.1), 0],
       { tags: ['stem', 'conn', 'stem'], caps: [m.cap, m.cap] });
@@ -529,7 +541,7 @@
     let parts = b.parts.map(p => R.shiftPart(p, shift, 0));
     // slant: shear (tops lean to the left for positive values)
     const k = Math.tan((m.dna.slant || 0) * Math.PI / 180);
-    if (k) parts = parts.map(p => p.type === 'image' ? Object.assign({}, p, { skew: k }) : Object.assign({}, p, { pts: p.pts.map(q => [q[0] + q[1] * k, q[1]]) }));
+    if (k) parts = parts.map(p => p.type === 'image' ? Object.assign({}, p, { skew: k }) : R.xformPart(p, q => [q[0] + q[1] * k, q[1]]));
     const anc = {};
     for (const key in b.anc) anc[key] = [b.anc[key][0] + shift, b.anc[key][1]];
     return { adv, parts, clip: { right: jr ? -m.ov : null, left: jl ? adv + m.ov : null }, anc, form: f };
@@ -603,8 +615,9 @@
     for (const p of built.parts) {
       if (!p.slot || p.slot === 'conn' || p.slot === 'dot') continue;
       let u0 = Infinity;
-      if (p.type === 'image') u0 = p.u0; else for (const q of p.pts) u0 = Math.min(u0, q[0]);
-      items.push({ slot: p.slot, u0 });
+      const pts = p.type === 'image' ? [[p.u0, 0]] : p.type === 'shape' ? R.shapePoints(p) : p.pts;
+      for (const q of pts) u0 = Math.min(u0, q[0]);
+      if (isFinite(u0)) items.push({ slot: p.slot, u0 });
     }
     items.sort((a, b) => a.u0 - b.u0);
     const order = [], count = {};
