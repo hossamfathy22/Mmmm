@@ -140,6 +140,7 @@
   /* ---------------------------------------------------------------- font building */
   let buildTimer = 0, buildSeq = 0;
   const famName = () => (($('#famName').value || '').replace(/[^A-Za-z0-9 \-]/g, '').trim()) || 'Rasm';
+  const fileBase = () => famName().replace(/\s+/g, '');
   function setStat(st, p) {
     S.stat = st;
     const stat = $('#buildStat'), track = $('#buildTrack'), btn = $('#buildBtn'), note = $('#testerNote');
@@ -290,6 +291,8 @@
     if (fit.roundness != null) S.dna.roundness = fit.roundness;
     S.measured = Object.assign({}, S.dna);
   }
+  // a file made from our template (exported again by Illustrator or not)
+  const isTemplate = (text) => /id="frame-(stem|tooth|basin)"/.test(text) || /viewBox="0 0 8220 6820"/.test(text);
   function runPieceChecks() {
     S.checks = {};
     const stem = R.slots.drawn.stem;
@@ -317,6 +320,16 @@
     if (r.issues.includes('image')) rows.push(['warn', 'في الملف صورة نقطية، والمحرك يقرأ الأشكال المتجهة فقط.']);
     if (r.issues.includes('clip')) rows.push(['warn', 'في الملف قناع قص يُتجاهل. حرّر الأشكال منه قبل التصدير.']);
     box.innerHTML = '';
+    if (!S.file.demo) {
+      const used = IO.ORDER.filter((id) => drawn[id] && R.slots.useDrawn[id] !== false).length;
+      const done = el('div', 'done');
+      const t = el('span');
+      t.append(el('b', '', 'رسومك مستعملة: '), document.createTextNode(AR(used) + ' قطعة، والحروف والخط مبنيان منها.'));
+      const go = el('button', 'btn small', 'اذهب إلى القطع'); go.type = 'button';
+      go.addEventListener('click', () => $('#pieces').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      done.append(t, go);
+      box.appendChild(done);
+    }
     const ul = el('ul', 'checks');
     for (const [lv, t] of rows) { const li = el('li', lv); li.textContent = t; ul.appendChild(li); }
     box.appendChild(ul);
@@ -354,11 +367,18 @@
     const drop = $('#svgDrop');
     ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('drag'); }));
     ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('drag'); }));
-    drop.addEventListener('drop', async (e) => {
-      const f = e.dataTransfer && e.dataTransfer.files[0];
+    // a file dropped anywhere on the page (not only on the box) is read, never opened in place of the page
+    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+    window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+    window.addEventListener('drop', async (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      drop.classList.remove('drag');
+      const f = e.dataTransfer.files[0];
       if (!f) return;
       if (!/svg/i.test(f.type) && !/\.svg$/i.test(f.name)) { toast('ارفع ملف SVG المصدَّر من Illustrator.'); return; }
       importSVG(await f.text(), f.name, false);
+      $('#start').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     $('#demoBtn').addEventListener('click', () => { importSVG(demoSVG(), 'demo', true); toast('حُمّل ملف تجريبي'); });
     $('#clearDrawn').addEventListener('click', () => {
@@ -470,6 +490,10 @@
     $('#logoFile').addEventListener('change', async (e) => {
       const f = e.target.files[0]; e.target.value = '';
       if (!f) return;
+      if (/svg/i.test(f.type) || /\.svg$/i.test(f.name)) {
+        const text = await f.text();
+        if (isTemplate(text)) { importSVG(text, f.name, false); toast('هذا ملف القالب، فقُرئت رسومه قطعاً.'); $('#start').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      }
       try { loadLogo(await R.analyze.loadFile(f), f.name); } catch (err) { toast(err.message || 'تعذّرت قراءة الملف'); }
     });
     $('#logoFold').addEventListener('toggle', () => renderLogo());
@@ -967,7 +991,7 @@
       const res = await ensureFont(); if (!res) return;
       const [fg, bg] = MK[S.mkColor]();
       const svg = R.textToSVG(res, $('#mkWord').value.trim() || 'رسم', { size: 400, kashida: +$('#mkKash').value, color: fg, bg: S.mkColor === 'hero' || S.mkColor === 'night' ? bg : null });
-      await saveFile(famName() + '-logo.svg', svg, 'image/svg+xml');
+      await saveFile(fileBase() + '-logo.svg', svg, 'image/svg+xml');
     });
     $('#mkPng').addEventListener('click', async () => {
       const gl = wordGlyphs($('#mkWord').value.trim() || 'رسم', +$('#mkKash').value);
@@ -979,7 +1003,7 @@
       if (S.mkColor === 'hero' || S.mkColor === 'night') { ctx.fillStyle = bg; ctx.fillRect(0, 0, c.width, c.height); }
       drawRun(ctx, gl, { x: pad, y: pad, w: c.width - pad * 2, h: c.height - pad * 2 }, fg, 'center', s);
       const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
-      if (blob) await saveFile(famName() + '-logo.png', blob, 'image/png');
+      if (blob) await saveFile(fileBase() + '-logo.png', blob, 'image/png');
     });
   }
 
@@ -1001,7 +1025,7 @@
     const slots = {};
     for (const id in R.slots.overrides) { const o = R.slots.overrides[id]; try { slots[id] = { png: o.img.toDataURL('image/png'), wu: o.wu, hu: o.hu, y0: o.y0, source: S.src[id] || 'upload' }; } catch (e) { /* skip */ } }
     const data = JSON.stringify({ app: 'rasm', v: 2, family: famName(), dna: S.dna, measured: S.measured, drawnDNA: S.drawnDNA, pp: S.pp, ppSrc: S.ppSrc, useDrawn: R.slots.useDrawn, drawn, slots });
-    await saveFile(famName() + '-rasm.json', data, 'application/json');
+    await saveFile(fileBase() + '-rasm.json', data, 'application/json');
   }
   async function loadProject(file) {
     try {

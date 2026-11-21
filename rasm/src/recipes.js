@@ -204,6 +204,16 @@
       b.anc.above = [a.w * 0.5, m.X + m.mg];
       return;
     }
+    if (f === 'fina' && R.slots.hasDrawn('ain')) {
+      const hw = m.Hw, w = Math.max(m.Aw, hw + m.W * 1.2), top = m.t;
+      const rh = m.rr('ain', (top - m.b) / 2);
+      const a = b.P('ain', 0, 0, { botEnd: m.h + hw * 0.22, botCap: m.cap });
+      const leg = Math.max(m.W * 0.9, rh * 0.6 + m.W * 0.5);
+      b.P('arc', 0, 0, { from: 'side', su: a.leftU != null ? a.leftU : a.w - m.h, leg, w, endU: m.h + w * 0.04, clearRight: m.W * 1.2 });
+      b.entry = { u: a.cx, dir: 'flat' };
+      b.anc.above = [a.w * 0.5, m.X + m.mg];
+      return;
+    }
     if (f === 'medi' || f === 'fina') {
       const a = b.P('ain', 0, 0, { closed: true });
       b.entry = { u: a.cx, dir: 'flat' };
@@ -236,6 +246,16 @@
       b.anc.inside = [n.w * 0.5, -m.mg];
       return;
     }
+    // final, drawn: the medial form (nose) and the bowl hanging from where its base ends (ـحـ + bowl)
+    if (R.slots.hasDrawn('nose') && R.slots.hasDrawn('arc')) {
+      const n = b.P('nose', 0, 0);
+      const ex = n.exitU != null ? n.exitU : n.w;
+      b.P('arc', 0, 0, { from: 'vertex', vx: ex, clearRight: Math.min(ex * 0.5, m.W * 1.6) });
+      b.entry = { u: m.h, dir: 'flat' };
+      b.anc.above = [n.w * 0.55, m.X + m.mg];
+      b.anc.inside = [ex * 0.55, -m.DD * 0.62];
+      return;
+    }
     // final: the nose rises from the line into the top bar, the arc takes over from there
     const w = m.Aw, su = Math.max(m.W * 1.8, w * 0.42);
     b.P('nose', 0, 0, { variant: 'up', to: su + 1 });
@@ -249,9 +269,9 @@
     // declared rule: الدال = خط الكاف على السطر
     const w = m.Dw;
     const k = b.P('kaf', 0, 0, { variant: 'dal' });
-    if (k.drawn) b.S([[k.cx, m.b], [k.cx + w * 0.72, m.b]], 0, { slot: 'kaf', caps: ['butt', m.cap] });
+    if (k.drawn && !k.ownBase) b.S([[k.cx, m.b], [k.cx + w * 0.72, m.b]], 0, { slot: 'kaf', caps: ['butt', m.cap] });
     if (f === 'fina') b.entry = { u: k.drawn ? k.cx : m.h, dir: 'flat' };
-    b.anc.above = [w * 0.46, m.X + m.mg];
+    b.anc.above = [(k.ownBase ? k.w : w) * 0.46, m.X + m.mg];
   };
 
   RX.reh = (b, m, f) => {

@@ -366,6 +366,57 @@
     });
   }
   const chain = (fns) => { fns = fns.filter(Boolean); return fns.length ? (q) => fns.reduce((r, f) => f(r), q) : null; };
+  const boxOf = (polys) => {
+    let u0 = Infinity, u1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const P of polys) for (const q of P) { if (q[0] < u0) u0 = q[0]; if (q[0] > u1) u1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+    return { u0, u1, y0, y1 };
+  };
+  // where the ink first meets the joint band on the right (u of the right edge of the band span)
+  const bandRight = (polys, W) => {
+    const sp = G.spanAt(polys, W * 0.5);
+    return sp.length ? Math.min(...sp.map((x) => x[0])) : 0;
+  };
+
+  /* الدال من خط الكاف: the part of the drawing that stands on the line, cut at the dal's height.
+   * A kaf drawn with a base of its own (نسخ) keeps that base, shortened in its straight run;
+   * a kaf without one (كوفي) gets the base from the recipe. */
+  function dalFromKaf(d, m) {
+    const W = m.W, ms = d.meas || {};
+    const own = d.shapes.filter((sh) => boxOf(G.flattenCmds(sh.cmds, 8)).y0 < W * 0.6);
+    const shapes = own.length ? own : d.shapes;
+    const vertexMid = ms.vertexY != null && ms.vertexY > W * 1.5;
+    const cutY = (vertexMid ? ms.vertexY : m.X) + W * 0.35;
+    const polys = [].concat(...shapes.map((sh) => G.flattenCmds(sh.cmds, 10)));
+    const bb = boxOf(polys);
+    let u0 = Infinity;
+    for (const P of polys) for (const q of P) if (q[1] <= cutY && q[0] < u0) u0 = q[0];
+    if (!isFinite(u0)) u0 = bb.u0;
+    // the base run: only one span stands there, low on the line
+    let run = null, best = null;
+    const longer = (a, b) => (!b || a[1] - a[0] > b[1] - b[0]) ? a : b;
+    for (let u = u0; u <= bb.u1; u += W / 4) {
+      const sp = G.spanAt(polys, u, true).filter((x) => x[0] < cutY);
+      const baseOnly = sp.length === 1 && sp[0][0] < W * 0.5 && sp[0][1] < W * 1.7;
+      if (baseOnly) { if (!run) run = [u, u]; else run[1] = u; } else if (run) { best = longer(run, best); run = null; }
+    }
+    if (run) best = longer(run, best);
+    const ownBase = !vertexMid && !!best && best[1] - best[0] > W * 1.5;
+    const curW = bb.u1 - u0;
+    const tw = Math.max(W * 3.2, m.X * 1.1);
+    let dlt = 0, squeeze = null;
+    if (ownBase && curW > tw) {
+      const za = best[0] + W * 0.5, zb = best[1] - W * 0.5;
+      if (zb > za) {
+        dlt = Math.min(zb - za, curW - tw);
+        const zc = za + (zb - za - dlt) / 2, ze = zc + dlt;
+        squeeze = (q) => [q[0] <= zc ? q[0] : q[0] >= ze ? q[0] - dlt : zc, q[1]];
+      }
+    }
+    const fn = chain([squeeze, (q) => [q[0] - u0, q[1]]]);
+    const keep = rectPoly(-BIG, -BIG, BIG, cutY);
+    const parts = shapes.map((sh) => Object.assign(R.xformPart({ type: 'shape', cmds: sh.cmds, rule: sh.rule, slot: 'kaf' }, fn), { keep }));
+    return { w: curW - dlt, cx: ownBase ? W * 0.55 : (ms.cx != null ? ms.cx - u0 : W / 2), parts, drawn: true, ownBase };
+  }
 
   function drawnPiece(id, m, p) {
     const d = S.drawn[id], ms = d.meas || {}, W = m.W;
@@ -385,9 +436,12 @@
         const len = p.len != null ? p.len : d.w;
         let fn = null;
         if (Math.abs(len - d.w) > 1) { const cut = d.w * 0.5, du = len - d.w; fn = (q) => q[0] > cut ? [q[0] + du, q[1]] : q; }
-        // without its right tip (the head or the stem stands there)
-        const cut = [rectPoly(-BIG, W * 1.05, (ms.tipEnd || W) + 2, BIG)];
-        return { w: len, cx: len / 2, parts: dShapes(d, 'basin', fn, null, cut), drawn: true };
+        // without its right tip (the head or the stem stands there); where its base meets the band
+        // becomes u = 0, so what stands at its right (stem, head) always meets it
+        const br = bandRight(d.polys, W);
+        const sh = br > W * 0.15 ? (q) => [q[0] - br, q[1]] : null;
+        const cut = [rectPoly(-BIG, W * 1.05, (ms.tipEnd || W) + 2 - (sh ? br : 0), BIG)];
+        return { w: len - (sh ? br : 0), cx: len / 2, parts: dShapes(d, 'basin', chain([fn, sh]), null, cut), drawn: true };
       }
       case 'cup': {
         const fns = [];
@@ -419,7 +473,9 @@
           const target = p.from === 'side' ? p.su : p.from === 'vertex' ? p.vx : null;
           const du = (target != null && ms.sideU != null) ? target - ms.sideU : 0;
           const fn = du ? (q) => [q[0] + du, q[1]] : null;
-          return { w: d.w + du, parts: dShapes(d, 'arc', fn, rectPoly(-BIG, -BIG, BIG, W * 0.9)), drawn: true };
+          // a final form's joint comes in at the right: the bowl's end stays under the line there
+          const cut = p.clearRight ? [rectPoly(-BIG, -W * 0.25, p.clearRight, BIG)] : null;
+          return { w: d.w + du, parts: dShapes(d, 'arc', fn, rectPoly(-BIG, -BIG, BIG, W * 0.9), cut), drawn: true };
         }
         return { w: d.w, parts: dShapes(d, 'arc'), drawn: true };
       }
@@ -432,7 +488,7 @@
         return { w: d.w, exitU: ms.legEnd != null ? ms.legEnd : d.w * 0.4, parts: dShapes(d, 'nose'), drawn: true };
       }
       case 'ain':
-        if (p.closed) return null;                       // medial/final head: drawn by the pen
+        // one drawing for every position: in the middle and at the end the joint runs along its base
         return { w: d.w, cx: d.w / 2, leftU: ms.leftU, parts: dShapes(d, 'ain'), drawn: true };
       case 'tail': {
         if (p.reach != null && p.reach <= W * 1.05) return null;
@@ -441,10 +497,7 @@
       }
       case 'kaf': {
         const cx = ms.cx != null ? ms.cx : W / 2;
-        if (p.variant === 'dal') {
-          const keep = rectPoly(-BIG, -BIG, BIG, (ms.vertexY != null ? ms.vertexY : d.h * 0.5) + W * 0.35);
-          return { w: d.w, cx, parts: dShapes(d, 'kaf', null, keep), drawn: true };
-        }
+        if (p.variant === 'dal') return dalFromKaf(d, m);
         return { w: d.w, cx, parts: dShapes(d, 'kaf'), drawn: true };
       }
       case 'heh':

@@ -185,7 +185,11 @@ button { cursor: pointer; }
 .steps li::before { content: counter(st, arabic-indic); position: absolute; inset-inline-start: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
 .steps li b { color: var(--ink); font-weight: 600; }
 .drop { border: 1.5px dashed var(--rest); border-radius: 14px; background: var(--field); min-height: 168px; display: grid; place-items: center; align-content: center; gap: 12px; text-align: center; padding: 22px 16px; transition: border-color .15s, background .15s; }
-.drop p { color: var(--muted); font-size: 15px; }
+.drop p { color: var(--muted); font-size: 14.5px; }
+.drop p.small { font-size: 12.5px; max-width: 30em; }
+.btn.big { padding: 10px 24px; font-size: 16px; }
+.import .done { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; background: color-mix(in srgb, var(--ok) 10%, var(--card)); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 14px; }
+.import .done b { font-weight: 600; }
 .drop.drag { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--field)); }
 .import { margin-top: 14px; }
 .chip.drawn { background: var(--ink); color: var(--paper); }
