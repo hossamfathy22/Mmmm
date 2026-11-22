@@ -1487,3 +1487,24 @@ def test_block_measuring_finds_a_moved_rule_again():
     got = blockfit.fit("نون", start, ink, origin, cycles=1, log=lambda s: None)
     assert blockfit.match("نون", got, ink, origin) > max(before, 0.9)
     assert abs(got.block["T"] - 80.0) < abs(70.0 - 80.0)
+
+
+def test_choices_of_taste_change_only_their_letter():
+    """What the logo has no witness for is the designer's choice, kept in the rules: each choice
+    changes its own letter and nothing else."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    def g(word, **opts):
+        lay = typeset(word, _block(**opts))
+        return unary_union([Polygon(sh[0], sh[1:]) for sh in lay.shapes])
+    assert g("هلال").symmetric_difference(g("هلال", heh_initial="stem")).area > 100
+    assert g("بلال").symmetric_difference(g("بلال", heh_initial="stem")).area < 1.0
+    assert g("بعد").symmetric_difference(g("بعد", ain_medial="closed")).area > 100
+    assert g("عمر").symmetric_difference(g("عمر", ain_medial="closed")).area < 1.0
+    # no lean: ا stands upright; as on the logo: every ا leans to the left
+    from shapely.geometry import box
+    up = g("ا", lean_mode="none")
+    foot, head = up.intersection(box(-1e3, 0, 1e3, 10)), up.intersection(box(-1e3, 75, 1e3, 85))
+    assert abs(foot.centroid.x - head.centroid.x) < 0.6                  # its top stands over its foot
+    first, second = (g("اا", lean_mode=m) for m in ("logo", "turn"))
+    assert first.symmetric_difference(second).area > 50

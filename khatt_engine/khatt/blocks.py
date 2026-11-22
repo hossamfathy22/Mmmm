@@ -84,6 +84,12 @@ KIVANO: Dict[str, float] = dict(
     kaf_end_x=20.5, kaf_side_y=48.3, kaf_end_n=1.6, kaf_corner_x=26.4, kaf_corner_n=1.3,
     kaf_tip_x=165.7, kaf_tip_high=54.2, kaf_slash_a=41.1, kaf_slash_l=63.7, kaf_slash_low_a=36.4,
     kaf_bar_rise_top=6.9, kaf_bar_rise_low=4.2, kaf_bar_dx=17.6, kaf_bar_dy=17.3, kaf_tip_cut_dx=10.8, kaf_tip_cut_dy=20.8,
+    # choices of taste where the logo has no witness (the designer's, as the size of و's head was in
+    # بيدوناق): ه starting a word ("slots": two slots side by side; "stem": a head with an upright on
+    # its left); ع in the middle ("v": a V open at the top; "closed": a small closed head); how free
+    # uprights lean ("turn": to one side and the other in turn; "logo": always as on the logo, ا to
+    # the left and a tooth to the right; "none")
+    heh_initial="slots", ain_medial="v", lean_mode="turn",
     slit=6.0,          # white between joined letters, above their join (5-8)
     touch=0.0,         # white between letters that do not join: they touch
     space=45.0,        # between words
@@ -132,7 +138,7 @@ class Pen:
     top to the left)."""
 
     def __init__(self, st: Style, R: Dict[str, float], sign: float = 1.0):
-        self.st, self.R, self.sign = st, R, sign
+        self.st, self.R, self.sign = st, R, sign       # 0: upright
         self.body: list = []            # the letter's ink
         self.holes: list = []           # slots
         self.joins: list = []           # its join to the next letter
@@ -512,7 +518,10 @@ def _heh(p: Pen, form, mark):
     heads one over the other, the join between them; last: a head with a short arm up to the left;
     alone (and ة): the head."""
     R = p.R
-    if form == "I":
+    if form == "I" and R["heh_initial"] == "stem":
+        left = p.head(0.0)
+        p.upright(left + R["U"] - 2.0, R["U"] - 4.0, R["U"] - 2.0, 1.2 * R["T"], 0.0, R["alef_chamfer"], y0=R["T"] - 14.0)
+    elif form == "I":
         left = p.head(0.0, width=1.4 * R["head_w"], slots=2)
     elif form == "M":
         left = p.head(0.0, bottom=R["T"] * 0.12, width=0.8 * R["head_w"], top=R["T"])
@@ -585,8 +594,9 @@ def _jeem(p: Pen, form, mark):
         knee = (-0.5 * U, 0.3 * T)
         p.body.append(_poly([(top_x - 0.55 * U, T - 2.0), (top_x + 0.6 * U, T - 2.0), (knee[0] + 0.6 * U, knee[1]), (knee[0] - 0.55 * U, knee[1] - 0.2 * U)]))
         p.cup(knee[0] + 0.6 * U, -w, 0.12 * T, right_side=False)
-        p.body.append(_poly([(knee[0] + 0.6 * U, knee[1]), (knee[0] - 0.55 * U, knee[1] - 0.2 * U),
-                             (-w + 1.4 * U, -R["D"] + 6.0), (-w + 0.4 * U, -R["D"] + R["bar"])]))
+        # the back, down to the left: its outer edge, the bottom, its inner edge (in order round it)
+        p.body.append(_poly([(knee[0] + 0.6 * U, knee[1]), (-w + 1.4 * U, -R["D"] + 6.0),
+                             (-w + 0.4 * U, -R["D"] + R["bar"]), (knee[0] - 0.55 * U, knee[1] - 0.2 * U)]))
         below = -R["D"]
     if mark == "b1":
         if form in ("I", "M"):
@@ -602,31 +612,53 @@ def _jeem(p: Pen, form, mark):
 
 
 def _ain(p: Pen, form, mark):
-    """ع غ. Starting a word: a mouth open to the right (an arm on top, a back falling to the baseline);
-    in the middle and at the end: a V open at the top, standing on the join; at the end and alone, a
-    bowl thrown back under the baseline to the left."""
+    """ع غ. Starting a word: a ⊏ open to the right, as square kufic draws it: an arm at the top, a back
+    on the left, the join along the baseline; alone, the same ⊏ falling into the bowl of ح. In the
+    middle: a V open at the top, standing on the join; last: the V falling into the bowl of ح."""
     R = p.R
     U, T = R["U"], R["T"]
     if form in ("i", "I"):
+        w = 2.0 * U
+        top = 0.95 * T
+        back_x = -w + U                                   # the back's right edge
+        p.bar(back_x - 2.0, -0.12 * U, top - R["arm"], R["arm"], cut_l=0.0, cut_r=7.0)
+        if form == "I":
+            p.upright(back_x, U, U, top, 0.0, 0.0)
+            p.join(-w - R["slit"] - R["into"], -0.2 * U)   # the bottom of the ⊏ and the join, one bar
+            left = -w
+        else:
+            knee = (back_x - U / 2, 0.25 * T)
+            p.upright(back_x, U, U, top, 0.0, 0.0, y0=knee[1])
+            d = R["D"]
+            p.body.append(_poly([(back_x, knee[1] + 2.0), (-w + 1.2 * U - U, -d + 6.0), (-w + 0.2 * U - U, -d + R["bar"]),
+                                 (back_x - U, knee[1] + 2.0)]))
+            p.cup(-0.3 * U, -w - 0.8 * U, 0.1 * T, right_side=False)
+            left = -w - 0.8 * U
+    elif form == "M" and R["ain_medial"] == "closed":
+        # a small closed head, wider at its top, its slot pointed at its foot (the logo's slot)
         w = 2.1 * U
-        top = 1.05 * T
-        p.bar(-w + 0.3 * U, -0.1 * U, top - R["arm"], R["arm"], cut_l=7.0)
-        p.body.append(_poly([(-w + 0.25 * U, top - 2.0), (-w + 1.2 * U, top - 2.0), (-1.0 * U, 0.0), (-1.9 * U, 0.0)]))
-        foot_x = -1.45 * U
+        top = 0.9 * T
+        foot_x = -w / 2
+        p.body.append(_poly([(-w, top), (0.0, top), (-0.55 * U, 0.0), (-w + 0.55 * U, 0.0)]))
+        p.holes.append(_poly([(foot_x - R["slot_w"] / 2, top - 0.22 * T), (foot_x + R["slot_w"] / 2, top - 0.22 * T - 2.0),
+                              (foot_x + 1.0, 0.32 * T), (foot_x - R["slot_w"] / 2, 0.45 * T)]))
+        left = -w
     else:
         w = 2.4 * U
         top = 0.95 * T
         foot_x = -w / 2
         p.body.append(_poly([(foot_x - 0.5 * U, 0.0), (foot_x + 0.45 * U, 0.0), (-0.1 * U, top), (-0.95 * U, top - 2.0)]))
         p.body.append(_poly([(foot_x - 0.45 * U, 0.0), (foot_x + 0.5 * U, 0.0), (-w + 0.95 * U, top - 2.0), (-w + 0.1 * U, top)]))
-    left = -w
-    if form in ("i", "F"):
-        left = -w - 0.4 * U
-        p.cup(foot_x + 0.6 * U, left, 0.1 * T, right_side=False)
-        p.body.append(_poly([(foot_x - 0.5 * U, 2.0), (foot_x + 0.5 * U, 2.0), (left + 1.5 * U, -R["D"] + 8.0), (left + 0.6 * U, -R["D"] + R["bar"])]))
+        left = -w
+        if form == "F":
+            left = -w - 0.4 * U
+            p.cup(foot_x + 0.6 * U, left, 0.1 * T, right_side=False)
+            p.body.append(_poly([(foot_x - 0.5 * U, 2.0), (foot_x + 0.5 * U, 2.0), (left + 1.5 * U, -R["D"] + 8.0),
+                                 (left + 0.6 * U, -R["D"] + R["bar"])]))
     if mark:
         p.mark(mark, -w / 2, top + 2.0)
-    _exit(p, form, -w, -4.0)
+    if form == "M":
+        _exit(p, form, -w, -4.0)
     return left
 
 
@@ -824,9 +856,13 @@ def typeset_blocks(word: str, st: Style):
             continue
         sign = 1.0
         if leans(c, form):
-            sign = 1.0 if leaning % 2 == 0 else -1.0     # in turn: the first to the left, the next to the right
+            mode = R.get("lean_mode", "turn")
+            if mode == "logo":                           # as on the logo: ا to the left, a tooth to the right
+                sign = 1.0 if c in LEANS else -1.0
+            else:                                        # in turn: the first to the left, the next to the right
+                sign = 1.0 if leaning % 2 == 0 else -1.0
             leaning += 1
-        p = Pen(st, R, sign)
+        p = Pen(st, R, 0.0 if R.get("lean_mode") == "none" and leans(c, form) else sign)
         left = build(c, form, p)
         body = _union(p.body)
         hole = _union(p.holes)

@@ -248,7 +248,8 @@ def fit(word: str, st: Style, ink: np.ndarray, origin: Tuple[float, float], cycl
 
     log(f"start {100 * score():.2f}%")
     for cycle in range(cycles):
-        for k in [k for k in block if k not in FIXED]:
+        # the numbers only: the choices of taste (words) are the designer's, not the logo's measures
+        for k in [k for k in block if k not in FIXED and isinstance(block[k], (int, float))]:
             def put(x, k=k):
                 block[k] = float(x[0])
             search(put, np.array([block[k]]), np.array([0.03 if k in FRACTIONS else 0.5 if k == "round" else 1.5]), 40)
