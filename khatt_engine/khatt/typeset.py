@@ -750,8 +750,12 @@ def _library(st: Style):
 
 def typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
     """Lay out `word`; with the logo's part library (st.library) every letter is built of the logo's
-    own stems, feet, tails, heads, dots and dashes (see library.py), unless a library is active already."""
+    own stems, feet, tails, heads, dots and dashes (see library.py), unless a library is active already.
+    A logo built of blocks (st.construction == "block") is set by blocks.py."""
     from .library import ACTIVE
+    if st.construction == "block":
+        from .blocks import typeset_blocks
+        return typeset_blocks(word, st)
     if st.library and st.library.get("parts") and ACTIVE.get() is None:
         tok = ACTIVE.set(_library(st))
         try:

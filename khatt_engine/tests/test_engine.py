@@ -1349,3 +1349,79 @@ def test_the_editor_offers_the_kit_suggestions_and_a_board_to_draw_on(tmp_path):
     if [f for f in faces() if f.endswith("-400.woff2")]:
         c = kit_candidates(st.to_dict(), "عروة")["candidates"]
         assert c and c[0]["part"]["polys"] and c[0]["preview"].startswith("<svg")
+
+
+# ---------------------------------------------------------------- the block construction (blocks.py)
+def _block(**rules):
+    return Style(construction="block", slant=0.0, block=rules)
+
+
+@pytest.mark.parametrize("letter", sorted(__import__("khatt.blocks", fromlist=["BUILD"]).BUILD))
+def test_every_letter_builds_of_blocks_in_every_form(letter):
+    from shapely.geometry import Polygon
+    for word in (letter, "ب" + letter + "ب", letter + "ب", "ب" + letter):
+        lay = typeset(word, _block())
+        assert lay.shapes and not lay.skipped
+        for shape in lay.shapes:
+            poly = Polygon(shape[0], shape[1:])
+            assert poly.is_valid and poly.area > 0
+
+
+def test_blocks_are_set_the_same_every_time_and_by_the_hand():
+    a, b = typeset("بيت سلام", _block()), typeset("بيت سلام", _block())
+    assert [s[0] for s in a.shapes] == [s[0] for s in b.shapes]
+    clean = typeset("بيت سلام", _block(hand=0.0))
+    assert [s[0] for s in clean.shapes] != [s[0] for s in a.shapes]
+
+
+def test_the_logo_word_takes_its_measured_hand():
+    st = _block()
+    st.block_hand = {"word": "كيوانو", "hand": {"3.stem": [6.0, 0, 0, 0, 0, 0, 0, 0]}}
+    leaning = typeset("كيوانو", st)
+    upright = typeset("كيوانو", _block(hand=0.0))
+    alef = lambda lay: [p for s in lay.shapes for p in s[0]]
+    assert alef(leaning) != alef(upright)
+    # another word does not take that hand
+    st.block_hand = {"word": "كيوان", "hand": {"3.stem": [30.0, 0, 0, 0, 0, 0, 0, 0]}}
+    assert [s[0] for s in typeset("كيوانو", st).shapes] == [s[0] for s in typeset("كيوانو", _block()).shapes]
+
+
+def test_dots_of_neighbours_do_not_run_together():
+    from shapely.geometry import Polygon
+    from khatt import blocks
+    from khatt.typeset import shape_forms
+    st = _block()
+    R = blocks.rules(st)
+    groups, bodies, x = [], [], 0.0
+    for i, (c, f) in enumerate(shape_forms("بيت")):
+        p = blocks.Pen(st, R, f"بيت|{i}")
+        left = blocks.build(c, f, p)
+        bodies.append([[(px + x, py) for px, py in q] for q in p.ink])
+        groups += [(i, [[(px + x, py) for px, py in q] for q in g]) for g in p.mark_groups]
+        x += left - R["join_white"]
+    placed = blocks.clear_marks(bodies, groups, R)
+    marks = [Polygon(q).buffer(0) for q in placed]
+    assert len(marks) == 3                       # the ب's dot, the ي's two dots as one bar, the ت's bar
+    assert all(not a.intersects(b) for i, a in enumerate(marks) for b in marks[i + 1:])
+
+
+def test_construction_is_a_choice_and_parts_stay_the_default():
+    assert Style().construction == "parts"
+    assert typeset("بيت", Style()).shapes and all(getattr(s, "source", "") != "block" for s in typeset("بيت", Style()).shapes)
+    assert all(s.source == "block" for s in typeset("بيت", _block()).shapes)
+
+
+def test_block_measuring_finds_a_moved_rule_again():
+    """The measuring tool, on a logo drawn by the construction itself with a taller x-height, finds it."""
+    from khatt import blockfit
+    truth = _block(hand=0.0, T=80.0)
+    lay = typeset("نون", truth)
+    x0, y0, x1, y1 = lay.bbox()
+    size = (int(x1 - x0) + 40, int(y1 - y0) + 40)
+    origin = (20 - x0, 20 + y1)
+    ink = blockfit.raster(lay, size, origin)
+    start = _block(hand=0.0, T=70.0)
+    before = blockfit.match("نون", start, ink, origin)
+    got = blockfit.fit("نون", start, ink, origin, cycles=1, log=lambda s: None)
+    assert blockfit.match("نون", got, ink, origin) > max(before, 0.9)
+    assert abs(got.block["T"] - 80.0) < abs(70.0 - 80.0)

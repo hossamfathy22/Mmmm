@@ -114,6 +114,13 @@ class Style:
     # letter (also those the logo does not contain): trait -> factor on the rules of that kind
     traits: Dict[str, float] = field(default_factory=dict)
     chosen: Dict[str, str] = field(default_factory=dict)
+    # how the letters are built: "parts" (letters.py: stems and hairlines of a contrast pen, round heads
+    # and cups, the construction of بيدوناق) or "block" (blocks.py: every part one straight block of a
+    # flat pen, cut at its ends, set by the designer's hand, the construction of كيوانو). The model
+    # chooses it on seeing how the logo was built, and gives the construction's measures:
+    construction: str = "parts"
+    block: Dict[str, float] = field(default_factory=dict)       # blocks.KIVANO's rules, as this logo measures them
+    block_hand: Dict = field(default_factory=dict)              # {"word": the logo's word, "hand": stroke -> its measured hand}
 
     @property
     def pitch(self) -> float:
