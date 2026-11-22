@@ -1,32 +1,37 @@
-"""Measuring a logo built of blocks: the engine's block construction fitted to the logo's own word.
+"""Measuring a logo built of blocks, as سیرنگ was measured before بيدوناق was written from it.
 
-This is the model's measuring step for a logo whose designer built every letter of straight blocks
-(blocks.py). The model has looked at the logo and set the construction; this code finds its numbers
-on the logo itself, as the stems and whites of سیرنگ were found by scanning its rows and columns:
+The model looks at the logo and understands how its designer built it; this code measures it:
 
-1. the rules (`Style.block`): the pen, its wedge, the x-height, the head and its cuts, the tail, the
-   dots, the kaf, the whites, the softened corners; one value each, for every letter;
-2. the hand (`Style.block_hand`): for each stroke of the logo's word, how the designer set it off its
-   rule (tilt, end cuts, length, weight, wedge, shift).
+1. `outline`: the logo's ink as clean outlines. Every edge of a block logo is a straight line, so the
+   contour is traced to a fraction of a pixel, its corners found, a line fitted to each edge between
+   corners, and each corner put where two edge lines meet (as one would draw it with the pen tool).
+   On كيوانو: 82 corners, the outline matches the logo's pixels 97.65%; no edge strays from its line by
+   more than 0.4 px.
+2. `cut_parts`: the outline cut into the logo's parts where its letters touch, along the lines the
+   model gives (from one inner corner to the next, or through the white between two letters): each
+   letter of the logo's word, its dots apart, and its dot, its two-dot bar and its head. They go into
+   `Style.block_parts`, in the letter's coordinates, and every word is written with them first
+   (blocks.py).
+3. `fit`: the rules of the construction (`Style.block`: pen, wedge, heights, head, slot, tail, dots,
+   corners), one value each for every letter, fitted to the logo's word drawn by the rules alone.
+   On كيوانو this reaches 84%: its designer cut every letter by hand (its two و, laid over each other
+   after turning one 14 degrees, cover each other only 82.6%; its ن and ي teeth 69%), so the rules
+   say how to build the letters the logo lacks, and the logo's own letters stand for themselves.
 
-`match` is the proof: the logo's word set by the engine from these numbers alone, with nothing cut
-from the logo, laid over the logo (the share of ink they have in common, IoU). كيوانو: the rules
-alone 84%, with its measured hand 95.2% (README, "طريقة البناء بالكتل").
+`match` lays a word set by the engine over the logo (the share of ink in common, IoU).
 """
 from __future__ import annotations
 
+import math
 from dataclasses import replace
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from .style import Style
 
-# rules that are fractions (searched in small steps) and rules the fit leaves alone (spacing is
-# measured by the letters' places, and the spread of the hand is read off the fitted hand)
 FRACTIONS = ("k", "kv", "h", "jh", "kaf_bar", "kaf_riser", "teeth", "teeth_yeh")
-FIXED = ("hand", "hand_tilt", "hand_cut", "hand_len", "hand_weight", "space", "gap", "join_white", "into")
-STEP = [2.0, 4.0, 4.0, 3.0, 2.0, 0.06, 2.0, 2.0]   # tilt, cut, cut, length, weight, wedge, shift x, shift y
+FIXED = ("space", "touch", "slit", "into", "rock")
 
 
 def raster(lay, size: Tuple[int, int], origin: Tuple[float, float], ss: int = 4) -> np.ndarray:
@@ -51,36 +56,146 @@ def match(word: str, st: Style, ink: np.ndarray, origin: Tuple[float, float]) ->
     return float((got & ink).sum() / union) if union else 0.0
 
 
-def _hand_keys(hand: Dict[str, List[float]], letter: int):
+# ---------------------------------------------------------------- 1. the outline
+def _edges(gray: np.ndarray, thresh: float, zoom: int, tol: float, ink_dark: bool):
+    """The contours of the ink, each as edges between corners, a line fitted to each edge."""
+    from PIL import Image
+    from skimage import measure
+    g = np.asarray(gray, float)
+    if not ink_dark:
+        g = 255.0 - g
+    big = np.array(Image.fromarray(g.astype(np.uint8)).resize((g.shape[1] * zoom, g.shape[0] * zoom), Image.BICUBIC), float)
     out = []
-    for name, v in hand.items():
-        if name.split(".")[0] != str(letter):
-            continue
-        n = 5 if name.endswith(".head") else 3 if name.endswith(".slot") else 1 if name.endswith((".dot", ".hamza")) else 8
-        out += [(name, i) for i in range(min(n, len(v)))]
+    for c in measure.find_contours(np.pad(big, 4, constant_values=255), thresh):
+        c = (c - 4) / zoom
+        pts = np.c_[c[:, 1], c[:, 0]]                                  # x, y (image)
+        corners = measure.approximate_polygon(c, tol)
+        corners = np.c_[corners[:, 1], corners[:, 0]]
+        area = 0.5 * np.sum(pts[:-1, 0] * pts[1:, 1] - pts[1:, 0] * pts[:-1, 1])
+        idx = [int(np.argmin(np.hypot(*(pts - q).T))) for q in corners]
+        segs = []
+        for k in range(len(idx) - 1):
+            a, b = idx[k], idx[k + 1]
+            seg = pts[a:b + 1] if b > a else np.r_[pts[a:], pts[:b + 1]]
+            L = math.hypot(*(seg[-1] - seg[0]))
+            s = dict(p0=seg[0], p1=seg[-1], len=L)
+            if L >= 5.0 and len(seg) >= 6:
+                inner = seg[len(seg) // 6: len(seg) - len(seg) // 6]   # the rounded ends left out
+                m = inner.mean(0)
+                d = np.linalg.svd(inner - m)[2][0]
+                if np.dot(d, seg[-1] - seg[0]) < 0:
+                    d = -d
+                s.update(mid=m, dir=d, angle=math.degrees(math.atan2(-d[1], d[0])),
+                         off=float(np.abs((inner - m) @ np.array([-d[1], d[0]])).max()))
+            segs.append(s)
+        out.append((area, segs))
     return out
 
 
+def outline(gray: np.ndarray, thresh: float = 128.0, zoom: int = 4, tol: float = 1.2, ink_dark: bool = True,
+            corner_reach: float = 3.0):
+    """The ink of a block logo (a grey image, ink dark unless `ink_dark` is False) as clean outlines in
+    image coordinates: each corner where two fitted edge lines meet (the short rounded corners kept).
+    Returns a shapely geometry and the largest distance of an edge from its line (how straight the
+    logo is: a block logo stays under half a pixel)."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+
+    def meet(a, b):
+        M = np.array([[a["dir"][0], -b["dir"][0]], [a["dir"][1], -b["dir"][1]]])
+        if abs(np.linalg.det(M)) < 1e-6:
+            return None
+        t = np.linalg.solve(M, b["mid"] - a["mid"])[0]
+        return a["mid"] + t * a["dir"]
+
+    inks, holes, worst = [], [], 0.0
+    for area, segs in _edges(gray, thresh, zoom, tol, ink_dark):
+        n = len(segs)
+        if n < 3:
+            continue
+        pts = []
+        for k in range(n):
+            a, b = segs[k], segs[(k + 1) % n]
+            corner = a["p1"]
+            if "dir" in a and "dir" in b:
+                worst = max(worst, a["off"])
+                ang = abs((a["angle"] - b["angle"] + 180) % 360 - 180)
+                x = meet(a, b)
+                if ang > 12 and x is not None and np.hypot(*(x - corner)) < corner_reach:
+                    pts.append(tuple(x))
+                    continue
+            pts.append(tuple(corner))
+        poly = Polygon(pts).buffer(0)
+        (inks if area < 0 else holes).append(poly)
+    ink = unary_union(inks)
+    if holes:
+        ink = ink.difference(unary_union(holes))
+    return ink, worst
+
+
+# ---------------------------------------------------------------- 2. the parts
+def cut_parts(ink, regions: Sequence[Tuple[str, Sequence[Tuple[float, float]]]], base: float,
+              marks: Optional[Dict[str, Sequence[str]]] = None, body_above: float = 20.0) -> Dict:
+    """Cut the logo's outline (`outline`, image coordinates) into its parts. `regions`: (name, polygon)
+    in the order they are taken (each takes what is left of the outline inside its polygon): the marks
+    first, then the letters. A letter's name is "letter.form" (ن.I); "نقطة", "شرطة" and "رأس" are the
+    logo's dot, two-dot bar and head. `marks`: for a letter, the names of the marks that are its own
+    (they stay with it when the letter stands for itself, and are left off when it lends its body to
+    a sibling). Returns Style.block_parts: each part in the letter's coordinates, y up from the
+    baseline `base`, x = 0 at the right edge of the letter's body (its ink above `body_above`)."""
+    from shapely.affinity import scale, translate
+    from shapely.geometry import Polygon, box
+
+    def up(g):
+        return scale(translate(g, 0, -base), 1, -1, origin=(0, 0))
+
+    def rings(g):
+        """[shape, ...], each shape [outer ring, holes...]"""
+        out = []
+        for p in getattr(g, "geoms", [g]):
+            if p.geom_type == "Polygon" and not p.is_empty and p.area > 1.0:
+                out.append([[[round(x, 2), round(y, 2)] for x, y in list(p.exterior.coords)[:-1]]] +
+                           [[[round(x, 2), round(y, 2)] for x, y in list(h.coords)[:-1]] for h in p.interiors])
+        return out
+
+    taken = None
+    raw = {}
+    for name, poly in regions:
+        g = ink.intersection(Polygon(poly))
+        if taken is not None:
+            g = g.difference(taken)
+        taken = g if taken is None else taken.union(g)
+        raw[name] = up(g)
+    out: Dict = {}
+    for name, g in raw.items():
+        if g.is_empty:
+            continue
+        body = g.intersection(box(-1e5, body_above, 1e5, 1e5))
+        right = (body if not body.is_empty else g).bounds[2]
+        part = {"polys": rings(translate(g, -right, 0))}
+        own = [raw[m] for m in (marks or {}).get(name, []) if m in raw]
+        if own:
+            part["marks"] = [r for m in own for r in rings(translate(m, -right, 0))]
+        out[name] = part
+    return out
+
+
+# ---------------------------------------------------------------- 3. the rules
 def fit(word: str, st: Style, ink: np.ndarray, origin: Tuple[float, float], cycles: int = 2,
         log: Callable[[str], None] = print) -> Style:
-    """Fit the rules and the hand of the block construction to the logo's ink (a boolean mask), the
-    logo's `word` standing with its right edge at origin[0] and its baseline at origin[1]. Each letter's
-    hand is searched with its strokes together (they pull on each other), then each rule alone."""
+    """Fit the rules of the block construction (`Style.block`) to the logo's ink (a boolean mask), the
+    logo's `word` drawn by the rules alone (no part of the logo), its right edge at origin[0] and its
+    baseline at origin[1]. Each rule is searched alone, in turn."""
     from scipy.optimize import minimize
     from .blocks import rules
-    from .typeset import shape_forms
 
     block = dict(rules(st))
-    hand = {k: list(v) for k, v in ((st.block_hand or {}).get("hand") or {}).items()} if (st.block_hand or {}).get("word") == word else {}
-    cur = replace(st, construction="block", block=block, block_hand={"word": word, "hand": hand})
-    # the strokes of the word, named by a first drawing (the hand starts at zero where not measured)
-    from .typeset import typeset
-    typeset(word, cur)
+    cur = replace(st, construction="block", block=block, block_parts={})
 
     def score() -> float:
         return match(word, cur, ink, origin)
 
-    def search(get, put, x0, steps, iters):
+    def search(put, x0, steps, iters):
         def f(x):
             put(x)
             return -score()
@@ -91,35 +206,10 @@ def fit(word: str, st: Style, ink: np.ndarray, origin: Tuple[float, float], cycl
         put(res.x if res.fun <= f0 else x0)
 
     log(f"start {100 * score():.2f}%")
-    letters = sum(1 for _, f in shape_forms(word) if f not in (" ", "?"))
     for cycle in range(cycles):
-        for i in range(letters):
-            keys = _hand_keys(hand, i)
-            if not keys:
-                continue
-
-            def put(x, keys=keys):
-                for (n, j), v in zip(keys, x):
-                    hand[n][j] = float(v)
-            x0 = np.array([hand[n][j] for n, j in keys])
-            steps = np.array([3.0 if n.endswith(".head") else STEP[j] for n, j in keys])
-            search(None, put, x0, steps, 2500)
-        log(f"cycle {cycle}: hand {100 * score():.2f}%")
         for k in [k for k in block if k not in FIXED]:
             def put(x, k=k):
                 block[k] = float(x[0])
-            search(None, put, np.array([block[k]]), np.array([0.03 if k in FRACTIONS else 0.5 if k == "round" else 1.5]), 40)
+            search(put, np.array([block[k]]), np.array([0.03 if k in FRACTIONS else 0.5 if k == "round" else 1.5]), 40)
         log(f"cycle {cycle}: rules {100 * score():.2f}%")
     return cur
-
-
-def spread(hand: Dict[str, List[float]]) -> Dict[str, float]:
-    """The spread of a measured hand, as the block rules give it for words the logo does not show:
-    twice the median of each measure over the strokes (a value drawn evenly from +- that has the
-    same mean size)."""
-    rows = np.array([v[:5] for n, v in hand.items() if len(v) >= 5 and not n.endswith((".head", ".slot", ".dot"))])
-    if not len(rows):
-        return {}
-    med = np.median(np.abs(rows), axis=0)
-    return dict(hand_tilt=float(2 * med[0]), hand_cut=float(2 * np.median(med[1:3])),
-                hand_len=float(2 * med[3]), hand_weight=float(2 * med[4]))

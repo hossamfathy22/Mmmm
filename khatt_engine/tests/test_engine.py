@@ -1352,8 +1352,13 @@ def test_the_editor_offers_the_kit_suggestions_and_a_board_to_draw_on(tmp_path):
 
 
 # ---------------------------------------------------------------- the block construction (blocks.py)
-def _block(**rules):
-    return Style(construction="block", slant=0.0, block=rules)
+def _block(parts=None, **rules):
+    return Style(construction="block", slant=0.0, block=rules, block_parts=parts or {})
+
+
+def _area(lay):
+    from shapely.geometry import Polygon
+    return sum(Polygon(sh[0], sh[1:]).area for sh in lay.shapes)
 
 
 @pytest.mark.parametrize("letter", sorted(__import__("khatt.blocks", fromlist=["BUILD"]).BUILD))
@@ -1367,42 +1372,86 @@ def test_every_letter_builds_of_blocks_in_every_form(letter):
             assert poly.is_valid and poly.area > 0
 
 
-def test_blocks_are_set_the_same_every_time_and_by_the_hand():
+def test_blocks_leave_nothing_to_chance():
+    """The same word is drawn the same way; a letter built by rule leans by the logo's measured lean,
+    to one side and the other in turn, and with no lean it stands upright."""
     a, b = typeset("بيت سلام", _block()), typeset("بيت سلام", _block())
     assert [s[0] for s in a.shapes] == [s[0] for s in b.shapes]
-    clean = typeset("بيت سلام", _block(hand=0.0))
-    assert [s[0] for s in clean.shapes] != [s[0] for s in a.shapes]
+    upright = typeset("ا", _block(rock=0.0))
+    xs = sorted({round(x, 3) for sh in upright.shapes for x, _ in sh[0]})
+    leaning = typeset("ا", _block(rock=6.0))
+    assert [s[0] for s in upright.shapes] != [s[0] for s in leaning.shapes]
+    assert max(y for sh in upright.shapes for _, y in sh[0]) > 80
 
 
-def test_the_logo_word_takes_its_measured_hand():
-    st = _block()
-    st.block_hand = {"word": "كيوانو", "hand": {"3.stem": [6.0, 0, 0, 0, 0, 0, 0, 0]}}
-    leaning = typeset("كيوانو", st)
-    upright = typeset("كيوانو", _block(hand=0.0))
-    alef = lambda lay: [p for s in lay.shapes for p in s[0]]
-    assert alef(leaning) != alef(upright)
-    # another word does not take that hand
-    st.block_hand = {"word": "كيوان", "hand": {"3.stem": [30.0, 0, 0, 0, 0, 0, 0, 0]}}
-    assert [s[0] for s in typeset("كيوانو", st).shapes] == [s[0] for s in typeset("كيوانو", _block()).shapes]
+def _square(x0, y0, x1, y1):
+    return [[[x0, y0], [x1, y0], [x1, y1], [x0, y1]]]
+
+
+def test_the_logo_letters_come_first():
+    """A letter the logo shows is drawn as the logo draws it (its measured outline), not by the rules."""
+    alef = {"polys": [[[[0, 0], [0, 120], [-10, 120], [-40, 0]]]]}   # a wedge no rule draws
+    lay = typeset("ا", _block({"ا.i": alef}))
+    assert abs(_area(lay) - 0.5 * (10 + 40) * 120) < 1.0
+    # and in the form that differs only by the join from the right
+    lay = typeset("نا", _block({"ا.i": alef}))
+    assert any(abs(max(y for _, y in sh[0]) - 120) < 0.5 for sh in lay.shapes)
+
+
+def test_a_tooth_lends_its_body_and_the_logo_its_dots():
+    """ب the logo lacks is the logo's ن tooth with its own dot, and the dot is the logo's dot."""
+    noon = {"polys": [_square(-26, 0, 0, 70)], "marks": [_square(-26, 80, -2, 104)]}
+    dot = {"polys": [[[[0, 0], [20, 0], [10, 17]]]]}                 # a triangle: the logo's own dot
+    st = _block({"ن.I": noon, "نقطة": dot})
+    lay = typeset("بب", st)
+    tris = [sh for sh in lay.shapes if len(sh[0]) == 3]
+    assert tris and all(max(y for _, y in sh[0]) < 0 for sh in tris)   # its dot, under the tooth
+    assert not any(min(y for _, y in sh[0]) > 75 for sh in lay.shapes)   # the ن's own dot did not come along
+
+
+def test_joined_letters_keep_the_slit_and_the_others_touch():
+    from shapely.geometry import Polygon
+    tooth = {"polys": [_square(-26, -1, 0, 70)], "marks": []}
+    st = _block({"ن.I": tooth, "ا.i": {"polys": [_square(-24, 0, 0, 92)]}}, slit=6.0, touch=0.0)
+    lay = typeset("ننن", st)                                            # the first two: the logo's tooth
+    ps = sorted(lay.placed, key=lambda q: -q.x)
+    assert abs((ps[0].x - 26) - ps[1].x - 6.0) < 0.6                     # 6 of white between the two teeth
+    lay = typeset("اا", st)
+    ps = sorted(lay.placed, key=lambda q: -q.x)
+    assert abs((ps[0].x - 24) - ps[1].x) < 0.6                           # the two ا touch
 
 
 def test_dots_of_neighbours_do_not_run_together():
     from shapely.geometry import Polygon
-    from khatt import blocks
-    from khatt.typeset import shape_forms
-    st = _block()
-    R = blocks.rules(st)
-    groups, bodies, x = [], [], 0.0
-    for i, (c, f) in enumerate(shape_forms("بيت")):
-        p = blocks.Pen(st, R, f"بيت|{i}")
-        left = blocks.build(c, f, p)
-        bodies.append([[(px + x, py) for px, py in q] for q in p.ink])
-        groups += [(i, [[(px + x, py) for px, py in q] for q in g]) for g in p.mark_groups]
-        x += left - R["join_white"]
-    placed = blocks.clear_marks(bodies, groups, R)
-    marks = [Polygon(q).buffer(0) for q in placed]
-    assert len(marks) == 3                       # the ب's dot, the ي's two dots as one bar, the ت's bar
-    assert all(not a.intersects(b) for i, a in enumerate(marks) for b in marks[i + 1:])
+    from shapely.ops import unary_union
+    lay = typeset("بيت", _block())
+    pieces = [Polygon(sh[0], sh[1:]) for sh in lay.shapes]
+    below = [p for p in pieces if p.bounds[3] < 0]
+    assert len(below) == 2                                               # the ب's dot, the ي's bar: apart
+    assert below[0].distance(below[1]) > 0
+
+
+def test_block_outline_is_measured_to_a_fraction_of_a_pixel():
+    """Two touching blocks and a square dot, drawn on an image: the outline has straight edges, and
+    the parts cut along the line between them come back in the letter's coordinates."""
+    from PIL import Image, ImageDraw
+    from khatt import blockfit
+    im = Image.new("L", (200, 140), 255)
+    d = ImageDraw.Draw(im)
+    d.polygon([(120, 30), (150, 30), (150, 110), (120, 110)], fill=0)       # an upright: x 120..150, baseline 110
+    d.polygon([(60, 90), (150, 90), (150, 110), (60, 110)], fill=0)         # a bar along the baseline, touching it
+    d.polygon([(70, 40), (90, 40), (90, 60), (70, 60)], fill=0)             # a dot
+    ink, worst = blockfit.outline(np.array(im))
+    drawn = int((np.array(im) < 128).sum())
+    assert worst < 0.6 and abs(ink.area - drawn) < 0.03 * drawn
+    parts = blockfit.cut_parts(ink, [("نقطة", [(60, 30), (100, 30), (100, 70), (60, 70)]),
+                                     ("ا.i", [(120, 0), (200, 0), (200, 140), (120, 140)]),   # along the upright's edge
+                                     ("ب.F", [(0, 0), (120, 0), (120, 140), (0, 140)])], base=110.0)
+    xs = [x for sh in parts["ا.i"]["polys"] for x, _ in sh[0]]
+    ys = [y for sh in parts["ا.i"]["polys"] for _, y in sh[0]]
+    # the upright, its body's right edge at 0, standing on the baseline, 31 wide and 81 high as drawn
+    assert abs(max(xs)) < 0.6 and abs((max(xs) - min(xs)) - 31) < 1.5 and abs(max(ys) - 80.5) < 1.5 and abs(min(ys)) < 1.0
+    assert set(parts) == {"نقطة", "ا.i", "ب.F"}
 
 
 def test_construction_is_a_choice_and_parts_stay_the_default():
@@ -1412,15 +1461,15 @@ def test_construction_is_a_choice_and_parts_stay_the_default():
 
 
 def test_block_measuring_finds_a_moved_rule_again():
-    """The measuring tool, on a logo drawn by the construction itself with a taller x-height, finds it."""
+    """The measuring tool, on a logo drawn by the rules with a taller x-height, finds it."""
     from khatt import blockfit
-    truth = _block(hand=0.0, T=80.0)
+    truth = _block(T=80.0, rock=0.0)
     lay = typeset("نون", truth)
     x0, y0, x1, y1 = lay.bbox()
     size = (int(x1 - x0) + 40, int(y1 - y0) + 40)
     origin = (20 - x0, 20 + y1)
     ink = blockfit.raster(lay, size, origin)
-    start = _block(hand=0.0, T=70.0)
+    start = _block(T=70.0, rock=0.0)
     before = blockfit.match("نون", start, ink, origin)
     got = blockfit.fit("نون", start, ink, origin, cycles=1, log=lambda s: None)
     assert blockfit.match("نون", got, ink, origin) > max(before, 0.9)

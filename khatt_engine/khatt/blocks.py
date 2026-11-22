@@ -1,20 +1,25 @@
 """Letters built of blocks: a construction for logos drawn with a broad marker or cut from paper.
 
 The engine's other construction (letters.py) is the one of بيدوناق: stems and hairlines of a
-contrast pen, round heads and cups. A logo like كيوانو is built another way: every part of every
-letter is one straight stroke of a flat pen, a block with straight sides whose ends are cut at an
-angle; a head is a block with a narrow slot in it and its corners cut; a tail is one block thrown
-down to the left; a dot is a square; two dots are one bar. And no stroke is exactly where the rule
-puts it: the designer's hand tilts each one a little, cuts its ends at its own angle, makes it a
-little longer or shorter, heavier or lighter.
+contrast pen, round heads and cups. A logo like كيوانو is built another way: every edge of every
+letter is a straight line (measured: none strays from its line by more than 0.1 to 0.4 px), so a
+letter is one or a few blocks of a flat pen with their ends cut at an angle; a head is a block with
+a narrow slot in it and its corners cut; a tail is one block thrown down to the left; a dot is a
+square; two dots are one bar; letters touch, and neighbours lean towards or away from each other in
+turn (a V or a Λ of white between them).
 
-So a letter here is (1) the rule: which strokes it has and where they go, in the logo's own
-measures (`Style.block`), and (2) the hand: for each stroke a tilt, two end cuts, a length, a
-weight, a wedge and a small shift. For the logo's own word the hand is measured (`Style.block_hand`);
-for any other word it is drawn from the spread measured on the logo, the same for the same word.
+A word is written as بيدوناق was written from سیرنگ:
+1. the logo's own letters, measured (`Style.block_parts`: each letter of the logo's word as a clean
+   outline, cut where it touches its neighbours, with its dots apart; and its dot, its two-dot bar
+   and its head as parts), for every letter the logo shows, as it shows them;
+2. a tooth the logo lacks (ب ت ث ...) is the logo's tooth with its own dots, made of the logo's dot
+   and bar;
+3. any other letter is built of blocks by the rules (`Style.block`), measured on the logo: its pen,
+   wedge, heights, head and slot, the cut of its ends; with the logo's own dot, bar and head where
+   they fit; and leaning, as the logo's letters lean, in turn to one side and the other.
+Nothing is left to chance: the same word is drawn the same way, every lean is the logo's.
 
-How the measures were found, and the proof that they are the logo's (كيوانو rebuilt from them,
-without cutting anything from the logo, matches it 95%): README, "طريقة البناء بالكتل".
+How كيوانو was measured, and the proof: README, "طريقة البناء بالكتل".
 
 Coordinates as in letters.py: a letter's right edge at x = 0, it grows to the left, baseline y = 0,
 y up. All lengths in pixels of the logo.
@@ -22,8 +27,9 @@ y up. All lengths in pixels of the logo.
 from __future__ import annotations
 
 import math
-import zlib
 from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 
 from .letters import Glyph, LETTERS
 from .library import Tagged
@@ -35,18 +41,18 @@ Poly = List[Pt]
 # the rules of the construction, measured on كيوانو (see the README); a logo built this way gives
 # its own in Style.block, and what it does not give is taken from here
 KIVANO: Dict[str, float] = dict(
-    W=30.0,        # pen: width of a stroke at its far end
+    W=30.0,        # pen: width of a stroke at its far end (uprights measured 24-30, the kaf's riser 30)
     k=0.84,        # wedge: a stroke at its root is this part of its far end (bars and tails)
-    kv=0.87,       # the same for upright strokes (they widen upwards)
+    kv=0.87,       # the same for upright strokes (ا 24.3 at its foot, 30.5 at its top)
     h=0.84,        # bars (the kaf's arms and base, dots) are this part of the pen
-    jh=0.633,      # joins along the baseline are this part of the pen
-    end_cut=9.0,   # the far end of a stroke is cut this many degrees off square (10 strokes in 13)
+    jh=0.633,      # joins along the baseline are this part of the pen (measured 15-17.5)
+    end_cut=9.0,   # the far end of a stroke is cut this many degrees off square (tops cut 6-9 degrees)
     T=68.4,        # x-height: teeth, heads
     A=92.0,        # alef, lam
     teeth=1.0,     # a tooth is this part of the x-height
     teeth_yeh=0.92,  # the tooth of ي ی ئ (the medial ي of كيوانو is lower than its ن)
-    head=66.4,     # head of و: width (ف ق م ه scale it)
-    cut=22.5,      # the head's top right corner cut
+    head=66.4,     # head of و: width (68 measured on the outline)
+    cut=22.5,      # the head's top right corner cut (23 x 22)
     cut_bl=18.4,   # the head's bottom left corner cut
     slot_w=14.4, slot_h=30.1, slot_x=35.1, slot_y=23.9,   # the slot in a head: width, height, centre from the right, bottom
     tail_x=14.7, tail_dx=-35.9, tail_dy=-24.5,            # a tail's root from the right edge, and its run
@@ -54,15 +60,12 @@ KIVANO: Dict[str, float] = dict(
     dot_dx=1.2,    # a dot over a tooth sits on its left shoulder, this far from the tooth's left edge
     dots_l=54.3, dots_y=-18.0,                            # two dots are one bar this long, under the baseline here
     kaf_l=163.5, kaf_bar=0.69, kaf_riser=0.78, slash_l=62.7, slash_a=40.2, bar_rise=4.0,
-    round=3.5,     # outer corners softened by this radius
-    join_white=8.4,   # white between a tooth and the letter it joins to
-    gap=-0.3,      # white between letters that do not join (they touch)
+    round=3.5,     # outer corners of the letters built by rule softened by this radius
+    slit=6.0,      # white between two joined letters, above the join (measured 5-8)
+    touch=0.0,     # white between letters that do not join: they touch (both lines of the logo are one piece)
     space=45.0,    # between words
     into=4.0,      # a join runs this far into the letter it reaches
-    # the hand for a word the logo does not show: each stroke's tilt (degrees), end cuts (degrees),
-    # length and weight are drawn evenly from +- these, twice the median measured on كيوانو's strokes
-    # (so the mean matches); `hand` scales them all (0 = the rule alone, clean blocks)
-    hand=1.0, hand_tilt=7.0, hand_cut=9.9, hand_len=8.0, hand_weight=3.3,
+    rock=4.0,      # a letter built by rule leans this many degrees, to one side and the other in turn (ا 5.4, ن -3)
 )
 
 
@@ -101,47 +104,45 @@ def turn(pts: Poly, deg: float, c: Optional[Pt] = None) -> Poly:
     return [(cx + (x - cx) * ca - (y - cy) * sa, cy + (x - cx) * sa + (y - cy) * ca) for x, y in pts]
 
 
+# ---------------------------------------------------------------- the logo's parts
+def part_shapes(part) -> List[List[Poly]]:
+    """A part of Style.block_parts as shapes: [outer ring, holes...] each (even-odd)."""
+    return [[[(float(x), float(y)) for x, y in ring] for ring in shape] for shape in (part or {}).get("polys", [])]
+
+
+def _bounds(shapes: List[List[Poly]]):
+    xs = [x for sh in shapes for x, _ in sh[0]]
+    ys = [y for sh in shapes for _, y in sh[0]]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _moved(shapes: List[List[Poly]], dx: float, dy: float) -> List[List[Poly]]:
+    return [[[(x + dx, y + dy) for x, y in ring] for ring in sh] for sh in shapes]
+
+
 class Pen:
-    """Draws the strokes of one letter with the hand that belongs to it."""
+    """Draws the strokes of one letter: by the rules, with the logo's own dot, bar and head."""
 
-    def __init__(self, st: Style, R: Dict[str, float], key: str, measured: Optional[Dict] = None):
-        self.st, self.R, self.key = st, R, key
-        self.measured = measured
-        self.ink: List[Poly] = []
-        self.mark_groups: List[List[Poly]] = []   # dots, dashes, hamzas: set clear of the neighbours' after layout
+    def __init__(self, st: Style, R: Dict[str, float], parts: Optional[Dict] = None):
+        self.st, self.R = st, R
+        self.parts = parts or {}
+        self.ink: List[Poly] = []           # the letter's body
+        self.joins: List[Poly] = []         # its join to the next letter (along the baseline: it does not lean)
         self.holes: List[Poly] = []
-
-    def hand(self, name: str, n: int = 8) -> List[float]:
-        """The hand of one stroke: measured on the logo's word, else drawn from the logo's spread."""
-        if self.measured is not None:
-            v = self.measured.setdefault(f"{self.key}.{name}", [0.0] * n)
-            while len(v) < n:
-                v.append(0.0)
-            return v
-        R = self.R
-        amp = R["hand"]
-        seed = zlib.crc32(f"{self.key}.{name}".encode())
-        def r(i):   # a number in [-1, 1], the same for the same word, letter and stroke
-            return ((zlib.crc32(f"{seed}:{i}".encode()) % 20001) / 10000.0) - 1.0
-        if n == 8:
-            return [amp * R["hand_tilt"] * r(0), amp * R["hand_cut"] * r(1), amp * R["hand_cut"] * r(2),
-                    amp * R["hand_len"] * r(3), amp * R["hand_weight"] * r(4), 0.0, 0.0, 0.0]
-        return [amp * R["hand_tilt"] * r(0) * 0.5] + [0.0] * (n - 1)
+        self.logo: List[List[Poly]] = []    # shapes taken whole from the logo's parts (they keep their own lean)
+        self.mark_groups: List[List[List[Poly]]] = []   # dots, bars, hamzas: set clear of the neighbours' after layout
+        self._marking: Optional[List[List[Poly]]] = None
 
     # -- strokes
+    def _put(self, poly: Poly, hole: bool = False) -> None:
+        if self._marking is not None and not hole:
+            self._marking.append([poly])
+        else:
+            (self.holes if hole else self.ink).append(poly)
+
     def stroke(self, name: str, p0: Pt, p1: Pt, wide: float, k: Optional[float] = None, hole: bool = False) -> Poly:
-        t, c0, c1, dl, dw, dk, sx, sy = self.hand(name)
-        p0 = (p0[0] + sx, p0[1] + sy)
-        p1 = (p1[0] + sx, p1[1] + sy)
-        a = math.radians(t)
-        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
-        n = math.hypot(dx, dy) or 1e-6
-        f = max(0.05, (n + dl) / n)
-        dx, dy = dx * f, dy * f
-        p1 = (p0[0] + dx * math.cos(a) - dy * math.sin(a), p0[1] + dx * math.sin(a) + dy * math.cos(a))
-        wide = max(2.0, wide + dw)
-        q = quad(p0, p1, wide * ((self.R["k"] if k is None else k) + dk), wide, c0, c1 + self.R["end_cut"])
-        (self.holes if hole else self.ink).append(q)
+        q = quad(p0, p1, wide * (self.R["k"] if k is None else k), wide, 0.0, self.R["end_cut"])
+        self._put(q, hole)
         return q
 
     def up(self, name: str, x: float, y0: float, y1: float, wide: Optional[float] = None) -> Poly:
@@ -154,40 +155,73 @@ class Pen:
 
     def join(self, name: str, x0: float, x1: float) -> Poly:
         hw = self.R["jh"] * self.R["W"]
-        return self.bar(name, x0, x1, hw / 2, hw)
+        q = quad((x0, hw / 2), (x1, hw / 2), hw * self.R["k"], hw, 0.0, self.R["end_cut"])
+        self.joins.append(q)
+        return q
 
     def head(self, name: str, xr: float, width: float, height: float, slot: bool = True, bottom: float = 0.0) -> None:
-        """A head: a block with its top right and bottom left corners cut and a narrow slot."""
+        """A head: the logo's own head where it is of this size, else a block with its top right and
+        bottom left corners cut and a narrow slot."""
         R = self.R
-        t, slope, cc, bc, hw = self.hand(name + ".head", 8)[:5] if self.measured is not None else (self.hand(name + ".head", 5)[0], 0, 0, 0, 0)
-        w = width + hw
-        c = min(R["cut"] * width / R["head"] + cc, 0.6 * min(w, height))
-        b = min(R["cut_bl"] * width / R["head"] + bc, 0.5 * min(w, height))
+        own = part_shapes(self.parts.get("رأس"))
+        if own:
+            x0, y0, x1, y1 = _bounds(own)
+            if abs((x1 - x0) - width) <= 0.12 * width and abs((y1 - y0) - height) <= 0.12 * height:
+                self.logo += _moved(own, xr - x1, bottom - y0)
+                return
+        w = width
+        c = min(R["cut"] * width / R["head"], 0.6 * min(w, height))
+        b = min(R["cut_bl"] * width / R["head"], 0.5 * min(w, height))
         T, x0, y0 = bottom + height, xr - w, bottom
-        pts = [(x0, T), (xr - c, T - slope), (xr, T - c - slope), (xr, y0), (x0 + b, y0), (x0, y0 + b)]
-        self.ink.append(turn(pts, t, (x0 + w / 2, y0 + height / 2)))
+        self._put([(x0, T), (xr - c, T), (xr, T - c), (xr, y0), (x0 + b, y0), (x0, y0 + b)])
         if slot:
             sh = R["slot_h"] * height / R["T"]
             sx = xr - R["slot_x"] * width / R["head"]
             sy = bottom + R["slot_y"] * height / R["T"]
-            t2, c0, c1 = (self.hand(name + ".slot", 8)[:3] if self.measured is not None else (0.0, 0.0, 0.0))
-            a = math.radians(t2)
-            self.holes.append(quad((sx, sy), (sx - sh * math.sin(a), sy + sh * math.cos(a)), R["slot_w"], R["slot_w"], c0, c1 + R["end_cut"]))
+            self._put(quad((sx, sy), (sx, sy + sh), R["slot_w"], R["slot_w"], 0.0, R["end_cut"]), hole=True)
 
     def block(self, name: str, pts: Poly, slot: Optional[Tuple[Pt, Pt, float]] = None) -> None:
         """Any block (a head that is not the box of و): its outline, and a slot from p0 to p1 this wide."""
-        t = self.hand(name, 8)[0] * (1.0 if self.measured is not None else 0.5)
-        c = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
-        self.ink.append(turn(pts, t, c))
+        self._put(pts)
         if slot:
             a, b, w = slot
-            self.holes.append(turn(quad(a, b, w, w, 0.0, self.R["end_cut"]), t, c))
+            self._put(quad(a, b, w, w, 0.0, self.R["end_cut"]), hole=True)
 
     def square(self, name: str, x: float, y: float, size: Optional[float] = None) -> None:
-        """A dot: a square with its bottom right corner at (x, y)."""
+        """A dot with its bottom right corner at (x, y): the logo's own dot, else a square."""
+        own = part_shapes(self.parts.get("نقطة"))
         d = self.R["dot"] if size is None else size
-        t = self.hand(name, 8)[0]
-        self.ink.append(turn([(x - d, y), (x, y), (x, y + d), (x - d, y + d)], t))
+        if own and size is None:
+            x0, y0, x1, y1 = _bounds(own)
+            for sh in _moved(own, x - x1, y - y0):
+                if self._marking is not None:
+                    self._marking.append(sh)
+                else:
+                    self.logo.append(sh)
+            return
+        self._put([(x - d, y), (x, y), (x, y + d), (x - d, y + d)])
+
+    def dots_bar(self, cx: float, cy: float) -> None:
+        """Two dots as one bar centred at (cx, cy): the logo's own, else by the rule."""
+        own = part_shapes(self.parts.get("شرطة"))
+        if own:
+            x0, y0, x1, y1 = _bounds(own)
+            for sh in _moved(own, cx - (x0 + x1) / 2, cy - (y0 + y1) / 2):
+                if self._marking is not None:
+                    self._marking.append(sh)
+                else:
+                    self.logo.append(sh)
+            return
+        R = self.R
+        bh = R["h"] * R["W"] * 0.8
+        self.bar("dots", cx - R["dots_l"] / 2, cx + R["dots_l"] / 2, cy, bh)
+
+    def bar_height(self) -> float:
+        own = part_shapes(self.parts.get("شرطة"))
+        if own:
+            x0, y0, x1, y1 = _bounds(own)
+            return y1 - y0
+        return self.R["h"] * self.R["W"] * 0.8
 
     def tail(self, name: str, x: float, y: float, scale: float = 1.0) -> None:
         R = self.R
@@ -207,22 +241,21 @@ class Pen:
         return -R["tail_dy"] + 0.1 * R["W"]
 
     # -- marks
-    def mark_start(self) -> int:
-        return len(self.ink)
+    def mark_start(self) -> None:
+        self._marking = []
 
-    def mark_end(self, n0: int) -> None:
-        """The strokes drawn since mark_start are a mark."""
-        if len(self.ink) > n0:
-            self.mark_groups.append(self.ink[n0:])
-            del self.ink[n0:]
+    def mark_end(self, _=None) -> None:
+        if self._marking:
+            self.mark_groups.append(self._marking)
+        self._marking = None
 
     def marks(self, spec: Optional[str], cx: float, top: float, bottom: float = 0.0) -> None:
         """a1/a2/a3 dots above (top = the top of the letter there), b1/b2/b3 under; ha hamza; md madda."""
         if not spec:
             return
-        n0 = self.mark_start()
+        self.mark_start()
         self._marks(spec, cx, top, bottom)
-        self.mark_end(n0)
+        self.mark_end()
 
     def hamza(self, cx: float, y: float, s: float) -> None:
         """ء of blocks: a small head on the right, a stroke down to the left from it, a bar back to the right."""
@@ -234,35 +267,35 @@ class Pen:
     def _marks(self, spec: str, cx: float, top: float, bottom: float = 0.0) -> None:
         R = self.R
         d, g = R["dot"], 0.25 * R["W"]
-        bh = R["h"] * R["W"] * 0.8
+        bh = self.bar_height()
         if spec in ("a1", "b1"):
             y = top + g if spec == "a1" else min(bottom, 0) + R["dots_y"] - d / 2
             self.square("dot", cx + d / 2, y)
         elif spec in ("a2", "b2"):
             y = top + g + bh / 2 if spec == "a2" else min(bottom, 0) + R["dots_y"]
-            self.bar("dots", cx - R["dots_l"] / 2, cx + R["dots_l"] / 2, y, bh)
+            self.dots_bar(cx, y)
         elif spec in ("a3", "b3"):
             if spec == "a3":
                 y = top + g + bh / 2
-                self.bar("dots", cx - R["dots_l"] / 2, cx + R["dots_l"] / 2, y, bh)
+                self.dots_bar(cx, y)
                 self.square("dot", cx + d / 2, y + bh / 2 + 0.2 * g)
             else:
                 y = min(bottom, 0) + R["dots_y"]
-                self.bar("dots", cx - R["dots_l"] / 2, cx + R["dots_l"] / 2, y, bh)
+                self.dots_bar(cx, y)
                 self.square("dot", cx + d / 2, y - bh / 2 - 0.2 * g - d)
         elif spec in ("ha", "hb"):
             s = 1.3 * d
             y = top + g if spec == "ha" else min(bottom, 0) + R["dots_y"] - 0.6 * s
             self.hamza(cx, y, s)
         elif spec == "md":
-            self.bar("madda", cx - 0.9 * R["dots_l"] / 2, cx + 0.9 * R["dots_l"] / 2, top + g + bh / 2, bh)
+            self.dots_bar(cx, top + g + bh / 2)
 
 
 # ---------------------------------------------------------------- the letters
 def _exit(p: Pen, form: str, left: float) -> None:
     if form in ("I", "M"):
         R = p.R
-        p.join("join", left - R["join_white"] - R["into"], 0.0)
+        p.join("join", left - R["slit"] - R["into"], 0.0)
 
 
 def _alef(p: Pen, form, mark):
@@ -282,9 +315,9 @@ def _tooth_letter(p: Pen, form, mark, letter):
     if mark and mark.startswith("a"):
         # a dot sits on the tooth's left shoulder (the ن of كيوانو)
         if mark == "a1":
-            n0 = p.mark_start()
+            p.mark_start()
             p.square("dot", -W + R["dot_dx"], top)
-            p.mark_end(n0)
+            p.mark_end()
         else:
             p.marks(mark, -W / 2, top)
     else:
@@ -311,9 +344,9 @@ def _noon_end(p: Pen, form, mark):
     w = 2.6 * W
     p.cup("cup", 0, -w, 0.75 * T, 0.35 * T)
     if mark:
-        n0 = p.mark_start()
+        p.mark_start()
         p.square("dot", -w / 2 + R["dot"] / 2, 0.75 * T + 0.25 * W)
-        p.mark_end(n0)
+        p.mark_end()
     return -w
 
 
@@ -325,10 +358,9 @@ def _yeh_end(p: Pen, form, mark):
     p.cup("cup", 0, -w, 0.5 * T, 0.3 * T)
     if mark in ("b2",):
         d = p.depth() + 0.4 * W
-        bh = R["h"] * W * 0.8
-        n0 = p.mark_start()
-        p.bar("dots", -w / 2 - R["dots_l"] / 2, -w / 2 + R["dots_l"] / 2, -d - 0.6 * W - bh / 2, bh)
-        p.mark_end(n0)
+        p.mark_start()
+        p.dots_bar(-w / 2, -d - 0.6 * W - p.bar_height() / 2)
+        p.mark_end()
     elif mark == "ha":
         p.marks("ha", -w / 2, 0.5 * T)
     return -w
@@ -450,7 +482,7 @@ def _seen(p: Pen, form, mark):
     R = p.R
     W, T = R["W"], R["T"]
     t = 0.55 * T
-    jw = R["join_white"]
+    jw = R["slot_w"]                      # the white inside a letter is the head's slot
     xs = [-W / 2 - i * (W + jw) for i in range(3)]
     for i, x in enumerate(xs):
         p.up(f"tooth{i}", x, 0, t, 0.9 * W)
@@ -544,7 +576,7 @@ def _kaf(p: Pen, form, mark, letter):
     if letter == "گ":
         p.stroke("slash2", (tip[0] + 0.35 * W, tip[1] + 0.9 * W),
                  (tip[0] + 0.35 * W + R["slash_l"] * math.cos(s), tip[1] + 0.9 * W + R["slash_l"] * math.sin(s)), h * W)
-    return -L + R["join_white"] if form in ("I", "M") else -L + 0.3 * W
+    return -L if form in ("I", "M") else -L + 0.3 * W
 
 
 def _lam(p: Pen, form, mark):
@@ -605,98 +637,257 @@ def build(c: str, form: str, p: Pen) -> float:
     return how(p, form, mark)
 
 
-# ---------------------------------------------------------------- the word
-def soften(ink: List[Poly], holes: List[Poly], r: float):
-    """The union of the blocks, the slots cut out, the outer corners softened."""
+# ---------------------------------------------------------------- the logo's letters
+TEETH_KIN = "بتثنيیئپ"
+# letters with one body that differ by their dots: the logo's drawing of one serves the others, with
+# their own dots (in the forms where the bodies are one)
+SAME_BODY = [(TEETH_KIN, "IM"), ("بتثپ", "iF"), ("جحخچ", "iIMF"), ("دذ", "iF"), ("رزژ", "iF"), ("سش", "iIMF"),
+             ("صض", "iIMF"), ("طظ", "iIMF"), ("عغ", "iIMF"), ("فقڤ", "IM"), ("فڤ", "iF"), ("اأإآٱ", "iF"),
+             ("وؤ", "iF"), ("هة", "iF")]
+TWINS = {"ك": "ک", "ک": "ك", "ي": "ی", "ی": "ي"}     # one drawing (ي and ی differ only when alone or last)
+
+
+def logo_letter(parts: Dict, c: str, form: str, seen: Optional[Dict[str, int]] = None):
+    """The logo's own drawing of `c` in `form` (or in the form that differs only by the join from the
+    right), and whether it is another letter's tooth standing in (then it comes without its dots).
+    A letter the logo draws more than once in different ways ("و.F", "و.F/2") takes its drawings in
+    turn, as the logo does (`seen` counts them)."""
+    other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
+    names = [c] + ([TWINS[c]] if c in TWINS and (form in ("I", "M") or c in "كک") else [])
+
+    def pick(key):
+        alts = [parts[key]] + [parts[f"{key}/{i}"] for i in range(2, 9) if f"{key}/{i}" in parts]
+        if seen is None:
+            return alts[0]
+        k = seen.get(key, 0)
+        seen[key] = k + 1
+        return alts[k % len(alts)]
+
+    for name in names:
+        for key in (f"{name}.{form}", f"{name}.{other}"):
+            if key in parts:
+                return pick(key), False
+    for group, forms in SAME_BODY:
+        if c in group and form in forms:
+            for q in group:
+                for f in (form, other):
+                    if f in forms and f"{q}.{f}" in parts:
+                        return parts[f"{q}.{f}"], True
+    return None, False
+
+
+def _geom(shapes: List[List[Poly]]):
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
-    S = unary_union([Polygon(q).buffer(0) for q in ink if len(q) >= 3])
-    if holes:
-        S = S.difference(unary_union([Polygon(q).buffer(0) for q in holes if len(q) >= 3]))
-    if r > 0:
-        S = S.buffer(-r, join_style=1).buffer(r, join_style=1)
+    gs = []
+    for sh in shapes:
+        if len(sh[0]) >= 3:
+            g = Polygon(sh[0]).buffer(0)
+            for hole in sh[1:]:
+                if len(hole) >= 3:
+                    g = g.difference(Polygon(hole).buffer(0))
+            gs.append(g)
+    return unary_union(gs) if gs else Polygon()
+
+
+def _shapes_of(geom) -> List[List[Poly]]:
     out = []
-    for poly in getattr(S, "geoms", [S]):
+    for poly in getattr(geom, "geoms", [geom]):
         if poly.geom_type != "Polygon" or poly.is_empty:
             continue
         out.append([list(poly.exterior.coords)[:-1]] + [list(h.coords)[:-1] for h in poly.interiors])
     return out
 
 
-def clear_marks(bodies: List[List[Poly]], groups: List[Tuple[int, List[Poly]]], R: Dict[str, float]) -> List[Poly]:
-    """Set each mark clear of the letters and of the marks already set: one that would touch them moves
-    away from the baseline (down under it, up over it), as a calligrapher staggers the dots of
-    neighbours. A mark may touch its own letter (the dot of كيوانو's ن sits on the tooth's shoulder)."""
+def soften(ink: List[Poly], holes: List[Poly], r: float):
+    """The union of the blocks, the slots cut out, the outer corners softened (as shapes)."""
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
-    clear = 0.2 * R["W"]
-    shapes = [unary_union([Polygon(q).buffer(0) for q in b if len(q) >= 3]).buffer(clear) for b in bodies]
+    S = unary_union([Polygon(q).buffer(0) for q in ink if len(q) >= 3])
+    if holes:
+        S = S.difference(unary_union([Polygon(q).buffer(0) for q in holes if len(q) >= 3]))
+    if r > 0 and not S.is_empty:
+        S = S.buffer(-r, join_style=1).buffer(r, join_style=1)
+    return _shapes_of(S)
+
+
+def clear_marks(bodies, groups, R: Dict[str, float]):
+    """Set each mark clear of the other letters and of the marks already set, as a calligrapher sets
+    the dots of neighbours. `groups`: (owner, shapes, other place) in order. A mark may touch its own
+    letter (the dot of كيوانو's ن stands on the tooth's shoulder). A mark that would touch another
+    letter or mark goes, in this order: to its other place (the logo's dot on a shoulder where the
+    neighbour leaves no room goes over its tooth); a little sideways (up to half its width); away from
+    the baseline (down under it, up over it)."""
+    from shapely.ops import unary_union
+    # the white the logo keeps between a mark and another letter is its slit (كيوانو: 6.3, 7.0, 10.2)
+    clear = max(1.0, R["slit"] - 1.0)
+    shapes = [b.buffer(clear) for b in bodies]
     placed = None
-    out: List[Poly] = []
-    for i, grp in groups:
+    out = []
+    for i, grp, alt in groups:
+        g0 = _geom(grp)
+        if g0.is_empty:
+            continue
         others = [sh for j, sh in enumerate(shapes) if j != i and not sh.is_empty]
         if placed is not None:
             others.append(placed)
-        taken = unary_union(others) if others else Polygon()
-        g = unary_union([Polygon(q).buffer(0) for q in grp if len(q) >= 3])
-        if g.is_empty:
-            continue
-        up = g.centroid.y > 0
+        taken = unary_union(others) if others else None
+
+        def free(dx, dy):
+            if taken is None:
+                return True
+            from shapely.affinity import translate
+            return not translate(g0, dx, dy).intersects(taken)
+
+        w = g0.bounds[2] - g0.bounds[0]
+        tries = [(0.0, 0.0)]
+        if alt is not None:
+            tries.append(alt)
+        tries += [(sg * k, 0.0) for k in np.arange(2.0, 0.5 * w + 0.01, 2.0) for sg in (1, -1)]
+        up = g0.centroid.y > 0
         step = 0.3 * R["W"] * (1 if up else -1)
-        dy = 0.0
-        for _ in range(6):
-            if not g.intersects(taken):
-                break
-            dy += step
-            g = unary_union([Polygon([(x, y + dy) for x, y in q]).buffer(0) for q in grp if len(q) >= 3])
+        base = alt if alt is not None else (0.0, 0.0)
+        tries += [(base[0], base[1] + step * k) for k in range(1, 7)]
+        dx, dy = next((t for t in tries if free(*t)), tries[-1])
+        from shapely.affinity import translate
+        g = translate(g0, dx, dy)
         placed = g.buffer(clear) if placed is None else placed.union(g.buffer(clear))
-        out += [[(x, y + dy) for x, y in q] for q in grp]
+        out += _moved(grp, dx, dy)
     return out
 
 
+def _gap_shift(prev, body, white: float) -> float:
+    """How far left of 0 `body` (its right edge at 0) must go to stand `white` clear of `prev` (placed)."""
+    from shapely.affinity import translate
+    if prev.is_empty or body.is_empty:
+        return prev.bounds[0] if not prev.is_empty else 0.0
+    hi = prev.bounds[2] - body.bounds[0] + 1.0          # right of here they cannot meet... search leftwards
+    lo = prev.bounds[0] - body.bounds[2] - 4 * white - 50.0
+    def apart(dx):
+        b = translate(body, dx, 0)
+        return prev.distance(b) if not prev.intersects(b) else -prev.intersection(b).area
+    if apart(hi) < white:           # (cannot happen for letters set right to left, kept for safety)
+        hi = prev.bounds[2] + abs(body.bounds[0]) + 1.0
+    for _ in range(50):             # the rightmost place at which they are `white` apart
+        mid = (lo + hi) / 2
+        if apart(mid) >= white - 1e-3:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+def _above(geom, y: float):
+    from shapely.geometry import box
+    return geom.intersection(box(-1e5, y, 1e5, 1e5))
+
+
+# ---------------------------------------------------------------- the word
 def typeset_blocks(word: str, st: Style):
-    """Lay out `word` right to left in the block construction."""
+    """Lay out `word` right to left in the block construction (see the module's docstring)."""
+    from shapely.affinity import rotate, translate
+    from shapely.ops import unary_union
     from .typeset import Layout, Placed, shape_forms
     R = rules(st)
+    parts = st.block_parts or {}
     lay = Layout(text=word, style=st)
-    measured = None
-    hand = st.block_hand or {}
-    if hand.get("word") == word:
-        measured = {k: list(v) for k, v in hand.get("hand", {}).items()}
-    x, prev, n = 0.0, None, 0
-    groups: List[Tuple[int, List[Poly]]] = []
-    bodies: List[List[Poly]] = []
-    ink: List[Poly] = []
-    holes: List[Poly] = []
+    # joined letters keep their slit above the bars on the baseline (the joins, and the base of ک that
+    # runs on into the next letter as its join: 23-26 high in كيوانو)
+    jy = 0.9 * R["W"]
+    prev_body, prev_left, prev_joins = None, 0.0, False
+    n = 0
+    built_ink: List[Poly] = []
+    built_holes: List[Poly] = []
+    logo_shapes: List[List[Poly]] = []
+    bodies, groups = [], []
+    seen: Dict[str, int] = {}
     for c, form in shape_forms(word):
         if form == " ":
-            if prev is not None:
-                x = prev.x + prev.glyph.left - R["space"]
-            prev = None
+            if prev_body is not None:
+                prev_left = prev_left - R["space"]
+                prev_body = None
             continue
         if form == "?" or c not in BUILD:
             lay.skipped.append(c)
             continue
-        p = Pen(st, R, f"{n}" if measured is not None else f"{word}|{n}", measured)
-        left = build(c, form, p)
-        if prev is not None:
-            joined = form in ("M", "F")
-            x = prev.x + prev.glyph.left - (R["join_white"] if joined else R["gap"])
-        glyph = Glyph([[q] for q in p.ink], left=left, entry_x=0.0, entry_edge=0.0,
-                      exit_x=left if form in ("I", "M") else None, exit_edge=left if form in ("I", "M") else None)
-        here = Placed(c, form, x, glyph, parts=[("block", "قطعة")] * len(p.ink))
-        lay.placed.append(here)
-        ink += [[(px + x, py) for px, py in q] for q in p.ink]
-        holes += [[(px + x, py) for px, py in q] for q in p.holes]
-        bodies.append([[(px + x, py) for px, py in q] for q in p.ink])
-        groups += [(len(bodies) - 1, [[(px + x, py) for px, py in q] for q in grp]) for grp in p.mark_groups]
-        prev = here
+        own, kin = logo_letter(parts, c, form, seen)
+        p = Pen(st, R, parts)
+        if own is not None:
+            body_shapes = part_shapes({"polys": own.get("polys", [])})
+            mark_shapes = [] if kin else part_shapes({"polys": own.get("marks", [])})
+            if kin or "marks" not in own:
+                # the logo's body (its tooth, its head, a letter the model made of its parts), and this
+                # letter's own dots, made of the logo's dot and bar: over the top of the body or under it
+                bx0, by0, bx1, by1 = _bounds(body_shapes) if body_shapes else (-R["W"], 0.0, 0.0, R["T"])
+                how, mark = BUILD[c]
+                if mark == "b2*":
+                    mark = "b2" if form in ("I", "M") else None
+                top_part = _above(_geom(body_shapes), 0.5 * R["T"])
+                if mark and mark.startswith(("a", "h", "m")) and not top_part.is_empty:
+                    hi = _above(top_part, top_part.bounds[3] - 0.25 * R["W"])
+                    cx, top = (hi.bounds[0] + hi.bounds[2]) / 2, hi.bounds[3] + R["slit"] - 0.25 * R["W"]
+                    p.marks(mark, cx, top)
+                elif mark:
+                    p.marks(mark, (bx0 + bx1) / 2 if form in ("i", "F") else -R["W"] / 2 - 0.1 * R["W"], 0, min(0.0, by0))
+            body = _geom(body_shapes)
+            left = body.bounds[0] if not body.is_empty else -R["W"]
+            angle = 0.0
+        else:
+            left = build(c, form, p)
+            # a letter built by rule leans as the logo's letters lean, to one side and the other in turn
+            angle = R["rock"] * (1.0 if n % 2 else -1.0)
+            pivot = (left / 2.0, 0.0)
+            p.ink = [turn(q, angle, pivot) for q in p.ink]
+            p.holes = [turn(q, angle, pivot) for q in p.holes]
+            p.logo = [[turn(r, angle, pivot) for r in sh] for sh in p.logo]
+            body_shapes = [[q] for q in p.ink] + p.logo
+            mark_shapes = []
+            body = _geom(body_shapes)
+            if p.holes:
+                body = body.difference(_geom([[q] for q in p.holes]))
+        joined = form in ("M", "F") and prev_joins
+        if prev_body is None:
+            x = 0.0 if n == 0 else prev_left - (body.bounds[2] if not body.is_empty else 0.0)
+        else:
+            ref_prev = _above(prev_body, jy if joined else 0.0)
+            ref_this = _above(body, jy if joined else 0.0)
+            x = _gap_shift(ref_prev, ref_this, R["slit"] if joined else R["touch"])
+        placed_body = translate(body, x, 0)
+        if own is not None:
+            logo_shapes += _moved(body_shapes, x, 0.0)
+            if mark_shapes:
+                # the logo's own dots, where the logo has them; their other place: over the tooth
+                m = _geom(mark_shapes)
+                above_top = m.centroid.y > 0.5 * R["T"]
+                top = _above(body, 0.5 * R["T"])
+                if above_top and not top.is_empty:
+                    hi = _above(body, top.bounds[3] - 0.25 * R["W"])
+                    cx = (hi.bounds[0] + hi.bounds[2]) / 2
+                    alt = (cx - (m.bounds[0] + m.bounds[2]) / 2, hi.bounds[3] + R["slit"] - m.bounds[1])
+                else:
+                    alt = None
+                groups.append((len(bodies), _moved(mark_shapes, x, 0.0), alt))
+        else:
+            built_ink += [[(px + x, py) for px, py in q] for q in p.ink]
+            built_holes += [[(px + x, py) for px, py in q] for q in p.holes]
+            logo_shapes += _moved(p.logo, x, 0.0)
+        built_ink += [[(px + x, py) for px, py in q] for q in p.joins]
+        bodies.append(placed_body)
+        groups += [(len(bodies) - 1, _moved(grp, x, 0.0), None) for grp in p.mark_groups]
+        glyph = Glyph([[q] for q in p.ink] + [sh for sh in body_shapes if own is not None], left=left, entry_x=0.0,
+                      entry_edge=0.0, exit_x=left if form in ("I", "M") else None,
+                      exit_edge=left if form in ("I", "M") else None)
+        lay.placed.append(Placed(c, form, x, glyph, parts=[("logo" if own is not None else "block", "قطعة")]))
+        prev_body, prev_left = placed_body, x + left
+        prev_joins = form in ("I", "M")
         n += 1
-    if measured is None:
-        ink += clear_marks(bodies, groups, R)
-    else:                                   # the logo's own word: its marks where it has them
-        ink += [q for _, grp in groups for q in grp]
-    for shape in soften(ink, holes, R["round"]):
+    marks = clear_marks(bodies, groups, R)
+    built = _geom([[q] for q in built_ink])
+    if built_holes:
+        built = built.difference(_geom([[q] for q in built_holes]))
+    if R["round"] > 0 and not built.is_empty:
+        built = built.buffer(-R["round"], join_style=1).buffer(R["round"], join_style=1)
+    whole = unary_union([built, _geom(logo_shapes), _geom(marks)])
+    for shape in _shapes_of(whole):
         lay.shapes.append(Tagged(shape, "block", "كتلة"))
     return lay
-
