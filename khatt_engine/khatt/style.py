@@ -120,9 +120,9 @@ class Style:
     # chooses it on seeing how the logo was built, and gives the construction's measures:
     construction: str = "parts"
     block: Dict[str, float] = field(default_factory=dict)       # blocks.KIVANO's rules, as this logo measures them
-    # the logo's own parts in the block construction (blockfit.cut_parts): "letter.form" -> {"polys": its
-    # outline, "marks": its dots}, and "نقطة" (its dot), "شرطة" (its two dots as one bar), "رأس" (its head),
-    # each in the letter's coordinates (the right edge of its body at x = 0, the baseline at y = 0)
+    # the logo's measured parts (blockfit.cut_parts): "letter.form" -> {"polys": its outline, "marks": its
+    # dots}, in the letter's coordinates. They check the measures (blockfit.rebuild) and are never
+    # written into a word: words are drawn from the rules (Style.block), as بيدوناق was from سیرنگ's
     block_parts: Dict = field(default_factory=dict)
 
     @property

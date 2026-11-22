@@ -1373,13 +1373,12 @@ def test_every_letter_builds_of_blocks_in_every_form(letter):
 
 
 def test_blocks_leave_nothing_to_chance():
-    """The same word is drawn the same way; a letter built by rule leans by the logo's measured lean,
-    to one side and the other in turn, and with no lean it stands upright."""
+    """The same word is drawn the same way; a letter with a free upright leans by the logo's measured
+    lean, and with no lean it stands upright."""
     a, b = typeset("بيت سلام", _block()), typeset("بيت سلام", _block())
     assert [s[0] for s in a.shapes] == [s[0] for s in b.shapes]
-    upright = typeset("ا", _block(rock=0.0))
-    xs = sorted({round(x, 3) for sh in upright.shapes for x, _ in sh[0]})
-    leaning = typeset("ا", _block(rock=6.0))
+    upright = typeset("ا", _block(lean_alef=0.0))
+    leaning = typeset("ا", _block(lean_alef=6.0))
     assert [s[0] for s in upright.shapes] != [s[0] for s in leaning.shapes]
     assert max(y for sh in upright.shapes for _, y in sh[0]) > 80
 
@@ -1388,37 +1387,55 @@ def _square(x0, y0, x1, y1):
     return [[[x0, y0], [x1, y0], [x1, y1], [x0, y1]]]
 
 
-def test_the_logo_letters_come_first():
-    """A letter the logo shows is drawn as the logo draws it (its measured outline), not by the rules."""
-    alef = {"polys": [[[[0, 0], [0, 120], [-10, 120], [-40, 0]]]]}   # a wedge no rule draws
-    lay = typeset("ا", _block({"ا.i": alef}))
-    assert abs(_area(lay) - 0.5 * (10 + 40) * 120) < 1.0
-    # and in the form that differs only by the join from the right
-    lay = typeset("نا", _block({"ا.i": alef}))
-    assert any(abs(max(y for _, y in sh[0]) - 120) < 0.5 for sh in lay.shapes)
+def test_words_are_drawn_by_the_rules_not_cut_from_the_logo():
+    """The logo's measured parts check the measures; they are never written into a word (the logo is
+    its designer's work: what is taken from it is how it is built)."""
+    parts = {"ا.i": {"polys": [[[[0, 0], [0, 120], [-10, 120], [-40, 0]]]]}, "ن.I": {"polys": [_square(-26, 0, 0, 70)]}}
+    for w in ("ا", "نا", "بيدوناق"):
+        assert [s[0] for s in typeset(w, _block(parts)).shapes] == [s[0] for s in typeset(w, _block()).shapes]
 
 
-def test_a_tooth_lends_its_body_and_the_logo_its_dots():
-    """ب the logo lacks is the logo's ن tooth with its own dot, and the dot is the logo's dot."""
-    noon = {"polys": [_square(-26, 0, 0, 70)], "marks": [_square(-26, 80, -2, 104)]}
-    dot = {"polys": [[[[0, 0], [20, 0], [10, 17]]]]}                 # a triangle: the logo's own dot
-    st = _block({"ن.I": noon, "نقطة": dot})
-    lay = typeset("بب", st)
-    tris = [sh for sh in lay.shapes if len(sh[0]) == 3]
-    assert tris and all(max(y for _, y in sh[0]) < 0 for sh in tris)   # its dot, under the tooth
-    assert not any(min(y for _, y in sh[0]) > 75 for sh in lay.shapes)   # the ن's own dot did not come along
+def test_the_measures_are_checked_by_rebuilding_the_logo_word():
+    """blockfit.rebuild puts the measured parts back with the two spacing rules: a slit between
+    joined letters (above the join), touching otherwise."""
+    from khatt import blockfit
+    from shapely.geometry import box
+    tooth = {"polys": [_square(-26, -1, 0, 70)]}
+    alef = {"polys": [_square(-24, 0, 0, 92)]}
+    g = blockfit.rebuild({"ن.I": tooth, "ن.M": tooth, "ا.i": alef}, ["ن.I", "ن.M"], _block(slit=6.0))
+    upper = g.intersection(box(-1e4, 30, 1e4, 1e4))
+    parts = sorted(getattr(upper, "geoms", [upper]), key=lambda q: -q.bounds[2])
+    assert len(parts) == 2 and abs(parts[0].bounds[0] - parts[1].bounds[2] - 6.0) < 0.5
+    g = blockfit.rebuild({"ا.i": alef}, ["ا.i", "ا.i"], _block(touch=0.0))
+    assert abs(g.area - 2 * 24 * 92) < 2.0 and len(getattr(g, "geoms", [g])) == 1      # they touch
 
 
 def test_joined_letters_keep_the_slit_and_the_others_touch():
-    from shapely.geometry import Polygon
-    tooth = {"polys": [_square(-26, -1, 0, 70)], "marks": []}
-    st = _block({"ن.I": tooth, "ا.i": {"polys": [_square(-24, 0, 0, 92)]}}, slit=6.0, touch=0.0)
-    lay = typeset("ننن", st)                                            # the first two: the logo's tooth
+    from shapely.geometry import Polygon, box
+    lay = typeset("ننن", _block(slit=6.0))
+    bodies = [Polygon(sh[0], sh[1:]) for sh in lay.shapes]
+    from shapely.ops import unary_union
+    upper = unary_union(bodies).intersection(box(-1e4, 35, 1e4, 60))
+    teeth = sorted(getattr(upper, "geoms", [upper]), key=lambda q: -q.bounds[2])
+    assert len(teeth) >= 2 and abs(teeth[0].distance(teeth[1]) - 6.0) < 0.8
+    lay = typeset("اد", _block(touch=0.0))
+    assert len(lay.shapes) == 1                                           # ا and د touch: one piece
+
+
+def test_heads_in_turn():
+    """As كيوانو's two و: the first head turned back (its left side raised), the next upright."""
+    from shapely.geometry import Polygon, box
+    from shapely.ops import unary_union
+    lay = typeset("وو", _block())
     ps = sorted(lay.placed, key=lambda q: -q.x)
-    assert abs((ps[0].x - 26) - ps[1].x - 6.0) < 0.6                     # 6 of white between the two teeth
-    lay = typeset("اا", st)
-    ps = sorted(lay.placed, key=lambda q: -q.x)
-    assert abs((ps[0].x - 24) - ps[1].x) < 0.6                           # the two ا touch
+    tops = []
+    for q in ps:
+        g = unary_union([Polygon(sh[0], sh[1:]) for sh in q.glyph.shapes]).intersection(box(-1e4, 40, 1e4, 1e4))
+        pts = [c for poly in getattr(g, "geoms", [g]) for c in poly.exterior.coords]
+        hx, hy = max(pts, key=lambda c: c[1])
+        tops.append((hy, hx, (g.bounds[0] + g.bounds[2]) / 2))
+    (y1, x1, c1), (y2, x2, c2) = tops
+    assert y1 > y2 + 3.0 and x1 < c1          # the first: higher, and its highest corner on the left
 
 
 def test_dots_of_neighbours_do_not_run_together():
@@ -1463,13 +1480,13 @@ def test_construction_is_a_choice_and_parts_stay_the_default():
 def test_block_measuring_finds_a_moved_rule_again():
     """The measuring tool, on a logo drawn by the rules with a taller x-height, finds it."""
     from khatt import blockfit
-    truth = _block(T=80.0, rock=0.0)
+    truth = _block(T=80.0, lean_tooth=0.0)
     lay = typeset("نون", truth)
     x0, y0, x1, y1 = lay.bbox()
     size = (int(x1 - x0) + 40, int(y1 - y0) + 40)
     origin = (20 - x0, 20 + y1)
     ink = blockfit.raster(lay, size, origin)
-    start = _block(T=70.0, rock=0.0)
+    start = _block(T=70.0, lean_tooth=0.0)
     before = blockfit.match("نون", start, ink, origin)
     got = blockfit.fit("نون", start, ink, origin, cycles=1, log=lambda s: None)
     assert blockfit.match("نون", got, ink, origin) > max(before, 0.9)

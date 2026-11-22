@@ -9,14 +9,16 @@ The model looks at the logo and understands how its designer built it; this code
    more than 0.4 px.
 2. `cut_parts`: the outline cut into the logo's parts where its letters touch, along the lines the
    model gives (from one inner corner to the next, or through the white between two letters): each
-   letter of the logo's word, its dots apart, and its dot, its two-dot bar and its head. They go into
-   `Style.block_parts`, in the letter's coordinates, and every word is written with them first
-   (blocks.py).
-3. `fit`: the rules of the construction (`Style.block`: pen, wedge, heights, head, slot, tail, dots,
-   corners), one value each for every letter, fitted to the logo's word drawn by the rules alone.
-   On كيوانو this reaches 84%: its designer cut every letter by hand (its two و, laid over each other
-   after turning one 14 degrees, cover each other only 82.6%; its ن and ي teeth 69%), so the rules
-   say how to build the letters the logo lacks, and the logo's own letters stand for themselves.
+   letter of the logo's word, its dots apart. They are measured (widths at every height, leans, the
+   cut of every top, the head and its slot, the tail, the joins, the dot and the bar), and
+   `rebuild` puts them back with the two measured spacing rules (a slit between joined letters,
+   touching otherwise): on كيوانو 95.67%, as سیرنگ rebuilt from its measured parts matched 95.3%. That
+   is the check of the measures; the parts themselves are never written into a word (the logo is its
+   designer's work: what is taken from it is how it is built).
+3. `fit`: the rules of the construction (`Style.block`), one value each, fitted to the logo's word
+   drawn by the rules alone (blocks.py). Its designer cut every letter by hand (its two و, laid over
+   each other after turning one 14 degrees, cover each other only 82.6%; its ن and ي teeth 69%): the
+   rules carry how the logo is built, not each cut of its designer's knife.
 
 `match` lays a word set by the engine over the logo (the share of ink in common, IoU).
 """
@@ -178,6 +180,45 @@ def cut_parts(ink, regions: Sequence[Tuple[str, Sequence[Tuple[float, float]]]],
             part["marks"] = [r for m in own for r in rings(translate(m, -right, 0))]
         out[name] = part
     return out
+
+
+def rebuild(parts: Dict, keys: Sequence[str], st: Style):
+    """The check of the measures: the logo's word put back together from its measured parts (`keys`,
+    "letter.form" in the word's order, a part used twice taking its "/2" drawing the second time),
+    with the measured spacing rules alone (a slit between joined letters, touching otherwise). Returns
+    the shapes (y up, the first letter's right edge at x = 0)."""
+    from shapely.affinity import translate
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from .blocks import above, gap_shift, rules
+    R = rules(st)
+    jy = R["bar"] + 2.0
+
+    def geom(shapes):
+        gs = []
+        for sh in shapes or []:
+            g = Polygon(sh[0]).buffer(0)
+            for h in sh[1:]:
+                g = g.difference(Polygon(h).buffer(0))
+            gs.append(g)
+        return unary_union(gs) if gs else Polygon()
+
+    seen: Dict[str, int] = {}
+    out, prev, prev_joins = [], None, False
+    for key in keys:
+        k = seen.get(key, 0)
+        seen[key] = k + 1
+        part = parts.get(f"{key}/{k + 1}") if k else None
+        part = part or parts[key]
+        body, marks = geom(part.get("polys")), geom(part.get("marks"))
+        form = key.split(".")[1]
+        joined = form in ("M", "F") and prev_joins
+        x = 0.0 if prev is None else gap_shift(above(prev, jy if joined else 0.0), above(body, jy if joined else 0.0),
+                                               R["slit"] if joined else R["touch"])
+        prev = translate(body, x, 0)
+        out += [prev, translate(marks, x, 0)]
+        prev_joins = form in ("I", "M")
+    return unary_union([g for g in out if not g.is_empty])
 
 
 # ---------------------------------------------------------------- 3. the rules

@@ -1,25 +1,20 @@
-"""Letters built of blocks: a construction for logos drawn with a broad marker or cut from paper.
+"""Letters built of blocks, by rules: the construction of logos drawn with a broad marker or cut from paper.
 
 The engine's other construction (letters.py) is the one of بيدوناق: stems and hairlines of a
-contrast pen, round heads and cups. A logo like كيوانو is built another way: every edge of every
-letter is a straight line (measured: none strays from its line by more than 0.1 to 0.4 px), so a
-letter is one or a few blocks of a flat pen with their ends cut at an angle; a head is a block with
-a narrow slot in it and its corners cut; a tail is one block thrown down to the left; a dot is a
-square; two dots are one bar; letters touch, and neighbours lean towards or away from each other in
-turn (a V or a Λ of white between them).
+contrast pen, round heads and cups. A logo like كيوانو is built another way, and is written here the
+way بيدوناق was written from سیرنگ: its rules are measured on the logo, and every letter is drawn
+from them, cleanly, from scratch. No letter and no piece of the logo is copied into a word: the logo
+is its designer's work; what is taken from it is how it is built.
 
-A word is written as بيدوناق was written from سیرنگ:
-1. the logo's own letters, measured (`Style.block_parts`: each letter of the logo's word as a clean
-   outline, cut where it touches its neighbours, with its dots apart; and its dot, its two-dot bar
-   and its head as parts), for every letter the logo shows, as it shows them;
-2. a tooth the logo lacks (ب ت ث ...) is the logo's tooth with its own dots, made of the logo's dot
-   and bar;
-3. any other letter is built of blocks by the rules (`Style.block`), measured on the logo: its pen,
-   wedge, heights, head and slot, the cut of its ends; with the logo's own dot, bar and head where
-   they fit; and leaning, as the logo's letters lean, in turn to one side and the other.
-Nothing is left to chance: the same word is drawn the same way, every lean is the logo's.
+The rules (`Style.block`; KIVANO below is كيوانو's, measured): one pen; uprights that widen towards
+their top, their top cut at an angle rising to the side they lean to; a tooth joined on both sides
+that stands upright and flares at its foot into its joins; the head, a block with its corners cut
+and a narrow slot with a pointed foot; a tail thrown down to the left; a join lighter than the pen;
+a dot that is a square; two dots that are one bar; a white between joined letters (the slit), none
+between the others (they touch); and the letters with a free upright (ا, ل, a tooth that begins a
+word) lean, in turn to one side and the other, as the logo's do.
 
-How كيوانو was measured, and the proof: README, "طريقة البناء بالكتل".
+How كيوانو was measured, and the checks: README, "طريقة البناء بالكتل".
 
 Coordinates as in letters.py: a letter's right edge at x = 0, it grows to the left, baseline y = 0,
 y up. All lengths in pixels of the logo.
@@ -31,41 +26,57 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .letters import Glyph, LETTERS
+from .letters import Glyph
 from .library import Tagged
 from .style import Style
 
 Pt = Tuple[float, float]
-Poly = List[Pt]
 
-# the rules of the construction, measured on كيوانو (see the README); a logo built this way gives
-# its own in Style.block, and what it does not give is taken from here
+# كيوانو, measured on its clean outline (the corners where its measured edge lines meet)
 KIVANO: Dict[str, float] = dict(
-    W=30.0,        # pen: width of a stroke at its far end (uprights measured 24-30, the kaf's riser 30)
-    k=0.84,        # wedge: a stroke at its root is this part of its far end (bars and tails)
-    kv=0.87,       # the same for upright strokes (ا 24.3 at its foot, 30.5 at its top)
-    h=0.84,        # bars (the kaf's arms and base, dots) are this part of the pen
-    jh=0.633,      # joins along the baseline are this part of the pen (measured 15-17.5)
-    end_cut=9.0,   # the far end of a stroke is cut this many degrees off square (tops cut 6-9 degrees)
-    T=68.4,        # x-height: teeth, heads
-    A=92.0,        # alef, lam
-    teeth=1.0,     # a tooth is this part of the x-height
-    teeth_yeh=0.92,  # the tooth of ي ی ئ (the medial ي of كيوانو is lower than its ن)
-    head=66.4,     # head of و: width (68 measured on the outline)
-    cut=22.5,      # the head's top right corner cut (23 x 22)
-    cut_bl=18.4,   # the head's bottom left corner cut
-    slot_w=14.4, slot_h=30.1, slot_x=35.1, slot_y=23.9,   # the slot in a head: width, height, centre from the right, bottom
-    tail_x=14.7, tail_dx=-35.9, tail_dy=-24.5,            # a tail's root from the right edge, and its run
-    dot=25.6,      # a dot is a square block
-    dot_dx=1.2,    # a dot over a tooth sits on its left shoulder, this far from the tooth's left edge
-    dots_l=54.3, dots_y=-18.0,                            # two dots are one bar this long, under the baseline here
-    kaf_l=163.5, kaf_bar=0.69, kaf_riser=0.78, slash_l=62.7, slash_a=40.2, bar_rise=4.0,
-    round=3.5,     # outer corners of the letters built by rule softened by this radius
-    slit=6.0,      # white between two joined letters, above the join (measured 5-8)
-    touch=0.0,     # white between letters that do not join: they touch (both lines of the logo are one piece)
-    space=45.0,    # between words
-    into=4.0,      # a join runs this far into the letter it reaches
-    rock=4.0,      # a letter built by rule leans this many degrees, to one side and the other in turn (ا 5.4, ن -3)
+    U=26.0,            # the pen (uprights 24-30.5; the kaf's riser 30)
+    T=70.0,            # x-height: the tops of teeth and heads
+    A=93.0,            # the top of ا (at its high corner)
+    D=27.0,            # the depth of tails, cups and the bar of dots under the baseline
+    J=17.5,            # a join along the baseline (measured 15-18.5), lighter than the pen
+    join_rise=4.0,     # its bottom rises towards the left by up to this much (7-14 degrees over a short join)
+    # a tooth joined on one side (ن): 24 at its foot, 26.4 at its top
+    tooth_foot=24.0, tooth_top=26.4, tooth_chamfer=4.0,
+    # a tooth joined on both sides (ي): upright, its foot flared into both joins, 0.93 of the x-height
+    flare_foot=40.0, flare_top=23.0, flare_h=0.93,
+    # ا: 24 at its foot, 30.5 at its top; its high top corner cut 6
+    alef_foot=24.0, alef_top=30.5, alef_chamfer=6.0,
+    top_cut=7.0,       # every top is cut this many degrees, rising to the side the letter leans to (6-9)
+    lean_alef=5.4,     # ا leans this many degrees ...
+    lean_tooth=3.0,    # ... a tooth that begins a word this many; to one side and the other in turn
+    # the head (the و that stands upright): 68.5 x 70 standing on its join, top right corner cut 23 x 22,
+    # bottom left 25 x 9, top left 6.5 x 4; its walls 24 (left) and 30 (right)
+    head_w=67.0, head_bottom=5.0, head_tr_x=23.3, head_tr_y=22.5, head_bl_x=24.8, head_bl_y=8.5,
+    head_tl_x=6.5, head_tl_y=4.3,
+    # its slot: 12.6 wide, its centre 36.5 from the right, its top 57.5 falling 3.3 to the right, its
+    # right side down to 26.5, a point at 18 (4 from its right side), its left side down to 33
+    slot_w=12.6, slot_x=36.5, slot_top=57.5, slot_fall=3.3, slot_right_low=26.5, slot_point=18.0,
+    slot_point_dx=4.0, slot_left_low=33.0,
+    # the tail: from the head's foot (38.4 to 4.8 from its right edge) down at 63 degrees to the depth;
+    # its tip's bottom rises 10 degrees to the left, its outer tip corner cut 7
+    tail_root_l=38.4, tail_root_r=4.8, tail_angle=63.0, tail_tip_rise=10.0, tail_tip_cut=7.0,
+    bar=24.8,          # a bar along the baseline (the kaf's base, the bottom of a cup)
+    arm=21.0,          # an arm (the kaf's bar, a flag)
+    r_low=24.0, r_high=21.0,   # the outer corners of the kaf's right end, rounded (bottom, top)
+    dot=24.5, dot_chamfer=5.5, dot_turn=2.6,   # a dot: a square, its bottom left corner cut, turned
+    # two dots: one bar 58.6 long, 13.4 high at its left end, 21.4 at its right, its top right corner
+    # cut 5.3, its bottom flat; under a tooth its right end is 8.9 past the tooth's right edge
+    dash_l=58.6, dash_h0=13.4, dash_h1=21.4, dash_chamfer=5.3, dash_dx=8.9, dash_top=6.0,
+    # the kaf: its base 167 long (24.8 high, its bottom falling 7 to the right end); its right end
+    # rounded, its riser 33 wide; its bar 20 thick from the tip rising 4.3 degrees; its slash 22 thick
+    # at 41.6 degrees, 63 long; its tip cut
+    kaf_l=167.0, kaf_riser=33.5, kaf_top=68.2, kaf_bar_low=36.9, kaf_bar_th=19.5, kaf_bar_rise=4.3,
+    kaf_slash_w=22.0, kaf_slash_a=41.6, kaf_slash_l=63.0, kaf_tip_x=165.7, kaf_tip_low=33.4, kaf_tip_high=54.2,
+    head_turn=14.0,    # heads in turn: the first turned back this many degrees with its tail, the next upright
+    slit=6.0,          # white between joined letters, above their join (5-8)
+    touch=0.0,         # white between letters that do not join: they touch
+    space=45.0,        # between words
+    into=4.0,          # a join runs this far into the letter it reaches
 )
 
 
@@ -75,28 +86,22 @@ def rules(st: Style) -> Dict[str, float]:
     return R
 
 
-# ---------------------------------------------------------------- one stroke of the pen
-def quad(p0: Pt, p1: Pt, w0: float, w1: float, c0: float = 0.0, c1: float = 0.0) -> Poly:
-    """Centre line p0 -> p1, width w0 at p0 and w1 at p1, end edges turned c0 / c1 degrees off square."""
-    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
-    L = math.hypot(dx, dy) or 1e-6
-    dx, dy = dx / L, dy / L
-    nx, ny = -dy, dx
-
-    def end(p, w, c):
-        a = math.radians(c)
-        ex, ey = nx * math.cos(a) - ny * math.sin(a), nx * math.sin(a) + ny * math.cos(a)
-        k = w / 2 / max(math.cos(a), 0.2)
-        return (p[0] + k * ex, p[1] + k * ey), (p[0] - k * ex, p[1] - k * ey)
-
-    a, b = end(p0, w0, c0)
-    c, d = end(p1, w1, c1)
-    return [a, c, d, b]
+# ---------------------------------------------------------------- geometry
+def _poly(pts):
+    from shapely.geometry import Polygon
+    return Polygon(pts).buffer(0)
 
 
-def turn(pts: Poly, deg: float, c: Optional[Pt] = None) -> Poly:
+def _union(gs):
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    gs = [g for g in gs if g is not None and not g.is_empty]
+    return unary_union(gs) if gs else Polygon()
+
+
+def turn(pts, deg: float, c: Optional[Pt] = None):
     if not deg:
-        return pts
+        return list(pts)
     cx = sum(p[0] for p in pts) / len(pts) if c is None else c[0]
     cy = sum(p[1] for p in pts) / len(pts) if c is None else c[1]
     a = math.radians(deg)
@@ -104,503 +109,539 @@ def turn(pts: Poly, deg: float, c: Optional[Pt] = None) -> Poly:
     return [(cx + (x - cx) * ca - (y - cy) * sa, cy + (x - cx) * sa + (y - cy) * ca) for x, y in pts]
 
 
-# ---------------------------------------------------------------- the logo's parts
-def part_shapes(part) -> List[List[Poly]]:
-    """A part of Style.block_parts as shapes: [outer ring, holes...] each (even-odd)."""
-    return [[[(float(x), float(y)) for x, y in ring] for ring in shape] for shape in (part or {}).get("polys", [])]
-
-
-def _bounds(shapes: List[List[Poly]]):
-    xs = [x for sh in shapes for x, _ in sh[0]]
-    ys = [y for sh in shapes for _, y in sh[0]]
-    return min(xs), min(ys), max(xs), max(ys)
-
-
-def _moved(shapes: List[List[Poly]], dx: float, dy: float) -> List[List[Poly]]:
-    return [[[(x + dx, y + dy) for x, y in ring] for ring in sh] for sh in shapes]
+def round_corner(g, x: float, y: float, r: float, sx: int, sy: int):
+    """Round the corner of `g` at (x, y); (sx, sy) point from the corner into the shape."""
+    from shapely.geometry import Point, box
+    sq = box(min(x, x + sx * r), min(y, y + sy * r), max(x, x + sx * r), max(y, y + sy * r))
+    return g.difference(sq.difference(Point(x + sx * r, y + sy * r).buffer(r, 48)))
 
 
 class Pen:
-    """Draws the strokes of one letter: by the rules, with the logo's own dot, bar and head."""
+    """Draws one letter by the rules. `sign` is the side the letter leans to, if it leans (+1: its
+    top to the left)."""
 
-    def __init__(self, st: Style, R: Dict[str, float], parts: Optional[Dict] = None):
-        self.st, self.R = st, R
-        self.parts = parts or {}
-        self.ink: List[Poly] = []           # the letter's body
-        self.joins: List[Poly] = []         # its join to the next letter (along the baseline: it does not lean)
-        self.holes: List[Poly] = []
-        self.logo: List[List[Poly]] = []    # shapes taken whole from the logo's parts (they keep their own lean)
-        self.mark_groups: List[List[List[Poly]]] = []   # dots, bars, hamzas: set clear of the neighbours' after layout
-        self._marking: Optional[List[List[Poly]]] = None
+    def __init__(self, st: Style, R: Dict[str, float], sign: float = 1.0):
+        self.st, self.R, self.sign = st, R, sign
+        self.body: list = []            # the letter's ink
+        self.holes: list = []           # slots
+        self.joins: list = []           # its join to the next letter
+        self.marks: List[Tuple[object, Optional[Pt]]] = []   # (a mark, its other place)
 
-    # -- strokes
-    def _put(self, poly: Poly, hole: bool = False) -> None:
-        if self._marking is not None and not hole:
-            self._marking.append([poly])
+    # -- uprights
+    def upright(self, xr: float, foot_w: float, top_w: float, h: float, lean: float, chamfer: float = 0.0,
+                y0: float = 0.0, cut: Optional[float] = None):
+        """A stroke standing from y0 to h: its foot right edge at xr; leaning `lean` degrees (+: its top
+        to the left); its top cut `cut` degrees (rising to the side it leans to), its high corner cut."""
+        R = self.R
+        cut = R["top_cut"] if cut is None else cut
+        rise = 1.0 if lean >= 0 else -1.0                 # +1: the top rises to the left
+        fc = xr - foot_w / 2
+        tc = fc - math.tan(math.radians(lean)) * (h - y0)
+        k = math.tan(math.radians(cut)) * top_w / 2
+        tl, tr = (tc - top_w / 2, h + rise * k), (tc + top_w / 2, h - rise * k)
+        pts = [(xr - foot_w, y0), (xr, y0)]
+        if chamfer > 0 and rise < 0:                      # the high corner is the right one
+            pts += [(tr[0] + 0.15 * chamfer, tr[1] - chamfer), (tr[0] - chamfer, tr[1] + 0.3 * chamfer), tl]
+        elif chamfer > 0:
+            pts += [tr, (tl[0] + chamfer, tl[1] + 0.3 * chamfer), (tl[0] - 0.15 * chamfer, tl[1] - chamfer)]
         else:
-            (self.holes if hole else self.ink).append(poly)
+            pts += [tr, tl]
+        g = _poly(pts)
+        self.body.append(g)
+        return g
 
-    def stroke(self, name: str, p0: Pt, p1: Pt, wide: float, k: Optional[float] = None, hole: bool = False) -> Poly:
-        q = quad(p0, p1, wide * (self.R["k"] if k is None else k), wide, 0.0, self.R["end_cut"])
-        self._put(q, hole)
-        return q
-
-    def up(self, name: str, x: float, y0: float, y1: float, wide: Optional[float] = None) -> Poly:
-        """An upright stroke at x from y0 (its root) to y1."""
-        return self.stroke(name, (x, y0), (x, y1), self.R["W"] if wide is None else wide, self.R["kv"])
-
-    def bar(self, name: str, x0: float, x1: float, y: float, wide: float) -> Poly:
-        """A bar from its root at x0 to x1 (bars are wide at the right)."""
-        return self.stroke(name, (x0, y), (x1, y), wide)
-
-    def join(self, name: str, x0: float, x1: float) -> Poly:
-        hw = self.R["jh"] * self.R["W"]
-        q = quad((x0, hw / 2), (x1, hw / 2), hw * self.R["k"], hw, 0.0, self.R["end_cut"])
-        self.joins.append(q)
-        return q
-
-    def head(self, name: str, xr: float, width: float, height: float, slot: bool = True, bottom: float = 0.0) -> None:
-        """A head: the logo's own head where it is of this size, else a block with its top right and
-        bottom left corners cut and a narrow slot."""
+    def tooth(self, xr: float = 0.0, h: Optional[float] = None) -> float:
+        """A tooth joined on one side (as ن begins كيوانو): it leans, its top cut, its high corner cut."""
         R = self.R
-        own = part_shapes(self.parts.get("رأس"))
-        if own:
-            x0, y0, x1, y1 = _bounds(own)
-            if abs((x1 - x0) - width) <= 0.12 * width and abs((y1 - y0) - height) <= 0.12 * height:
-                self.logo += _moved(own, xr - x1, bottom - y0)
-                return
-        w = width
-        c = min(R["cut"] * width / R["head"], 0.6 * min(w, height))
-        b = min(R["cut_bl"] * width / R["head"], 0.5 * min(w, height))
-        T, x0, y0 = bottom + height, xr - w, bottom
-        self._put([(x0, T), (xr - c, T), (xr, T - c), (xr, y0), (x0 + b, y0), (x0, y0 + b)])
-        if slot:
-            sh = R["slot_h"] * height / R["T"]
-            sx = xr - R["slot_x"] * width / R["head"]
-            sy = bottom + R["slot_y"] * height / R["T"]
-            self._put(quad((sx, sy), (sx, sy + sh), R["slot_w"], R["slot_w"], 0.0, R["end_cut"]), hole=True)
+        h = R["T"] if h is None else h
+        self.upright(xr, R["tooth_foot"], R["tooth_top"], h, R["lean_tooth"] * self.sign, R["tooth_chamfer"])
+        return xr - R["tooth_foot"]
 
-    def block(self, name: str, pts: Poly, slot: Optional[Tuple[Pt, Pt, float]] = None) -> None:
-        """Any block (a head that is not the box of و): its outline, and a slot from p0 to p1 this wide."""
-        self._put(pts)
-        if slot:
-            a, b, w = slot
-            self._put(quad(a, b, w, w, 0.0, self.R["end_cut"]), hole=True)
-
-    def square(self, name: str, x: float, y: float, size: Optional[float] = None) -> None:
-        """A dot with its bottom right corner at (x, y): the logo's own dot, else a square."""
-        own = part_shapes(self.parts.get("نقطة"))
-        d = self.R["dot"] if size is None else size
-        if own and size is None:
-            x0, y0, x1, y1 = _bounds(own)
-            for sh in _moved(own, x - x1, y - y0):
-                if self._marking is not None:
-                    self._marking.append(sh)
-                else:
-                    self.logo.append(sh)
-            return
-        self._put([(x - d, y), (x, y), (x, y + d), (x - d, y + d)])
-
-    def dots_bar(self, cx: float, cy: float) -> None:
-        """Two dots as one bar centred at (cx, cy): the logo's own, else by the rule."""
-        own = part_shapes(self.parts.get("شرطة"))
-        if own:
-            x0, y0, x1, y1 = _bounds(own)
-            for sh in _moved(own, cx - (x0 + x1) / 2, cy - (y0 + y1) / 2):
-                if self._marking is not None:
-                    self._marking.append(sh)
-                else:
-                    self.logo.append(sh)
-            return
+    def medial_tooth(self, xr: float = 0.0, h: Optional[float] = None) -> float:
+        """A tooth joined on both sides (as ي in كيوانو): upright, flaring at its foot into its joins."""
         R = self.R
-        bh = R["h"] * R["W"] * 0.8
-        self.bar("dots", cx - R["dots_l"] / 2, cx + R["dots_l"] / 2, cy, bh)
+        h = R["T"] * R["flare_h"] if h is None else h
+        w0, w1 = R["flare_foot"], R["flare_top"]
+        c = xr - w0 / 2 + 3.5
+        k = math.tan(math.radians(R["top_cut"] - 1.0)) * w1 / 2
+        self.body.append(_poly([(c - w0 / 2, 0.0), (c + w0 / 2, 0.0), (c + w1 / 2, h - k), (c - w1 / 2, h + k)]))
+        return c - w1 / 2 - 0.27 * (w0 - w1)
 
-    def bar_height(self) -> float:
-        own = part_shapes(self.parts.get("شرطة"))
-        if own:
-            x0, y0, x1, y1 = _bounds(own)
-            return y1 - y0
-        return self.R["h"] * self.R["W"] * 0.8
-
-    def tail(self, name: str, x: float, y: float, scale: float = 1.0) -> None:
+    def alef(self, xr: float = 0.0, h: Optional[float] = None, y0: float = 0.0) -> float:
         R = self.R
-        self.stroke(name, (x, y), (x + R["tail_dx"] * scale, R["tail_dy"] * scale), R["W"])
+        h = R["A"] if h is None else h
+        self.upright(xr, R["alef_foot"], R["alef_top"], h, R["lean_alef"] * self.sign, R["alef_chamfer"], y0=y0)
+        return xr - R["alef_foot"]
 
-    def cup(self, name: str, xr: float, xl: float, top_r: float, top_l: float) -> None:
-        """A cup under the baseline, of three strokes: down on the right, along the bottom, up on the left."""
+    # -- the head
+    def head(self, xr: float = 0.0, bottom: Optional[float] = None, width: Optional[float] = None,
+             top: Optional[float] = None, slots: int = 1) -> float:
+        """The head: a block with its corners cut and a narrow slot with a pointed foot. Its walls keep
+        the pen's measure whatever its width; its slot takes what is left."""
         R = self.R
-        W, d = R["W"], self.depth()
-        self.up(name + ".right", xr - W / 2, -d - 0.4 * W, top_r)
-        self.bar(name + ".bottom", xl, xr, -d, R["h"] * W)
-        self.up(name + ".left", xl + W / 2, -d - 0.4 * W, top_l)
+        b = R["head_bottom"] if bottom is None else bottom
+        w = R["head_w"] if width is None else width
+        H = R["T"] if top is None else top
+        s = (H - b) / (R["T"] - R["head_bottom"])         # heights scale with the head
+        x0 = xr - w
+        outer = [(x0 + R["head_tl_x"], H), (xr - R["head_tr_x"], H), (xr - 1.2, H - R["head_tr_y"] * s),
+                 (xr - 0.5, b + 28.0 * s), (xr - 1.2, b + 13.5 * s), (xr - R["tail_root_r"], b),
+                 (xr - R["tail_root_l"] * w / R["head_w"], b + 1.0), (x0 + 3.8, b + R["head_bl_y"] * s),
+                 (x0, b + 12.0 * s), (x0, H - R["head_tl_y"])]
+        self.body.append(_poly(outer))
+        n = max(1, slots)
+        span = w - 24.0 - 30.0                             # between the walls (left 24, right 30)
+        for i in range(n):
+            if n == 1:
+                cx = xr - R["slot_x"] * min(1.0, w / R["head_w"]) if w <= 1.2 * R["head_w"] else xr - 30.0 - span / 2
+                sw = R["slot_w"] if w <= 1.2 * R["head_w"] else span
+            else:
+                part = (span - (n - 1) * 24.0) / n
+                cx = xr - 30.0 - part / 2 - i * (part + 24.0)
+                sw = part
+            top_l = b + (R["slot_top"] - R["head_bottom"]) * s
+            top_r = b + (R["slot_top"] - R["slot_fall"] - R["head_bottom"]) * s
+            hole = [(cx - sw / 2, top_l), (cx + sw / 2, top_r), (cx + sw / 2, b + (R["slot_right_low"] - R["head_bottom"]) * s),
+                    (cx + sw / 2 - R["slot_point_dx"], b + (R["slot_point"] - R["head_bottom"]) * s),
+                    (cx - sw / 2, b + (R["slot_left_low"] - R["head_bottom"]) * s)]
+            self.holes.append(_poly(hole))
+        return x0
 
-    def depth(self) -> float:
-        """How far a cup goes under the baseline: as far as the logo's tails (centre of its bottom)."""
+    def tail(self, xr: float = 0.0, b: Optional[float] = None, angle: Optional[float] = None,
+             root: Optional[Tuple[float, float]] = None):
+        """The tail, thrown from a foot (root: its left and right ends, measured from xr) down to the depth."""
         R = self.R
-        return -R["tail_dy"] + 0.1 * R["W"]
+        b = R["head_bottom"] + 0.8 if b is None else b
+        a = math.radians(R["tail_angle"] if angle is None else angle)
+        rl, rr = root if root is not None else (R["tail_root_l"], R["tail_root_r"])
+        dy = b + R["D"]
+        run = dy / math.tan(a)
+        tip_r = (xr - rr - run, -R["D"])
+        tip_l_x = xr - rl - run + R["tail_tip_cut"]
+        rise = math.tan(math.radians(R["tail_tip_rise"])) * (tip_r[0] - tip_l_x)
+        pts = [(xr - rl, b), (xr - rl - (dy - rise - R["tail_tip_cut"]) / math.tan(a), -R["D"] + rise + R["tail_tip_cut"]),
+               (tip_l_x, -R["D"] + rise), tip_r, (xr - rr, b - 0.8)]
+        g = _poly(pts)
+        self.body.append(g)
+        return g
+
+    # -- bars
+    def join(self, x0: float, x1: float):
+        """A join along the baseline from x0 (left) to x1: lighter than the pen, its bottom rising to the left."""
+        R = self.R
+        rise = min(R["join_rise"], 0.14 * (x1 - x0))
+        g = _poly([(x0, -1.0 + rise), (x1, -1.0), (x1, R["J"] - 1.0), (x0, R["J"] - 1.0)])
+        self.joins.append(g)
+        return g
+
+    def bar(self, x0: float, x1: float, y0: float, thick: float, cut_l: float = 7.0, cut_r: float = 0.0,
+            fall: float = 0.0, joins: bool = False):
+        """A bar from x0 to x1 standing on y0 (its bottom falling `fall` to the right), its ends cut."""
+        t0, t1 = math.tan(math.radians(cut_l)) * thick, math.tan(math.radians(cut_r)) * thick
+        g = _poly([(x0, y0), (x1, y0 - fall), (x1 - t1, y0 + thick), (x0 + t0, y0 + thick)])
+        (self.joins if joins else self.body).append(g)
+        return g
+
+    def kaf_end(self, xr: float = 0.0, flag_to: Optional[float] = None, base_to: Optional[float] = None,
+                top: Optional[float] = None) -> float:
+        """The right end of ک: its riser between its bar and its base, its outer corners rounded; the bar
+        and the base reach left to flag_to and base_to (د is this end alone, a short flag on a base)."""
+        R = self.R
+        top = R["kaf_top"] if top is None else top
+        rw = R["kaf_riser"]
+        flag_to = xr - rw - 13.0 if flag_to is None else flag_to
+        base_to = xr - rw - 30.0 if base_to is None else base_to
+        fall = 7.0 * (xr - base_to) / R["kaf_l"]
+        low = -3.0
+        end = _poly([(xr - rw, low), (xr, low), (xr, top), (xr - rw, top)])
+        end = round_corner(end, xr, low, R["r_low"], -1, 1)
+        end = round_corner(end, xr, top, R["r_high"], -1, -1)
+        self.bar(base_to, xr - rw + 2.0, low + fall, R["bar"] - fall, cut_l=7.0, fall=fall)
+        flag = _poly([(flag_to, top - R["arm"] - 2.5), (xr - rw + 2.0, top - R["arm"]), (xr - rw + 2.0, top),
+                      (flag_to + math.tan(math.radians(7.0)) * R["arm"], top - 1.0)])
+        self.body += [end, flag]
+        return min(base_to, flag_to)
+
+    def cup(self, xr: float, xl: float, up_top: float, right_side: bool = True):
+        """A cup under the baseline: its right side a tail (or none), its bottom a bar of the pen rising a
+        little to the left, its outer left corner rounded as the kaf rounds its corners, an upright end."""
+        R = self.R
+        d = -R["D"]
+        x_in = xr
+        if right_side:
+            b = R["head_bottom"] + 1.0                    # the tail starts at the head's foot, no white between
+            self.tail(xr, b=b)
+            x_in = xr - R["tail_root_r"] - (b + R["D"]) / math.tan(math.radians(R["tail_angle"]))
+        bottom = _poly([(xl, d), (x_in, d), (x_in - 6.0, d + R["bar"]), (xl, d + R["bar"])])
+        bottom = round_corner(bottom, xl, d, 0.7 * R["r_low"], 1, 1)
+        self.body.append(bottom)
+        # the upturn rises flush from the bottom's left end
+        self.upright(xl + R["U"], R["U"], R["U"], up_top, 0.0, 0.0, y0=d + R["bar"] - 4.0)
 
     # -- marks
-    def mark_start(self) -> None:
-        self._marking = []
+    def dot(self, x_right: float, y_bottom: float, alt: Optional[Pt] = None):
+        """A dot: a square, its bottom left corner cut, turned a little; bottom right at (x_right, y_bottom)."""
+        R = self.R
+        d, c = R["dot"], R["dot_chamfer"]
+        pts = [(x_right, y_bottom), (x_right, y_bottom + d), (x_right - d, y_bottom + d), (x_right - d, y_bottom + c),
+               (x_right - d + c, y_bottom)]
+        self.marks.append((_poly(turn(pts, R["dot_turn"])), alt))
 
-    def mark_end(self, _=None) -> None:
-        if self._marking:
-            self.mark_groups.append(self._marking)
-        self._marking = None
+    def dots_bar(self, x_right: float, y_bottom: float, alt: Optional[Pt] = None):
+        """Two dots as one bar: low at its left, high at its right, its top right corner cut."""
+        R = self.R
+        L, h0, h1, c = R["dash_l"], R["dash_h0"], R["dash_h1"], R["dash_chamfer"]
+        pts = [(x_right - L, y_bottom), (x_right - 1.2, y_bottom), (x_right, y_bottom + h1 - c),
+               (x_right - c, y_bottom + h1), (x_right - L, y_bottom + h0)]
+        self.marks.append((_poly(pts), alt))
 
-    def marks(self, spec: Optional[str], cx: float, top: float, bottom: float = 0.0) -> None:
-        """a1/a2/a3 dots above (top = the top of the letter there), b1/b2/b3 under; ha hamza; md madda."""
+    def hamza(self, cx: float, y: float):
+        """ء of blocks: a small square head, a stroke down to the left, a bar back to the right."""
+        s = 0.8 * self.R["dot"]
+        g = _union([_poly([(cx + s / 2, y + 0.55 * s), (cx + s / 2, y + 1.15 * s), (cx - 0.1 * s, y + 1.15 * s), (cx - 0.1 * s, y + 0.55 * s)]),
+                    _poly([(cx + 0.05 * s, y + 0.75 * s), (cx + 0.3 * s, y + 0.55 * s), (cx - 0.35 * s, y + 0.1 * s), (cx - 0.6 * s, y + 0.3 * s)]),
+                    _poly([(cx - 0.6 * s, y), (cx + 0.55 * s, y), (cx + 0.55 * s, y + 0.38 * s), (cx - 0.55 * s, y + 0.38 * s)])])
+        self.marks.append((g, None))
+
+    def mark(self, spec: Optional[str], cx: float, top: float, bottom: float = 0.0, alt: Optional[Pt] = None):
+        """a1/a2/a3 over a letter whose top is `top`; b1/b2/b3 under one whose bottom is `bottom`; ha/hb a
+        hamza; md madda. They keep the slit from their letter."""
         if not spec:
             return
-        self.mark_start()
-        self._marks(spec, cx, top, bottom)
-        self.mark_end()
-
-    def hamza(self, cx: float, y: float, s: float) -> None:
-        """ء of blocks: a small head on the right, a stroke down to the left from it, a bar back to the right."""
-        hw = 0.42 * s
-        self.square("hamza", cx + s / 2, y + 0.55 * s, 0.6 * s)
-        self.stroke("hamza.down", (cx + 0.1 * s, y + 0.6 * s), (cx - 0.45 * s, y + 0.1 * s), hw)
-        self.bar("hamza.bar", cx - 0.5 * s, cx + 0.55 * s, y + hw / 2, hw)
-
-    def _marks(self, spec: str, cx: float, top: float, bottom: float = 0.0) -> None:
         R = self.R
-        d, g = R["dot"], 0.25 * R["W"]
-        bh = self.bar_height()
-        if spec in ("a1", "b1"):
-            y = top + g if spec == "a1" else min(bottom, 0) + R["dots_y"] - d / 2
-            self.square("dot", cx + d / 2, y)
-        elif spec in ("a2", "b2"):
-            y = top + g + bh / 2 if spec == "a2" else min(bottom, 0) + R["dots_y"]
-            self.dots_bar(cx, y)
-        elif spec in ("a3", "b3"):
-            if spec == "a3":
-                y = top + g + bh / 2
-                self.dots_bar(cx, y)
-                self.square("dot", cx + d / 2, y + bh / 2 + 0.2 * g)
-            else:
-                y = min(bottom, 0) + R["dots_y"]
-                self.dots_bar(cx, y)
-                self.square("dot", cx + d / 2, y - bh / 2 - 0.2 * g - d)
-        elif spec in ("ha", "hb"):
-            s = 1.3 * d
-            y = top + g if spec == "ha" else min(bottom, 0) + R["dots_y"] - 0.6 * s
-            self.hamza(cx, y, s)
-        elif spec == "md":
-            self.dots_bar(cx, top + g + bh / 2)
+        g = R["slit"]
+        low = min(bottom, 0.0) - R["dash_top"]
+        if spec == "a1":
+            self.dot(cx + R["dot"] / 2, top + g, alt)
+        elif spec == "b1":
+            self.dot(cx + R["dot"] / 2, low - R["dot"])
+        elif spec in ("a2", "md"):
+            self.dots_bar(cx + R["dash_l"] / 2, top + g, alt)
+        elif spec == "b2":
+            self.dots_bar(cx + R["dash_l"] / 2, low - R["dash_h1"])
+        elif spec == "a3":
+            self.dots_bar(cx + R["dash_l"] / 2, top + g)
+            self.dot(cx + R["dot"] / 2, top + g + R["dash_h1"] + g)
+        elif spec == "b3":
+            self.dots_bar(cx + R["dash_l"] / 2, low - R["dash_h1"])
+            self.dot(cx + R["dot"] / 2, low - R["dash_h1"] - g - R["dot"])
+        elif spec == "ha":
+            self.hamza(cx, top + g)
+        elif spec == "hb":
+            self.hamza(cx, low - 0.92 * R["dot"])
 
 
 # ---------------------------------------------------------------- the letters
-def _exit(p: Pen, form: str, left: float) -> None:
+def _exit(p: Pen, form: str, left: float, foot: float) -> None:
+    """A letter joined to the next draws the join, from its foot to `into` past the slit."""
     if form in ("I", "M"):
         R = p.R
-        p.join("join", left - R["slit"] - R["into"], 0.0)
+        p.join(left - R["slit"] - R["into"], foot)
+
+
+LEANS = set("اأإآٱل")          # letters with a free upright: they lean (and teeth that begin a word)
 
 
 def _alef(p: Pen, form, mark):
     R = p.R
-    W = R["W"]
-    p.up("stem", -W / 2, 0, R["A"])
-    p.marks(mark, -W / 2, R["A"])
-    return -W
+    left = p.alef(0.0)
+    if mark in ("ha", "md"):
+        p.mark(mark, -R["alef_foot"] / 2 - math.tan(math.radians(R["lean_alef"] * p.sign)) * R["A"], R["A"] + 3.0)
+    elif mark == "hb":
+        p.mark(mark, -R["alef_foot"] / 2, R["A"], 0.0)
+    return left
 
 
 def _tooth_letter(p: Pen, form, mark, letter):
-    """ب ت ث ن ي and their kin joined on the left: a tooth."""
+    """ب ت ث ن ي and their kin joined on the left: a tooth (upright and flared when joined on both sides)."""
     R = p.R
-    W = R["W"]
-    top = R["T"] * (R["teeth"] if letter not in "يیئ" else R.get("teeth_yeh", 0.94))
-    p.up("tooth", -W / 2, 0, top)
-    if mark and mark.startswith("a"):
-        # a dot sits on the tooth's left shoulder (the ن of كيوانو)
-        if mark == "a1":
-            p.mark_start()
-            p.square("dot", -W + R["dot_dx"], top)
-            p.mark_end()
-        else:
-            p.marks(mark, -W / 2, top)
+    h = R["T"] * (R["flare_h"] if letter in "يیئ" else 1.0)
+    if form == "M":
+        left = p.medial_tooth(0.0, h)
+        foot = -4.0
     else:
-        p.marks(mark, -W / 2 - 0.1 * W, 0)
-    _exit(p, form, -W)
-    return -W
+        left = p.tooth(0.0, h)
+        foot = -2.0
+    top = h + 2.0
+    cx = left / 2
+    if mark == "a1":
+        # the dot stands on the tooth's left shoulder (as on كيوانو's ن), or, with no room there, over it
+        x_r, y_b = left + 2.0, h - 3.0
+        p.dot(x_r, y_b, alt=(cx + R["dot"] / 2 - x_r, top + R["slit"] - y_b))
+    elif mark == "b2":
+        p.dots_bar(R["dash_dx"], -R["dash_top"] - R["dash_h1"])     # under the tooth, as under كيوانو's ي
+    elif mark:
+        p.mark(mark, cx, top)
+    _exit(p, form, left, foot)
+    return left
 
 
 def _beh_end(p: Pen, form, mark, letter):
-    """ب ت ث alone or last: a boat, a short post at each end and the baseline between."""
+    """ب ت ث alone or last: a boat, a short upright at each end and a bar on the baseline between."""
     R = p.R
-    W, T = R["W"], R["T"]
-    w = 3.2 * W
-    p.up("post.r", -W / 2, 0, 0.5 * T)
-    p.join("base", -w, 0)
-    p.up("post.l", -w + W / 2, 0, 0.4 * T, 0.8 * W)
-    p.marks(mark, -w / 2, 0.5 * T)
+    w = 3.4 * R["U"]
+    p.upright(0.0, R["tooth_foot"], R["tooth_top"], 0.55 * R["T"], 0.0, R["tooth_chamfer"])
+    p.bar(-w, -4.0, -1.0, R["J"] + 2.0, cut_l=0.0)
+    p.upright(-w + R["U"] - 2.0, R["U"] - 4.0, R["U"] - 2.0, 0.42 * R["T"], 0.0, 0.0)
+    p.mark(mark, -w / 2, 0.55 * R["T"] + 2.0, -1.0)
     return -w
 
 
 def _noon_end(p: Pen, form, mark):
     R = p.R
-    W, T = R["W"], R["T"]
-    w = 2.6 * W
-    p.cup("cup", 0, -w, 0.75 * T, 0.35 * T)
+    w = 2.8 * R["U"]
+    p.upright(0.0, R["tooth_foot"], R["tooth_top"], 0.8 * R["T"], 0.0, R["tooth_chamfer"], y0=-R["D"] + 8.0)
+    p.cup(-R["tooth_foot"] + 6.0, -w, 0.38 * R["T"], right_side=False)
     if mark:
-        p.mark_start()
-        p.square("dot", -w / 2 + R["dot"] / 2, 0.75 * T + 0.25 * W)
-        p.mark_end()
+        p.dot(-w / 2 + R["dot"] / 2, 0.8 * R["T"] + R["slit"])
     return -w
 
 
 def _yeh_end(p: Pen, form, mark):
-    """ي ی ى alone or last: a short post, then a wide cup back under it; its two dots under the cup."""
+    """ي ی ى alone or last: a short upright, then a wide cup back under it; its two dots under the cup."""
     R = p.R
-    W, T = R["W"], R["T"]
-    w = 3.0 * W
-    p.cup("cup", 0, -w, 0.5 * T, 0.3 * T)
-    if mark in ("b2",):
-        d = p.depth() + 0.4 * W
-        p.mark_start()
-        p.dots_bar(-w / 2, -d - 0.6 * W - p.bar_height() / 2)
-        p.mark_end()
+    w = 3.2 * R["U"]
+    p.upright(0.0, R["tooth_foot"], R["tooth_top"], 0.5 * R["T"], 0.0, R["tooth_chamfer"], y0=-R["D"] + 8.0)
+    p.cup(-R["tooth_foot"] + 6.0, -w, 0.3 * R["T"], right_side=False)
+    if mark == "b2":
+        p.dots_bar(-w / 2 + R["dash_l"] / 2, -R["D"] - R["slit"] - R["dash_h1"])
     elif mark == "ha":
-        p.marks("ha", -w / 2, 0.5 * T)
+        p.mark("ha", -w / 2, 0.5 * R["T"] + 2.0)
     return -w
 
 
 def _reh(p: Pen, form, mark):
-    """ر ز ژ: a tail, one block thrown down to the left from above the baseline."""
+    """ر ز ژ: the و without its loop: the right wall of the head, half as high, and its tail."""
     R = p.R
-    W, T = R["W"], R["T"]
-    x = -W / 2
-    p.stroke("tail", (x, 0.5 * T), (x + 1.2 * R["tail_dx"], 1.2 * R["tail_dy"]), W)
-    p.marks(mark, x - 0.2 * W, 0.5 * T + 0.2 * W)
-    return -1.1 * W
+    wall = 30.0
+    p.upright(0.0, wall, wall - 2.0, 0.55 * R["T"], 0.0, R["tooth_chamfer"])
+    p.tail(0.0, b=4.0, root=(wall + 4.0, R["tail_root_r"]))
+    p.mark(mark, -wall / 2, 0.55 * R["T"] + 2.0)
+    return -wall
 
 
 def _dal(p: Pen, form, mark):
-    """د ذ: an upright on the right and the baseline back to the left."""
+    """د ذ: the right end of ک alone: its riser with its rounded corners, a short flag, a longer base."""
     R = p.R
-    W, T = R["W"], R["T"]
-    w = 1.9 * W
-    p.up("post", -W / 2, 0, 0.62 * T)
-    p.join("base", -w, 0)
-    p.marks(mark, -w / 2, 0.62 * T)
-    return -w
+    left = p.kaf_end(0.0)
+    p.mark(mark, -R["kaf_riser"] / 2, R["kaf_top"] + 2.0)
+    return left
 
 
 def _waw(p: Pen, form, mark):
     R = p.R
-    p.head("waw", 0.0, R["head"], R["T"])
-    p.tail("tail", -R["tail_x"], R["W"] * 0.3)
+    left = p.head(0.0)
+    p.tail(0.0)
     if mark == "ha":
-        p.marks("ha", -R["head"] / 2, R["T"])
-    return -R["head"]
+        p.mark("ha", left / 2, R["T"] + 2.0)
+    return left
 
 
 def _head_letter(p: Pen, form, mark, letter):
-    """ف ق: a head on the baseline; joined, it goes on; alone or last, ف lies along the baseline and
-    ق drops into a cup."""
+    """ف ق: the head; joined, it goes on; alone or last, ف lies along the baseline, ق drops into a cup."""
     R = p.R
-    W, T = R["W"], R["T"]
-    hw, ht = 0.85 * R["head"], 0.85 * T
-    p.head("head", 0.0, hw, ht)
-    left = -hw
+    left = p.head(0.0)
+    body_left = left
     if form in ("i", "F"):
         if letter == "ق":
-            p.cup("cup", -hw + W, -hw - 1.6 * W, 0.0, 0.35 * T)
-            left = -hw - 1.6 * W
+            body_left = left - 1.2 * R["U"]
+            p.cup(0.0, body_left, 0.42 * R["T"])
         else:
-            left = -hw - 1.6 * W
-            p.join("base", left, -hw + W)
-            p.up("post.l", left + W / 2, 0, 0.35 * T, 0.8 * W)
-    p.marks(mark, -hw / 2, ht)
-    _exit(p, form, -hw)
-    return left
+            body_left = left - 1.6 * R["U"]
+            p.bar(body_left, left + 20.0, -1.0, R["J"] + 2.0, cut_l=0.0)
+            p.upright(body_left + R["U"] - 2.0, R["U"] - 4.0, R["U"] - 2.0, 0.4 * R["T"], 0.0, 0.0)
+    if mark:
+        p.mark(mark, left / 2, R["T"] + 2.0)
+    _exit(p, form, left, -6.0)
+    return body_left
 
 
 def _meem(p: Pen, form, mark):
     R = p.R
-    W, T = R["W"], R["T"]
-    hw, ht = 0.8 * R["head"], 0.62 * T
-    p.head("head", 0.0, hw, ht)
+    left = p.head(0.0)
     if form in ("i", "F"):
-        p.stroke("tail", (-hw + W / 2, 0.3 * W), (-hw + W / 2 - 0.15 * W, -p.depth() - 0.3 * W), W, R["kv"])
-    _exit(p, form, -hw)
-    return -hw
+        p.upright(left + R["U"], R["U"] - 2.0, R["U"], R["head_bottom"] + 12.0, 0.0, 0.0, y0=-R["D"])
+    _exit(p, form, left, -6.0)
+    return left
 
 
 def _heh(p: Pen, form, mark):
-    """ه ة. Starting a word: a block with two slots side by side (as square kufic draws it: a head with
-    one stroke above reads as ط); in the middle: two heads one over the other, the join between them;
-    last: a head with a short flick thrown up to the left; alone (and ة): a head."""
+    """ه ة. Starting a word: a wider head with two slots (as square kufic draws it); in the middle: two
+    heads one over the other, the join between them; last: a head with a short arm up to the left;
+    alone (and ة): the head."""
     R = p.R
-    W, T = R["W"], R["T"]
     if form == "I":
-        hw, ht = 1.15 * R["head"], 0.95 * T
-        c = R["cut"] * 0.8
-        pts = [(-hw, ht), (-c, ht), (0.0, ht - c), (0.0, 0.0), (-hw, 0.0)]
-        sh = 0.5 * ht
-        p.block("head", pts, ((-0.3 * hw, 0.25 * ht), (-0.3 * hw, 0.25 * ht + sh), R["slot_w"]))
-        p.holes.append(quad((-0.72 * hw, 0.35 * ht), (-0.72 * hw, 0.35 * ht + sh), R["slot_w"], R["slot_w"], 0.0, R["end_cut"]))
+        left = p.head(0.0, width=1.4 * R["head_w"], slots=2)
     elif form == "M":
-        hw = 0.65 * R["head"]
-        p.head("head", 0.0, hw, 0.6 * T, bottom=0.1 * T)
-        p.head("low", 0.0, hw, 0.6 * T, bottom=-0.6 * T)
-        ht = 0.7 * T
+        left = p.head(0.0, bottom=R["T"] * 0.12, width=0.8 * R["head_w"], top=R["T"])
+        p.head(0.0, bottom=-R["T"] * 0.55, width=0.8 * R["head_w"], top=R["T"] * 0.1)
     elif form == "F" and mark is None:
-        hw, ht = 0.8 * R["head"], 0.7 * T
-        p.head("head", 0.0, hw, ht)
-        p.stroke("flick", (-hw + 0.6 * W, ht - 0.3 * W), (-hw - 0.3 * W, ht + 0.45 * T), 0.8 * W)
+        left = p.head(0.0)
+        p.upright(left + R["U"] - 4.0, R["U"] - 6.0, R["U"] - 4.0, R["T"] + 18.0, R["lean_alef"], R["alef_chamfer"], y0=R["T"] - 12.0)
     else:
-        hw, ht = 0.8 * R["head"], 0.8 * T
-        p.head("head", 0.0, hw, ht)
-    p.marks(mark, -hw / 2, ht)
-    _exit(p, form, -hw)
-    return -hw
+        left = p.head(0.0)
+    if mark:
+        p.mark(mark, left / 2, R["T"] + 2.0)
+    _exit(p, form, left, -6.0)
+    return left
 
 
 def _sad(p: Pen, form, mark, letter):
-    """ص ض ط ظ: a long head lying on the baseline; ص ends in a small tooth, ط carries a tall stroke."""
+    """ص ض ط ظ: a long head lying on the baseline; ص ends in a small tooth, ط carries the upright of ا."""
     R = p.R
-    W, T = R["W"], R["T"]
-    hw, ht = 1.9 * R["head"] * 0.85, 0.62 * T
-    left = -hw
+    w = 1.7 * R["head_w"]
     if letter in "صض":
-        p.up("tooth", -W / 2, 0, 0.62 * T)
-        p.head("head", -W, hw - W, ht)
+        p.upright(0.0, R["tooth_foot"], R["tooth_top"], 0.55 * R["T"], 0.0, R["tooth_chamfer"])
+        left = p.head(-R["tooth_foot"] + 4.0, width=w, top=0.85 * R["T"])
     else:
-        p.head("head", 0.0, hw, ht)
-        p.up("stem", -hw + 1.2 * W, 0, R["A"])
+        left = p.head(0.0, width=w, top=0.85 * R["T"])
+        p.alef(left + 1.3 * R["U"], y0=R["head_bottom"])
+    body_left = left
     if form in ("i", "F") and letter in "صض":
-        p.cup("cup", -hw + W, -hw - 1.8 * W, 0.0, 0.35 * T)
-        left = -hw - 1.8 * W
-    p.marks(mark, -hw / 2, ht)
-    _exit(p, form, -hw)
-    return left
+        body_left = left - 1.4 * R["U"]
+        p.cup(left + 20.0, body_left, 0.4 * R["T"], right_side=False)
+    if mark:
+        p.mark(mark, left / 2 if letter in "صض" else left * 0.6, 0.85 * R["T"] + 2.0)
+    _exit(p, form, left, -6.0)
+    return body_left
 
 
 def _seen(p: Pen, form, mark):
+    """س ش: three teeth joined on both sides, on one join; alone or last, a cup."""
     R = p.R
-    W, T = R["W"], R["T"]
-    t = 0.55 * T
-    jw = R["slot_w"]                      # the white inside a letter is the head's slot
-    xs = [-W / 2 - i * (W + jw) for i in range(3)]
-    for i, x in enumerate(xs):
-        p.up(f"tooth{i}", x, 0, t, 0.9 * W)
-    left = xs[-1] - W / 2
-    p.join("base", left, 0)
+    x = 0.0
+    lefts = []
+    for i in range(3):
+        left = p.medial_tooth(x, R["T"] * (0.8 if i else 0.88))
+        lefts.append(left)
+        x = left - R["slit"] + 4.0
+    left = lefts[-1]
+    p.bar(left - 2.0, -4.0, -1.0, R["J"], cut_l=0.0, joins=True)
+    body_left = left
     if form in ("i", "F"):
-        p.cup("cup", left + W, left - 1.8 * W, 0.0, 0.35 * T)
-        left = left - 1.8 * W
-    p.marks(mark, xs[1], t)
-    _exit(p, form, xs[-1] - W / 2)
-    return left
+        body_left = left - 1.6 * R["U"]
+        p.cup(left + 12.0, body_left, 0.4 * R["T"], right_side=False)
+    if mark:
+        p.mark(mark, (lefts[0] + lefts[1]) / 2 + 6.0, R["T"] * 0.88 + 2.0)
+    _exit(p, form, left, -6.0)
+    return body_left
 
 
 def _jeem(p: Pen, form, mark):
-    """ج ح خ: a hat on the left at the top and from its right end a stroke falling to the right, to the
-    baseline (joined) or, alone or last, on into a bowl thrown back under the baseline to the left."""
+    """ج ح خ: a hat on the left at the top, and from its right end a stroke falling to the right, to the
+    join (joined) or, alone or last, on into a bowl thrown back under the baseline to the left."""
     R = p.R
-    W, T, h = R["W"], R["T"], R["h"]
-    hb = h * W
-    w = 2.5 * W
-    p.bar("hat", -w, -1.15 * W, T - hb / 2, hb)
+    U, T = R["U"], R["T"]
+    w = 2.6 * U
+    p.bar(-w, -1.0 * U, T - R["arm"], R["arm"], cut_l=7.0, cut_r=0.0)
+    top_x = -1.55 * U
     if form in ("I", "M"):
-        p.stroke("fall", (-1.45 * W, T - 0.3 * W), (-0.5 * W, 0.45 * W), W)
+        foot = -0.55 * U
+        p.body.append(_poly([(top_x - 0.55 * U, T - 2.0), (top_x + 0.6 * U, T - 2.0), (foot + 0.6 * U, 0.0), (foot - 0.55 * U, 0.0)]))
         below = 0.0
     else:
-        d = p.depth() + 0.3 * W
-        knee = (-0.45 * W, 0.3 * T)
-        p.stroke("fall", (-1.45 * W, T - 0.3 * W), knee, W)
-        p.stroke("back", knee, (-w + 0.3 * W, -d), W)
-        p.bar("bottom", -w, -0.2 * W, -d, hb)
-        below = -d - hb / 2
+        knee = (-0.5 * U, 0.3 * T)
+        p.body.append(_poly([(top_x - 0.55 * U, T - 2.0), (top_x + 0.6 * U, T - 2.0), (knee[0] + 0.6 * U, knee[1]), (knee[0] - 0.55 * U, knee[1] - 0.2 * U)]))
+        p.cup(knee[0] + 0.6 * U, -w, 0.12 * T, right_side=False)
+        p.body.append(_poly([(knee[0] + 0.6 * U, knee[1]), (knee[0] - 0.55 * U, knee[1] - 0.2 * U),
+                             (-w + 1.4 * U, -R["D"] + 6.0), (-w + 0.4 * U, -R["D"] + R["bar"])]))
+        below = -R["D"]
     if mark == "b1":
-        p.marks("b1", -1.0 * W if form in ("I", "M") else -1.2 * W, 0, below)
+        if form in ("I", "M"):
+            p.dot(-1.15 * U + R["dot"] / 2, -R["dash_top"] - R["dot"])
+        else:
+            p.dot(-1.1 * U + R["dot"] / 2, below - R["slit"] - R["dot"])
     elif mark == "a1":
-        p.marks("a1", -w + 0.9 * W, T)
+        p.mark("a1", -w + 1.0 * U, T)
     elif mark == "b3":
-        p.marks("b3", -1.0 * W, 0, below)
-    _exit(p, form, -w)
+        p.mark("b3", -1.1 * U, 0.0, below)
+    _exit(p, form, -w, -4.0)
     return -w
 
 
 def _ain(p: Pen, form, mark):
     """ع غ. Starting a word: a mouth open to the right (an arm on top, a back falling to the baseline);
-    in the middle and at the end: a V open at the top, standing on the join; at the end and alone a
-    bowl is thrown back under the baseline to the left."""
+    in the middle and at the end: a V open at the top, standing on the join; at the end and alone, a
+    bowl thrown back under the baseline to the left."""
     R = p.R
-    W, T, h = R["W"], R["T"], R["h"]
-    hb = h * W
-    d = p.depth() + 0.3 * W
+    U, T = R["U"], R["T"]
     if form in ("i", "I"):
-        w = 2.0 * W
+        w = 2.1 * U
         top = 1.05 * T
-        p.bar("arm", -w + 0.3 * W, -0.15 * W, top - hb / 2, hb)
-        p.stroke("back", (-1.2 * W, 0.35 * W), (-w + 0.75 * W, top - 0.2 * W), W, R["kv"])
-        foot = (-1.2 * W, 0.2 * W)
+        p.bar(-w + 0.3 * U, -0.1 * U, top - R["arm"], R["arm"], cut_l=7.0)
+        p.body.append(_poly([(-w + 0.25 * U, top - 2.0), (-w + 1.2 * U, top - 2.0), (-1.0 * U, 0.0), (-1.9 * U, 0.0)]))
+        foot_x = -1.45 * U
     else:
-        # open at the top, a V on the join (a closed head would read as م)
-        w = 2.3 * W
+        w = 2.4 * U
         top = 0.95 * T
-        foot = (-w / 2, 0.35 * W)
-        p.stroke("right", foot, (-0.45 * W, top - 0.2 * W), 0.9 * W, R["kv"])
-        p.stroke("left", foot, (-w + 0.45 * W, top - 0.2 * W), 0.9 * W, R["kv"])
+        foot_x = -w / 2
+        p.body.append(_poly([(foot_x - 0.5 * U, 0.0), (foot_x + 0.45 * U, 0.0), (-0.1 * U, top), (-0.95 * U, top - 2.0)]))
+        p.body.append(_poly([(foot_x - 0.45 * U, 0.0), (foot_x + 0.5 * U, 0.0), (-w + 0.95 * U, top - 2.0), (-w + 0.1 * U, top)]))
     left = -w
     if form in ("i", "F"):
-        p.stroke("drop", foot, (-w - 0.2 * W, -d), W)
-        p.bar("bottom", -w - 0.5 * W, foot[0] + 0.6 * W, -d, hb)
-        left = -w - 0.5 * W
-    p.marks(mark, -w / 2, top)
-    _exit(p, form, -w)
+        left = -w - 0.4 * U
+        p.cup(foot_x + 0.6 * U, left, 0.1 * T, right_side=False)
+        p.body.append(_poly([(foot_x - 0.5 * U, 2.0), (foot_x + 0.5 * U, 2.0), (left + 1.5 * U, -R["D"] + 8.0), (left + 0.6 * U, -R["D"] + R["bar"])]))
+    if mark:
+        p.mark(mark, -w / 2, top + 2.0)
+    _exit(p, form, -w, -4.0)
     return left
 
 
 def _kaf(p: Pen, form, mark, letter):
-    """ک as كيوانو draws it: a long base, a riser on the right, the bar back to a tip, and from the tip
-    the slash up to the right. Alone or last, a short post stands at the left end of the base."""
+    """ک as كيوانو draws it, by its measures: a long base, the right end with its riser and rounded
+    corners, the bar back to a tip, and from the tip the slash up to the right. Alone or last, a short
+    upright stands at the left end of the base."""
     R = p.R
-    W, T, h = R["W"], R["T"], R["h"]
     L = R["kaf_l"]
-    hb = h * W
-    if form in ("I", "M"):
-        p.bar("base", -L - R["into"], 0, hb / 2, hb)
-    else:
-        p.bar("base", -L + 0.3 * W, 0, hb / 2, hb)
-        p.up("post.l", -L + 0.3 * W + W / 2, 0, 0.35 * T, 0.8 * W)
-    p.up("riser", -W / 2, 0, T * R["kaf_riser"])
-    tip = (-L + 0.07 * L, T * R["kaf_bar"])
-    a = math.radians(R["bar_rise"])
-    p.stroke("bar", tip, (-W / 2, tip[1] + (L * 0.93 - W / 2) * math.tan(a)), h * W)
-    s = math.radians(R["slash_a"])
-    p.stroke("slash", tip, (tip[0] + R["slash_l"] * math.cos(s), tip[1] + R["slash_l"] * math.sin(s)), h * W)
+    tip_x = -R["kaf_tip_x"]
+    base_left = -L - R["into"] if form in ("I", "M") else -L + 0.4 * R["U"]
+    p.kaf_end(0.0, flag_to=tip_x + 20.0, base_to=base_left)
+    rise = math.tan(math.radians(R["kaf_bar_rise"]))
+    xr = -R["kaf_riser"] + 4.0
+    lo_l = R["kaf_bar_low"]
+    lo_r = lo_l + (xr - (tip_x + 17.0)) * rise
+    p.body.append(_poly([(tip_x + 17.0, lo_l), (xr, lo_r), (xr, R["kaf_top"] - 1.0), (tip_x + 34.0, lo_l + R["kaf_bar_th"] + 2.0)]))
+    a = math.radians(R["kaf_slash_a"])
+    ux, uy = math.cos(a), math.sin(a)
+    nx, ny = -uy, ux
+    base_pt = (tip_x, R["kaf_tip_high"])
+    w = R["kaf_slash_w"]
+    far = (base_pt[0] + ux * R["kaf_slash_l"], base_pt[1] + uy * R["kaf_slash_l"])
+    p.body.append(_poly([base_pt, far, (far[0] - nx * w + 5.0, far[1] - ny * w - 5.0),
+                         (base_pt[0] - nx * w + 12.0, base_pt[1] - ny * w), (tip_x + 10.0, R["kaf_tip_low"])]))
     if letter == "گ":
-        p.stroke("slash2", (tip[0] + 0.35 * W, tip[1] + 0.9 * W),
-                 (tip[0] + 0.35 * W + R["slash_l"] * math.cos(s), tip[1] + 0.9 * W + R["slash_l"] * math.sin(s)), h * W)
-    return -L if form in ("I", "M") else -L + 0.3 * W
+        off = 0.9 * R["U"]
+        p.body.append(_poly([(base_pt[0] + 20.0, base_pt[1] + off), (far[0] + 20.0, far[1] + off),
+                             (far[0] + 20.0 - nx * w * 0.8, far[1] + off - ny * w * 0.8),
+                             (base_pt[0] + 20.0 - nx * w * 0.8, base_pt[1] + off - ny * w * 0.8)]))
+    if form in ("i", "F"):
+        p.upright(base_left + R["U"], R["U"] - 4.0, R["U"] - 2.0, 0.4 * R["T"], 0.0, 0.0)
+    return -L if form in ("I", "M") else base_left
 
 
 def _lam(p: Pen, form, mark):
     R = p.R
-    W, T = R["W"], R["T"]
-    p.up("stem", -W / 2, 0, R["A"])
-    left = -W
     if form in ("i", "F"):
-        p.cup("cup", 0, -2.4 * W, 0.0, 0.35 * T)
-        left = -2.4 * W
-    _exit(p, form, -W)
+        left = p.alef(0.0, y0=-R["D"] + 6.0)
+        body_left = left - 1.6 * R["U"]
+        p.cup(left + 6.0, body_left, 0.38 * R["T"], right_side=False)
+        return body_left
+    left = p.alef(0.0)
+    _exit(p, form, left, -4.0)
     return left
 
 
 def _hamza(p: Pen, form, mark):
     R = p.R
-    p.marks("ha", -0.5 * R["dot"], 0.1 * R["T"])
+    p.hamza(-0.5 * R["dot"], 0.12 * R["T"])
     return -R["dot"]
 
 
 def _tatweel(p: Pen, form, mark):
     R = p.R
-    p.join("join", -1.5 * R["W"], 0)
-    return -1.5 * R["W"]
+    p.join(-1.5 * R["U"], 0.0)
+    return -1.5 * R["U"]
 
 
 BUILD = {
@@ -616,6 +657,15 @@ BUILD = {
     "ل": (_lam, None), "م": (_meem, None), "ه": (_heh, None), "ة": (_heh, "a2"),
     "و": (_waw, None), "ؤ": (_waw, "ha"), "ء": (_hamza, None), "ـ": (_tatweel, None),
 }
+
+
+TURNS = set("وؤ")             # a head that stands alone with its tail turns back, in turn (the first و of كيوانو)
+
+
+def leans(c: str, form: str) -> bool:
+    """A letter with a free upright leans: ا ل, and a tooth that begins a word."""
+    how = BUILD.get(c, (None, None))[0]
+    return c in LEANS or (how in ("beh", "noon", "yeh") and form == "I")
 
 
 def build(c: str, form: str, p: Pen) -> float:
@@ -637,60 +687,8 @@ def build(c: str, form: str, p: Pen) -> float:
     return how(p, form, mark)
 
 
-# ---------------------------------------------------------------- the logo's letters
-TEETH_KIN = "بتثنيیئپ"
-# letters with one body that differ by their dots: the logo's drawing of one serves the others, with
-# their own dots (in the forms where the bodies are one)
-SAME_BODY = [(TEETH_KIN, "IM"), ("بتثپ", "iF"), ("جحخچ", "iIMF"), ("دذ", "iF"), ("رزژ", "iF"), ("سش", "iIMF"),
-             ("صض", "iIMF"), ("طظ", "iIMF"), ("عغ", "iIMF"), ("فقڤ", "IM"), ("فڤ", "iF"), ("اأإآٱ", "iF"),
-             ("وؤ", "iF"), ("هة", "iF")]
-TWINS = {"ك": "ک", "ک": "ك", "ي": "ی", "ی": "ي"}     # one drawing (ي and ی differ only when alone or last)
-
-
-def logo_letter(parts: Dict, c: str, form: str, seen: Optional[Dict[str, int]] = None):
-    """The logo's own drawing of `c` in `form` (or in the form that differs only by the join from the
-    right), and whether it is another letter's tooth standing in (then it comes without its dots).
-    A letter the logo draws more than once in different ways ("و.F", "و.F/2") takes its drawings in
-    turn, as the logo does (`seen` counts them)."""
-    other = {"i": "F", "F": "i", "I": "M", "M": "I"}[form]
-    names = [c] + ([TWINS[c]] if c in TWINS and (form in ("I", "M") or c in "كک") else [])
-
-    def pick(key):
-        alts = [parts[key]] + [parts[f"{key}/{i}"] for i in range(2, 9) if f"{key}/{i}" in parts]
-        if seen is None:
-            return alts[0]
-        k = seen.get(key, 0)
-        seen[key] = k + 1
-        return alts[k % len(alts)]
-
-    for name in names:
-        for key in (f"{name}.{form}", f"{name}.{other}"):
-            if key in parts:
-                return pick(key), False
-    for group, forms in SAME_BODY:
-        if c in group and form in forms:
-            for q in group:
-                for f in (form, other):
-                    if f in forms and f"{q}.{f}" in parts:
-                        return parts[f"{q}.{f}"], True
-    return None, False
-
-
-def _geom(shapes: List[List[Poly]]):
-    from shapely.geometry import Polygon
-    from shapely.ops import unary_union
-    gs = []
-    for sh in shapes:
-        if len(sh[0]) >= 3:
-            g = Polygon(sh[0]).buffer(0)
-            for hole in sh[1:]:
-                if len(hole) >= 3:
-                    g = g.difference(Polygon(hole).buffer(0))
-            gs.append(g)
-    return unary_union(gs) if gs else Polygon()
-
-
-def _shapes_of(geom) -> List[List[Poly]]:
+# ---------------------------------------------------------------- the word
+def _shapes_of(geom) -> List[List[List[Pt]]]:
     out = []
     for poly in getattr(geom, "geoms", [geom]):
         if poly.geom_type != "Polygon" or poly.is_empty:
@@ -699,75 +697,17 @@ def _shapes_of(geom) -> List[List[Poly]]:
     return out
 
 
-def soften(ink: List[Poly], holes: List[Poly], r: float):
-    """The union of the blocks, the slots cut out, the outer corners softened (as shapes)."""
-    from shapely.geometry import Polygon
-    from shapely.ops import unary_union
-    S = unary_union([Polygon(q).buffer(0) for q in ink if len(q) >= 3])
-    if holes:
-        S = S.difference(unary_union([Polygon(q).buffer(0) for q in holes if len(q) >= 3]))
-    if r > 0 and not S.is_empty:
-        S = S.buffer(-r, join_style=1).buffer(r, join_style=1)
-    return _shapes_of(S)
-
-
-def clear_marks(bodies, groups, R: Dict[str, float]):
-    """Set each mark clear of the other letters and of the marks already set, as a calligrapher sets
-    the dots of neighbours. `groups`: (owner, shapes, other place) in order. A mark may touch its own
-    letter (the dot of كيوانو's ن stands on the tooth's shoulder). A mark that would touch another
-    letter or mark goes, in this order: to its other place (the logo's dot on a shoulder where the
-    neighbour leaves no room goes over its tooth); a little sideways (up to half its width); away from
-    the baseline (down under it, up over it)."""
-    from shapely.ops import unary_union
-    # the white the logo keeps between a mark and another letter is its slit (كيوانو: 6.3, 7.0, 10.2)
-    clear = max(1.0, R["slit"] - 1.0)
-    shapes = [b.buffer(clear) for b in bodies]
-    placed = None
-    out = []
-    for i, grp, alt in groups:
-        g0 = _geom(grp)
-        if g0.is_empty:
-            continue
-        others = [sh for j, sh in enumerate(shapes) if j != i and not sh.is_empty]
-        if placed is not None:
-            others.append(placed)
-        taken = unary_union(others) if others else None
-
-        def free(dx, dy):
-            if taken is None:
-                return True
-            from shapely.affinity import translate
-            return not translate(g0, dx, dy).intersects(taken)
-
-        w = g0.bounds[2] - g0.bounds[0]
-        tries = [(0.0, 0.0)]
-        if alt is not None:
-            tries.append(alt)
-        tries += [(sg * k, 0.0) for k in np.arange(2.0, 0.5 * w + 0.01, 2.0) for sg in (1, -1)]
-        up = g0.centroid.y > 0
-        step = 0.3 * R["W"] * (1 if up else -1)
-        base = alt if alt is not None else (0.0, 0.0)
-        tries += [(base[0], base[1] + step * k) for k in range(1, 7)]
-        dx, dy = next((t for t in tries if free(*t)), tries[-1])
-        from shapely.affinity import translate
-        g = translate(g0, dx, dy)
-        placed = g.buffer(clear) if placed is None else placed.union(g.buffer(clear))
-        out += _moved(grp, dx, dy)
-    return out
-
-
-def _gap_shift(prev, body, white: float) -> float:
+def gap_shift(prev, body, white: float) -> float:
     """How far left of 0 `body` (its right edge at 0) must go to stand `white` clear of `prev` (placed)."""
     from shapely.affinity import translate
     if prev.is_empty or body.is_empty:
         return prev.bounds[0] if not prev.is_empty else 0.0
-    hi = prev.bounds[2] - body.bounds[0] + 1.0          # right of here they cannot meet... search leftwards
+    hi = prev.bounds[2] - body.bounds[0] + 1.0
     lo = prev.bounds[0] - body.bounds[2] - 4 * white - 50.0
+
     def apart(dx):
         b = translate(body, dx, 0)
         return prev.distance(b) if not prev.intersects(b) else -prev.intersection(b).area
-    if apart(hi) < white:           # (cannot happen for letters set right to left, kept for safety)
-        hi = prev.bounds[2] + abs(body.bounds[0]) + 1.0
     for _ in range(50):             # the rightmost place at which they are `white` apart
         mid = (lo + hi) / 2
         if apart(mid) >= white - 1e-3:
@@ -777,30 +717,59 @@ def _gap_shift(prev, body, white: float) -> float:
     return lo
 
 
-def _above(geom, y: float):
+def above(geom, y: float):
     from shapely.geometry import box
     return geom.intersection(box(-1e5, y, 1e5, 1e5))
 
 
-# ---------------------------------------------------------------- the word
-def typeset_blocks(word: str, st: Style):
-    """Lay out `word` right to left in the block construction (see the module's docstring)."""
-    from shapely.affinity import rotate, translate
+def clear_marks(bodies, groups, R: Dict[str, float]):
+    """Set each mark clear of the other letters and of the marks already set, as a calligrapher sets
+    the dots of neighbours. `groups`: (owner, mark, other place). A mark may touch its own letter (the dot
+    of كيوانو's ن stands on the tooth's shoulder) and keeps the logo's slit from the others (كيوانو: 6.3,
+    7.0, 10.2). One that would come nearer goes, in this order: to its other place (the dot on a
+    shoulder where the neighbour leaves no room goes over its tooth); a little sideways (up to half its
+    width); away from the baseline."""
+    from shapely.affinity import translate
     from shapely.ops import unary_union
+    clear = max(1.0, R["slit"] - 1.0)
+    shapes = [b.buffer(clear) for b in bodies]
+    placed = None
+    out = []
+    for i, g0, alt in groups:
+        if g0.is_empty:
+            continue
+        others = [sh for j, sh in enumerate(shapes) if j != i and not sh.is_empty]
+        if placed is not None:
+            others.append(placed)
+        taken = unary_union(others) if others else None
+
+        def free(dx, dy):
+            return taken is None or not translate(g0, dx, dy).intersects(taken)
+        w = g0.bounds[2] - g0.bounds[0]
+        tries = [(0.0, 0.0)] + ([alt] if alt is not None else [])
+        tries += [(sg * k, 0.0) for k in np.arange(2.0, 0.5 * w + 0.01, 2.0) for sg in (1, -1)]
+        step = 0.3 * R["U"] * (1 if g0.centroid.y > 0 else -1)
+        base = alt if alt is not None else (0.0, 0.0)
+        tries += [(base[0], base[1] + step * k) for k in range(1, 7)]
+        dx, dy = next((t for t in tries if free(*t)), tries[-1])
+        g = translate(g0, dx, dy)
+        placed = g.buffer(clear) if placed is None else placed.union(g.buffer(clear))
+        out.append(g)
+    return out
+
+
+def typeset_blocks(word: str, st: Style):
+    """Lay out `word` right to left in the block construction, every letter drawn by the rules."""
+    from shapely.affinity import translate
     from .typeset import Layout, Placed, shape_forms
     R = rules(st)
-    parts = st.block_parts or {}
     lay = Layout(text=word, style=st)
     # joined letters keep their slit above the bars on the baseline (the joins, and the base of ک that
-    # runs on into the next letter as its join: 23-26 high in كيوانو)
-    jy = 0.9 * R["W"]
+    # runs on into the next letter as its join)
+    jy = R["bar"] + 2.0
     prev_body, prev_left, prev_joins = None, 0.0, False
-    n = 0
-    built_ink: List[Poly] = []
-    built_holes: List[Poly] = []
-    logo_shapes: List[List[Poly]] = []
-    bodies, groups = [], []
-    seen: Dict[str, int] = {}
+    n, leaning, heads = 0, 0, 0
+    ink, holes, bodies, groups = [], [], [], []
     for c, form in shape_forms(word):
         if form == " ":
             if prev_body is not None:
@@ -810,84 +779,48 @@ def typeset_blocks(word: str, st: Style):
         if form == "?" or c not in BUILD:
             lay.skipped.append(c)
             continue
-        own, kin = logo_letter(parts, c, form, seen)
-        p = Pen(st, R, parts)
-        if own is not None:
-            body_shapes = part_shapes({"polys": own.get("polys", [])})
-            mark_shapes = [] if kin else part_shapes({"polys": own.get("marks", [])})
-            if kin or "marks" not in own:
-                # the logo's body (its tooth, its head, a letter the model made of its parts), and this
-                # letter's own dots, made of the logo's dot and bar: over the top of the body or under it
-                bx0, by0, bx1, by1 = _bounds(body_shapes) if body_shapes else (-R["W"], 0.0, 0.0, R["T"])
-                how, mark = BUILD[c]
-                if mark == "b2*":
-                    mark = "b2" if form in ("I", "M") else None
-                top_part = _above(_geom(body_shapes), 0.5 * R["T"])
-                if mark and mark.startswith(("a", "h", "m")) and not top_part.is_empty:
-                    hi = _above(top_part, top_part.bounds[3] - 0.25 * R["W"])
-                    cx, top = (hi.bounds[0] + hi.bounds[2]) / 2, hi.bounds[3] + R["slit"] - 0.25 * R["W"]
-                    p.marks(mark, cx, top)
-                elif mark:
-                    p.marks(mark, (bx0 + bx1) / 2 if form in ("i", "F") else -R["W"] / 2 - 0.1 * R["W"], 0, min(0.0, by0))
-            body = _geom(body_shapes)
-            left = body.bounds[0] if not body.is_empty else -R["W"]
-            angle = 0.0
-        else:
-            left = build(c, form, p)
-            # a letter built by rule leans as the logo's letters lean, to one side and the other in turn
-            angle = R["rock"] * (1.0 if n % 2 else -1.0)
-            pivot = (left / 2.0, 0.0)
-            p.ink = [turn(q, angle, pivot) for q in p.ink]
-            p.holes = [turn(q, angle, pivot) for q in p.holes]
-            p.logo = [[turn(r, angle, pivot) for r in sh] for sh in p.logo]
-            body_shapes = [[q] for q in p.ink] + p.logo
-            mark_shapes = []
-            body = _geom(body_shapes)
-            if p.holes:
-                body = body.difference(_geom([[q] for q in p.holes]))
+        sign = 1.0
+        if leans(c, form):
+            sign = 1.0 if leaning % 2 == 0 else -1.0     # in turn: the first to the left, the next to the right
+            leaning += 1
+        p = Pen(st, R, sign)
+        left = build(c, form, p)
+        if c in TURNS:
+            # heads in turn, as كيوانو's two و: the first turned back with its tail, the next upright
+            if heads % 2 == 0 and R["head_turn"]:
+                from shapely.affinity import rotate
+                pivot = (left / 2.0, 0.0)
+                p.body = [rotate(g, -R["head_turn"], origin=pivot) for g in p.body]      # its left side raised
+                p.holes = [rotate(g, -R["head_turn"], origin=pivot) for g in p.holes]
+            heads += 1
+        body = _union(p.body)
+        hole = _union(p.holes)
+        solid = body.difference(hole) if not hole.is_empty else body
         joined = form in ("M", "F") and prev_joins
         if prev_body is None:
-            x = 0.0 if n == 0 else prev_left - (body.bounds[2] if not body.is_empty else 0.0)
+            x = 0.0 if n == 0 else prev_left - (solid.bounds[2] if not solid.is_empty else 0.0)
         else:
-            ref_prev = _above(prev_body, jy if joined else 0.0)
-            ref_this = _above(body, jy if joined else 0.0)
-            x = _gap_shift(ref_prev, ref_this, R["slit"] if joined else R["touch"])
-        placed_body = translate(body, x, 0)
-        if own is not None:
-            logo_shapes += _moved(body_shapes, x, 0.0)
-            if mark_shapes:
-                # the logo's own dots, where the logo has them; their other place: over the tooth
-                m = _geom(mark_shapes)
-                above_top = m.centroid.y > 0.5 * R["T"]
-                top = _above(body, 0.5 * R["T"])
-                if above_top and not top.is_empty:
-                    hi = _above(body, top.bounds[3] - 0.25 * R["W"])
-                    cx = (hi.bounds[0] + hi.bounds[2]) / 2
-                    alt = (cx - (m.bounds[0] + m.bounds[2]) / 2, hi.bounds[3] + R["slit"] - m.bounds[1])
-                else:
-                    alt = None
-                groups.append((len(bodies), _moved(mark_shapes, x, 0.0), alt))
-        else:
-            built_ink += [[(px + x, py) for px, py in q] for q in p.ink]
-            built_holes += [[(px + x, py) for px, py in q] for q in p.holes]
-            logo_shapes += _moved(p.logo, x, 0.0)
-        built_ink += [[(px + x, py) for px, py in q] for q in p.joins]
-        bodies.append(placed_body)
-        groups += [(len(bodies) - 1, _moved(grp, x, 0.0), None) for grp in p.mark_groups]
-        glyph = Glyph([[q] for q in p.ink] + [sh for sh in body_shapes if own is not None], left=left, entry_x=0.0,
-                      entry_edge=0.0, exit_x=left if form in ("I", "M") else None,
-                      exit_edge=left if form in ("I", "M") else None)
-        lay.placed.append(Placed(c, form, x, glyph, parts=[("logo" if own is not None else "block", "قطعة")]))
-        prev_body, prev_left = placed_body, x + left
+            x = gap_shift(above(prev_body, jy if joined else 0.0), above(solid, jy if joined else 0.0),
+                          R["slit"] if joined else R["touch"])
+        placed = translate(solid, x, 0)
+        ink += [translate(g, x, 0) for g in p.body + p.joins]
+        holes += [translate(g, x, 0) for g in p.holes]
+        bodies.append(placed)
+        groups += [(len(bodies) - 1, translate(g, x, 0), alt) for g, alt in p.marks]
+        lay.placed.append(Placed(c, form, x, Glyph(_shapes_of(solid), left=left, entry_x=0.0, entry_edge=0.0,
+                                                    exit_x=left if form in ("I", "M") else None,
+                                                    exit_edge=left if form in ("I", "M") else None),
+                                 parts=[("block", "قطعة")]))
+        prev_body, prev_left = placed, x + left
         prev_joins = form in ("I", "M")
         n += 1
-    marks = clear_marks(bodies, groups, R)
-    built = _geom([[q] for q in built_ink])
-    if built_holes:
-        built = built.difference(_geom([[q] for q in built_holes]))
-    if R["round"] > 0 and not built.is_empty:
-        built = built.buffer(-R["round"], join_style=1).buffer(R["round"], join_style=1)
-    whole = unary_union([built, _geom(logo_shapes), _geom(marks)])
+    whole = _union(ink)
+    if holes:
+        whole = whole.difference(_union(holes))
+    whole = _union([whole] + clear_marks(bodies, groups, R))
+    # where two blocks meet edge to edge no hairline of white may be left, nor a sliver of ink
+    whole = whole.buffer(0.6, join_style=2).buffer(-0.6, join_style=2)
+    whole = _union([q for q in getattr(whole, "geoms", [whole]) if q.area > 4.0])
     for shape in _shapes_of(whole):
         lay.shapes.append(Tagged(shape, "block", "كتلة"))
     return lay
