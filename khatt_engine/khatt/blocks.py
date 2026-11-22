@@ -32,47 +32,58 @@ from .style import Style
 
 Pt = Tuple[float, float]
 
-# كيوانو, measured on its clean outline (the corners where its measured edge lines meet)
+# كيوانو, measured on its clean outline (the corners where its measured edge lines meet), each value then
+# measured again by code on the logo's word drawn by these rules alone (blockfit.fit) and kept where
+# the two agree; where they did not (the tooth's foot cut, the top cut, the head's top left corner,
+# the left end of the kaf's base) the direct measure is kept: the fit was making up for something else
 KIVANO: Dict[str, float] = dict(
     U=26.0,            # the pen (uprights 24-30.5; the kaf's riser 30)
-    T=70.0,            # x-height: the tops of teeth and heads
-    A=93.0,            # the top of ا (at its high corner)
-    D=27.0,            # the depth of tails, cups and the bar of dots under the baseline
+    T=69.9,            # x-height: the tops of teeth and heads
+    A=91.5,            # the top of ا (at its high corner)
+    D=26.9,            # the depth of tails, cups and the bar of dots under the baseline
     J=17.5,            # a join along the baseline (measured 15-18.5), lighter than the pen
     join_rise=4.0,     # its bottom rises towards the left by up to this much (7-14 degrees over a short join)
-    # a tooth joined on one side (ن): 24 at its foot, 26.4 at its top
-    tooth_foot=24.0, tooth_top=26.4, tooth_chamfer=4.0,
+    # a tooth joined on one side (ن): 24 wide at 22 above the baseline, 26.4 at its top; under 22 its foot
+    # is cut back to 20 on the side it leans to (where the slit between it and its neighbour opens)
+    tooth_foot=23.3, tooth_top=26.3, tooth_chamfer=4.9, tooth_knee=20.9, tooth_foot_cut=4.0,
     # a tooth joined on both sides (ي): upright, its foot flared into both joins, 0.93 of the x-height
-    flare_foot=40.0, flare_top=23.0, flare_h=0.93,
+    flare_foot=40.7, flare_top=23.0, flare_h=0.93,
     # ا: 24 at its foot, 30.5 at its top; its high top corner cut 6
-    alef_foot=24.0, alef_top=30.5, alef_chamfer=6.0,
+    alef_foot=24.0, alef_top=30.0, alef_chamfer=6.0,
     top_cut=7.0,       # every top is cut this many degrees, rising to the side the letter leans to (6-9)
     lean_alef=5.4,     # ا leans this many degrees ...
     lean_tooth=3.0,    # ... a tooth that begins a word this many; to one side and the other in turn
     # the head (the و that stands upright): 68.5 x 70 standing on its join, top right corner cut 23 x 22,
     # bottom left 25 x 9, top left 6.5 x 4; its walls 24 (left) and 30 (right)
-    head_w=67.0, head_bottom=5.0, head_tr_x=23.3, head_tr_y=22.5, head_bl_x=24.8, head_bl_y=8.5,
-    head_tl_x=6.5, head_tl_y=4.3,
+    head_w=67.0, head_bottom=5.0, head_tr_x=24.5, head_tr_y=22.7, head_bl_x=24.8, head_bl_y=7.8,
+    head_tl_x=6.1, head_tl_y=4.3,
     # its slot: 12.6 wide, its centre 36.5 from the right, its top 57.5 falling 3.3 to the right, its
     # right side down to 26.5, a point at 18 (4 from its right side), its left side down to 33
-    slot_w=12.6, slot_x=36.5, slot_top=57.5, slot_fall=3.3, slot_right_low=26.5, slot_point=18.0,
-    slot_point_dx=4.0, slot_left_low=33.0,
+    slot_w=12.6, slot_x=36.2, slot_top=56.0, slot_fall=3.3, slot_right_low=25.6, slot_point=17.8,
+    slot_point_dx=5.5, slot_left_low=31.5,
     # the tail: from the head's foot (38.4 to 4.8 from its right edge) down at 63 degrees to the depth;
     # its tip's bottom rises 10 degrees to the left, its outer tip corner cut 7
-    tail_root_l=38.4, tail_root_r=4.8, tail_angle=63.0, tail_tip_rise=10.0, tail_tip_cut=7.0,
+    tail_root_l=38.8, tail_root_r=4.8, tail_angle=63.4, tail_tip_rise=7.4, tail_tip_cut=5.1,
     bar=24.8,          # a bar along the baseline (the kaf's base, the bottom of a cup)
     arm=21.0,          # an arm (the kaf's bar, a flag)
     r_low=24.0, r_high=21.0,   # the outer corners of the kaf's right end, rounded (bottom, top)
-    dot=24.5, dot_chamfer=5.5, dot_turn=2.6,   # a dot: a square, its bottom left corner cut, turned
+    dot=26.3, dot_chamfer=6.6, dot_turn=2.6,   # a dot: a square, its bottom left corner cut, turned
     # two dots: one bar 58.6 long, 13.4 high at its left end, 21.4 at its right, its top right corner
     # cut 5.3, its bottom flat; under a tooth its right end is 8.9 past the tooth's right edge
-    dash_l=58.6, dash_h0=13.4, dash_h1=21.4, dash_chamfer=5.3, dash_dx=8.9, dash_top=6.0,
-    # the kaf: its base 167 long (24.8 high, its bottom falling 7 to the right end); its right end
-    # rounded, its riser 33 wide; its bar 20 thick from the tip rising 4.3 degrees; its slash 22 thick
-    # at 41.6 degrees, 63 long; its tip cut
-    kaf_l=167.0, kaf_riser=33.5, kaf_top=68.2, kaf_bar_low=36.9, kaf_bar_th=19.5, kaf_bar_rise=4.3,
-    kaf_slash_w=22.0, kaf_slash_a=41.6, kaf_slash_l=63.0, kaf_tip_x=165.7, kaf_tip_low=33.4, kaf_tip_high=54.2,
-    head_turn=14.0,    # heads in turn: the first turned back this many degrees with its tail, the next upright
+    dash_l=58.6, dash_h0=13.4, dash_h1=21.4, dash_chamfer=6.0, dash_dx=8.9, dash_top=6.0,
+    # the kaf, by its measured angles: its base 167 long, its top flat at 24.8, its bottom falling from 3.9
+    # at its left end to -3 under its right end; its right end a long curve like a D (from the base's
+    # bottom 20.5 left of its right edge, rising to the right edge at 49.2: a superellipse of exponent
+    # 1.6; then a nearly straight corner to the top at 68.2, 26.7 left of the right edge: exponent 1.3);
+    # its riser 33.5 wide; its tip's high corner 165.7 left of the right edge at 54.2; the slash's upper
+    # edge from there at 41.6 degrees, 63.1 long, its end cut (17.4 right and 11.9 down, then 5.4 down);
+    # its lower edge back at 37.1 degrees to where it meets the top of the bar; the bar's top rising 6.7
+    # degrees to the right end, its bottom 4.2 degrees from 17.2 right and 17.3 below the tip; the tip cut
+    # 10 right and 20.8 down
+    kaf_l=167.0, kaf_riser=32.2, kaf_top=68.2, kaf_base_top=24.8, kaf_base_left=3.9, kaf_base_right=-2.2,
+    kaf_end_x=20.5, kaf_side_y=48.3, kaf_end_n=1.6, kaf_corner_x=26.4, kaf_corner_n=1.3,
+    kaf_tip_x=165.7, kaf_tip_high=54.2, kaf_slash_a=41.1, kaf_slash_l=63.7, kaf_slash_low_a=36.4,
+    kaf_bar_rise_top=6.9, kaf_bar_rise_low=4.2, kaf_bar_dx=17.6, kaf_bar_dy=17.3, kaf_tip_cut_dx=10.8, kaf_tip_cut_dy=20.8,
     slit=6.0,          # white between joined letters, above their join (5-8)
     touch=0.0,         # white between letters that do not join: they touch
     space=45.0,        # between words
@@ -151,10 +162,26 @@ class Pen:
         return g
 
     def tooth(self, xr: float = 0.0, h: Optional[float] = None) -> float:
-        """A tooth joined on one side (as ن begins كيوانو): it leans, its top cut, its high corner cut."""
+        """A tooth joined on one side (as ن begins كيوانو): it leans, its top cut, its high corner cut, its
+        foot cut back on the side it leans to. Its top left corner is kept (self.top_left) for its dot."""
         R = self.R
         h = R["T"] if h is None else h
-        self.upright(xr, R["tooth_foot"], R["tooth_top"], h, R["lean_tooth"] * self.sign, R["tooth_chamfer"])
+        lean = R["lean_tooth"] * self.sign
+        g = self.upright(xr, R["tooth_foot"], R["tooth_top"], h, lean, R["tooth_chamfer"])
+        cut, k = R["tooth_foot_cut"], R["tooth_knee"]
+        if cut > 0:
+            from shapely.geometry import box
+            pts = list(g.exterior.coords)
+            if lean < 0:      # leaning right: the right foot is cut back
+                wedge = _poly([(xr - cut, -1.0), (xr + 2.0, -1.0), (xr + 2.0, k), (xr + 0.1, k)])
+            else:             # leaning left: the left foot
+                x0 = xr - R["tooth_foot"]
+                wedge = _poly([(x0 + cut, -1.0), (x0 - 2.0, -1.0), (x0 - 2.0, k), (x0 - 0.1, k)])
+            cut_g = g.difference(wedge)
+            self.body[-1] = cut_g
+            g = cut_g
+        top = [c for c in g.exterior.coords if c[1] > h - 7.0]
+        self.top_left = min(top, key=lambda c: c[0]) if top else (xr - R["tooth_foot"], h)
         return xr - R["tooth_foot"]
 
     def medial_tooth(self, xr: float = 0.0, h: Optional[float] = None) -> float:
@@ -244,22 +271,35 @@ class Pen:
 
     def kaf_end(self, xr: float = 0.0, flag_to: Optional[float] = None, base_to: Optional[float] = None,
                 top: Optional[float] = None) -> float:
-        """The right end of ک: its riser between its bar and its base, its outer corners rounded; the bar
-        and the base reach left to flag_to and base_to (د is this end alone, a short flag on a base)."""
+        """The right end of ک: its riser between its bar and its base, its outer side the long curve of a D
+        (as measured); the base reaches left to base_to, a short flag of the bar to flag_to (د is this
+        end alone, a short flag on a base)."""
         R = self.R
         top = R["kaf_top"] if top is None else top
         rw = R["kaf_riser"]
         flag_to = xr - rw - 13.0 if flag_to is None else flag_to
         base_to = xr - rw - 30.0 if base_to is None else base_to
-        fall = 7.0 * (xr - base_to) / R["kaf_l"]
-        low = -3.0
-        end = _poly([(xr - rw, low), (xr, low), (xr, top), (xr - rw, top)])
-        end = round_corner(end, xr, low, R["r_low"], -1, 1)
-        end = round_corner(end, xr, top, R["r_high"], -1, -1)
-        self.bar(base_to, xr - rw + 2.0, low + fall, R["bar"] - fall, cut_l=7.0, fall=fall)
-        flag = _poly([(flag_to, top - R["arm"] - 2.5), (xr - rw + 2.0, top - R["arm"]), (xr - rw + 2.0, top),
-                      (flag_to + math.tan(math.radians(7.0)) * R["arm"], top - 1.0)])
-        self.body += [end, flag]
+        bl, br = R["kaf_base_left"], R["kaf_base_right"]
+        ex, sy, cxr = R["kaf_end_x"], R["kaf_side_y"], R["kaf_corner_x"]
+        span = max(1.0, R["kaf_l"] - ex)
+
+        def bottom_at(x):            # the base's bottom: 3.9 at the kaf's left end, -3 under its right end
+            return br + (bl - br) * min(1.0, max(0.0, (xr - ex - x) / span))
+        n1, n2 = max(0.5, R["kaf_end_n"]), max(0.5, R["kaf_corner_n"])
+        low = [(xr - ex + ex * abs(math.cos(t)) ** (2 / n1), sy - (sy - br) * abs(math.sin(t)) ** (2 / n1))
+               for t in np.linspace(math.pi / 2, 0, 24)]
+        up = [(xr - cxr + cxr * abs(math.cos(t)) ** (2 / n2), sy + (top - sy) * abs(math.sin(t)) ** (2 / n2))
+              for t in np.linspace(0, math.pi / 2, 16)]
+        end = _poly([(xr - rw, bottom_at(xr - rw)), *low, *up[1:], (xr - rw, top)])
+        base = _poly([(base_to, bottom_at(base_to)), (xr - ex, br), (xr - rw + 2.0, R["kaf_base_top"]),
+                      (base_to + math.tan(math.radians(7.0)) * (R["kaf_base_top"] - bottom_at(base_to)), R["kaf_base_top"])])
+        # a short flag of the bar, its top rising 6.7 and its bottom 4.2 degrees towards the right end
+        t1, t2 = math.tan(math.radians(R["kaf_bar_rise_top"])), math.tan(math.radians(R["kaf_bar_rise_low"]))
+        x_in = xr - rw + 2.0
+        low_in = top - 22.9
+        flag = _poly([(flag_to, low_in - (x_in - flag_to) * t2), (x_in, low_in), (x_in, top),
+                      (flag_to + 3.0, top - (x_in - flag_to) * t1)])
+        self.body += [end, base, flag]
         return min(base_to, flag_to)
 
     def cup(self, xr: float, xl: float, up_top: float, right_side: bool = True):
@@ -365,8 +405,10 @@ def _tooth_letter(p: Pen, form, mark, letter):
     top = h + 2.0
     cx = left / 2
     if mark == "a1":
-        # the dot stands on the tooth's left shoulder (as on كيوانو's ن), or, with no room there, over it
-        x_r, y_b = left + 2.0, h - 3.0
+        # the dot stands on the tooth's top left corner, 2.8 below it (as on كيوانو's ن), or, with no
+        # room there, over the tooth
+        tl = getattr(p, "top_left", (left, h))
+        x_r, y_b = tl[0], tl[1] - 2.8
         p.dot(x_r, y_b, alt=(cx + R["dot"] / 2 - x_r, top + R["slit"] - y_b))
     elif mark == "b2":
         p.dots_bar(R["dash_dx"], -R["dash_top"] - R["dash_h1"])     # under the tooth, as under كيوانو's ي
@@ -589,32 +631,36 @@ def _ain(p: Pen, form, mark):
 
 
 def _kaf(p: Pen, form, mark, letter):
-    """ک as كيوانو draws it, by its measures: a long base, the right end with its riser and rounded
-    corners, the bar back to a tip, and from the tip the slash up to the right. Alone or last, a short
-    upright stands at the left end of the base."""
+    """ک as كيوانو draws it, by its measured angles: a long base, its right end with its riser and its D
+    curve, the bar back to a tip, and from the tip the slash up to the right, its lower edge less steep
+    than its upper, meeting the bar's top. Alone or last, a short upright stands at the base's left end."""
     R = p.R
     L = R["kaf_l"]
-    tip_x = -R["kaf_tip_x"]
     base_left = -L - R["into"] if form in ("I", "M") else -L + 0.4 * R["U"]
-    p.kaf_end(0.0, flag_to=tip_x + 20.0, base_to=base_left)
-    rise = math.tan(math.radians(R["kaf_bar_rise"]))
-    xr = -R["kaf_riser"] + 4.0
-    lo_l = R["kaf_bar_low"]
-    lo_r = lo_l + (xr - (tip_x + 17.0)) * rise
-    p.body.append(_poly([(tip_x + 17.0, lo_l), (xr, lo_r), (xr, R["kaf_top"] - 1.0), (tip_x + 34.0, lo_l + R["kaf_bar_th"] + 2.0)]))
-    a = math.radians(R["kaf_slash_a"])
-    ux, uy = math.cos(a), math.sin(a)
-    nx, ny = -uy, ux
-    base_pt = (tip_x, R["kaf_tip_high"])
-    w = R["kaf_slash_w"]
-    far = (base_pt[0] + ux * R["kaf_slash_l"], base_pt[1] + uy * R["kaf_slash_l"])
-    p.body.append(_poly([base_pt, far, (far[0] - nx * w + 5.0, far[1] - ny * w - 5.0),
-                         (base_pt[0] - nx * w + 12.0, base_pt[1] - ny * w), (tip_x + 10.0, R["kaf_tip_low"])]))
+    p.kaf_end(0.0, flag_to=-R["kaf_riser"] - 2.0, base_to=base_left)
+    tip = (-R["kaf_tip_x"], R["kaf_tip_high"])
+    a, a2 = math.radians(R["kaf_slash_a"]), math.radians(R["kaf_slash_low_a"])
+    up_end = (tip[0] + R["kaf_slash_l"] * math.cos(a), tip[1] + R["kaf_slash_l"] * math.sin(a))
+    e1 = (up_end[0] + 17.4, up_end[1] - 11.9)
+    e2 = (e1[0] + 0.5, e1[1] - 5.4)
+    t1, t2 = math.tan(math.radians(R["kaf_bar_rise_top"])), math.tan(math.radians(R["kaf_bar_rise_low"]))
+    top_at_end = R["kaf_top"]
+    xr_bar = -R["kaf_corner_x"]
+    # where the slash's lower edge meets the bar's top: the bar's top runs back from the right end at 6.7
+    # degrees, the slash's lower edge down from its end at 37.1 degrees
+    # top: y = top_at_end - (xr_bar - x) t1 ; slash: y = e2.y - (e2.x - x) tan(a2)
+    ta2 = math.tan(a2)
+    xj = (top_at_end - xr_bar * t1 - e2[1] + e2[0] * ta2) / (ta2 - t1)
+    yj = top_at_end - (xr_bar - xj) * t1
+    b0 = (tip[0] + R["kaf_bar_dx"], tip[1] - R["kaf_bar_dy"])
+    x_in = -R["kaf_riser"] + 6.0
+    arm = [tip, up_end, e1, e2, (xj, yj), (x_in, top_at_end - (xr_bar - x_in) * t1),
+           (x_in, b0[1] + (x_in - b0[0]) * t2), b0, (tip[0] + R["kaf_tip_cut_dx"], tip[1] - R["kaf_tip_cut_dy"])]
+    p.body.append(_poly(arm))
     if letter == "گ":
         off = 0.9 * R["U"]
-        p.body.append(_poly([(base_pt[0] + 20.0, base_pt[1] + off), (far[0] + 20.0, far[1] + off),
-                             (far[0] + 20.0 - nx * w * 0.8, far[1] + off - ny * w * 0.8),
-                             (base_pt[0] + 20.0 - nx * w * 0.8, base_pt[1] + off - ny * w * 0.8)]))
+        p.body.append(_poly([(tip[0] + 22.0, tip[1] + off), (up_end[0] + 22.0, up_end[1] + off), (e2[0] + 22.0, e2[1] + off),
+                             (xj + 22.0, yj + off)]))
     if form in ("i", "F"):
         p.upright(base_left + R["U"], R["U"] - 4.0, R["U"] - 2.0, 0.4 * R["T"], 0.0, 0.0)
     return -L if form in ("I", "M") else base_left
@@ -657,9 +703,6 @@ BUILD = {
     "ل": (_lam, None), "م": (_meem, None), "ه": (_heh, None), "ة": (_heh, "a2"),
     "و": (_waw, None), "ؤ": (_waw, "ha"), "ء": (_hamza, None), "ـ": (_tatweel, None),
 }
-
-
-TURNS = set("وؤ")             # a head that stands alone with its tail turns back, in turn (the first و of كيوانو)
 
 
 def leans(c: str, form: str) -> bool:
@@ -768,7 +811,7 @@ def typeset_blocks(word: str, st: Style):
     # runs on into the next letter as its join)
     jy = R["bar"] + 2.0
     prev_body, prev_left, prev_joins = None, 0.0, False
-    n, leaning, heads = 0, 0, 0
+    n, leaning = 0, 0
     ink, holes, bodies, groups = [], [], [], []
     for c, form in shape_forms(word):
         if form == " ":
@@ -785,14 +828,6 @@ def typeset_blocks(word: str, st: Style):
             leaning += 1
         p = Pen(st, R, sign)
         left = build(c, form, p)
-        if c in TURNS:
-            # heads in turn, as كيوانو's two و: the first turned back with its tail, the next upright
-            if heads % 2 == 0 and R["head_turn"]:
-                from shapely.affinity import rotate
-                pivot = (left / 2.0, 0.0)
-                p.body = [rotate(g, -R["head_turn"], origin=pivot) for g in p.body]      # its left side raised
-                p.holes = [rotate(g, -R["head_turn"], origin=pivot) for g in p.holes]
-            heads += 1
         body = _union(p.body)
         hole = _union(p.holes)
         solid = body.difference(hole) if not hole.is_empty else body

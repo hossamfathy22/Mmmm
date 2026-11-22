@@ -32,7 +32,7 @@ import numpy as np
 
 from .style import Style
 
-FRACTIONS = ("k", "kv", "h", "jh", "kaf_bar", "kaf_riser", "teeth", "teeth_yeh")
+FRACTIONS = ("flare_h", "kaf_end_n", "kaf_corner_n")
 FIXED = ("space", "touch", "slit", "into", "rock")
 
 

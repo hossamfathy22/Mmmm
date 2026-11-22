@@ -1422,20 +1422,16 @@ def test_joined_letters_keep_the_slit_and_the_others_touch():
     assert len(lay.shapes) == 1                                           # ا and د touch: one piece
 
 
-def test_heads_in_turn():
-    """As كيوانو's two و: the first head turned back (its left side raised), the next upright."""
-    from shapely.geometry import Polygon, box
+def test_one_rule_for_the_head():
+    """The two و of كيوانو are not one head turned (one transform from the second to the first leaves
+    corners 9 px and the tail 22 px apart): the first is its designer's own cut. The rule draws every
+    head one way."""
+    from shapely.geometry import Polygon
     from shapely.ops import unary_union
     lay = typeset("وو", _block())
     ps = sorted(lay.placed, key=lambda q: -q.x)
-    tops = []
-    for q in ps:
-        g = unary_union([Polygon(sh[0], sh[1:]) for sh in q.glyph.shapes]).intersection(box(-1e4, 40, 1e4, 1e4))
-        pts = [c for poly in getattr(g, "geoms", [g]) for c in poly.exterior.coords]
-        hx, hy = max(pts, key=lambda c: c[1])
-        tops.append((hy, hx, (g.bounds[0] + g.bounds[2]) / 2))
-    (y1, x1, c1), (y2, x2, c2) = tops
-    assert y1 > y2 + 3.0 and x1 < c1          # the first: higher, and its highest corner on the left
+    a, b = (unary_union([Polygon(sh[0], sh[1:]) for sh in q.glyph.shapes]) for q in ps)
+    assert abs(a.area - b.area) < 1.0 and a.symmetric_difference(b).area < 1.0
 
 
 def test_dots_of_neighbours_do_not_run_together():
