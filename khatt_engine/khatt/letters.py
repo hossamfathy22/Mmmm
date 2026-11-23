@@ -153,7 +153,9 @@ param("cup.width", lambda st: max(3.4 * st.stem, 1.18 * st.x_height), "عرض ا
 param("cup.arm", lambda st: 0.4 * st.x_height, "حيث ينزل ذراع الكأس الأيمن من جذعه = 0.4 × ارتفاع الحروف", BY_EYE, "الكأس")
 param("cup.left", lambda st: 0.45 * st.x_height, "ارتفاع طرف الكأس الأيسر = 0.45 × ارتفاع الحروف", BY_EYE, "الكأس")
 param("bowl.reach", lambda st: 2.0 * st.pitch, "امتداد الكأس الراجع إلى اليمين تحت ح ع = خطوتان", BY_EYE, "الكأس الراجع")
-param("mark.gap", lambda st: 0.44 * st.dot, "البياض بين النقطة وحرفها = 0.44 من قطرها", BY_EYE, "النقاط")
+# measured on 30 open typefaces: the white between a dot and the stroke straight under or over it is 0.72
+# of the dot (medians: ب alone 0.66, ب joined 0.82, ف 0.63, خ 0.79); it was 0.44 by eye, the dots too close
+param("mark.gap", lambda st: 0.72 * st.dot, "البياض بين النقطة وحرفها = 0.72 من قطرها (وسيط 30 خطًا مفتوحًا)", MEASURED, "النقاط")
 param("mark.dash", lambda st: st.dash if st.dash > 0 else 1.5 * st.dot,
       "طول شرطة النقطتين = طول شرطة الشعار إن وُجدت، وإلا 1.5 من قطر النقطة", MEASURED, "النقاط")
 def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = None,
