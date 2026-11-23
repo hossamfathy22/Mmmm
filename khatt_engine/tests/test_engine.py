@@ -1699,3 +1699,18 @@ def test_joined_kaf_reads_as_kaf_among_real_typefaces():
     st = Style(slant=0.0)
     got = [reads_as_real(LETTERS["ك"][1](st, f), f, st) for f in "IM"]
     assert "ل" not in got
+
+
+def test_the_professional_exam_measures_every_rule_and_names_what_is_missing():
+    """Every rule of khatt.anatomy.RULES is measured on a style; what the engine cannot draw yet
+    (digits, punctuation, harakat) is reported, not hidden."""
+    from khatt import anatomy as A
+    from khatt.professional import exam, report
+    res = exam(Style(), fonts=False)
+    assert [r["rule"] for r in res] == [k for k, _, _ in A.RULES]
+    by = {r["rule"]: r for r in res}
+    assert "37/37" in by["coverage"]["measure"] and not by["coverage"]["ok"]       # digits, punctuation, harakat
+    for k in ("stroke", "kashida", "lam-alef", "marks", "counters"):
+        assert by[k]["ok"], by[k]
+    assert "31/31" in by["joins"]["measure"]                                         # every join on the line
+    assert report(res).startswith("قواعد الخط الاحترافي")
