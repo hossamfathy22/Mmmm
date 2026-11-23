@@ -91,6 +91,8 @@ KIVANO: Dict[str, float] = dict(
     # the left and a tooth to the right; "none")
     heh_initial="slots", ain_medial="v", lean_mode="turn",
     slit=6.0,          # white between joined letters, above their join (5-8)
+    join_line=16.5,    # joined letters merge in one band up to here, the top of the join (ي→و 16, ن→و 17)
+    kashida=0.0,       # how much one join of the word is drawn longer (0: none)
     touch=0.0,         # white between letters that do not join: they touch
     space=45.0,        # between words
     into=4.0,          # a join runs this far into the letter it reaches
@@ -143,6 +145,7 @@ class Pen:
         self.holes: list = []           # slots
         self.joins: list = []           # its join to the next letter
         self.marks: List[Tuple[object, Optional[Pt]]] = []   # (a mark, its other place)
+        self.join_top: Optional[float] = None    # how high it merges with the letter it joins (None: the joining line)
 
     # -- uprights
     def upright(self, xr: float, foot_w: float, top_w: float, h: float, lean: float, chamfer: float = 0.0,
@@ -670,6 +673,8 @@ def _kaf(p: Pen, form, mark, letter):
     L = R["kaf_l"]
     base_left = -L - R["into"] if form in ("I", "M") else -L + 0.4 * R["U"]
     p.kaf_end(0.0, flag_to=-R["kaf_riser"] - 2.0, base_to=base_left)
+    if form in ("I", "M"):
+        p.join_top = R["kaf_base_top"] + 2.0      # its long base is the join the next letter stands on
     tip = (-R["kaf_tip_x"], R["kaf_tip_high"])
     a, a2 = math.radians(R["kaf_slash_a"]), math.radians(R["kaf_slash_low_a"])
     up_end = (tip[0] + R["kaf_slash_l"] * math.cos(a), tip[1] + R["kaf_slash_l"] * math.sin(a))
@@ -748,6 +753,27 @@ def _lam_alef(p: Pen, form, mark):
     elif mark == "hb":
         p.mark(mark, xr - R["alef_foot"] / 2, R["A"], 0.0)
     return left_a
+
+
+FLOORS = set("سشصض")
+
+
+def kashida_join(pairs) -> set:
+    """Where a word takes its kashida: once in the word (W3C alreq 7.2.5: typographers keep it to
+    chosen joins and avoid several in one word), only between two joined letters (never inside لا,
+    which is one letter). By
+    default after the floor of س ش ص ض when the word has one (their long base invites it), otherwise
+    before the word's last joined letter. Returns the index of the letter the longer join reaches."""
+    out, start = set(), 0
+    for end in [i for i, (c, f) in enumerate(pairs) if f == " "] + [len(pairs)]:
+        word = range(start, end)
+        joins = [i for i in word if i > start and pairs[i][1] in ("M", "F") and pairs[i - 1][1] in ("I", "M")
+                 and "ـ" not in (pairs[i][0], pairs[i - 1][0])]
+        if joins and not any(pairs[i][0] == "ـ" for i in word):    # a word that already holds one keeps it
+            after_floor = [i for i in joins if pairs[i - 1][0] in FLOORS]
+            out.add(after_floor[-1] if after_floor else joins[-1])
+        start = end + 1
+    return out
 
 
 def ligatures(pairs):
@@ -887,16 +913,20 @@ def clear_marks(bodies, groups, R: Dict[str, float]):
 def typeset_blocks(word: str, st: Style):
     """Lay out `word` right to left in the block construction, every letter drawn by the rules."""
     from shapely.affinity import translate
+    from shapely.geometry import box
     from .typeset import Layout, Placed, shape_forms
     R = rules(st)
     lay = Layout(text=word, style=st)
-    # joined letters keep their slit above the bars on the baseline (the joins, and the base of ک that
-    # runs on into the next letter as its join)
-    jy = R["bar"] + 2.0
-    prev_body, prev_left, prev_joins = None, 0.0, False
+    # Joins as كيوانو draws them (measured on its ي→و and ن→و): the two letters merge in one band on the
+    # line up to the joining line (16–17, the top of the join, J − 1), and above it they stand a vertical
+    # slit apart. The base of ک is the join of the letter after it, up to its own top.
+    line = R["join_line"]
+    prev_body, prev_left, prev_joins, prev_top = None, 0.0, False, line + 0.5
     n, leaning = 0, 0
     ink, holes, bodies, groups = [], [], [], []
-    for c, form in ligatures(shape_forms(word)):
+    pairs = ligatures(shape_forms(word))
+    stretch_at = kashida_join(pairs) if R.get("kashida", 0.0) > 0 else set()
+    for i, (c, form) in enumerate(pairs):
         if form == " ":
             if prev_body is not None:
                 prev_left = prev_left - R["space"]
@@ -919,6 +949,7 @@ def typeset_blocks(word: str, st: Style):
         hole = _union(p.holes)
         solid = body.difference(hole) if not hole.is_empty else body
         joined = form in ("M", "F") and prev_joins
+        jy = max(prev_top, p.join_top if p.join_top is not None else line + 0.5)
         prev_above = above(prev_body, jy if joined else 0.0) if prev_body is not None else None
         this_above = above(solid, jy if joined else 0.0)
         if prev_body is None:
@@ -929,8 +960,19 @@ def typeset_blocks(word: str, st: Style):
             x = prev_left - (solid.bounds[2] if not solid.is_empty else 0.0) + R["into"]
         else:
             x = gap_shift(prev_above, this_above, R["slit"] if joined else R["touch"])
+        if joined and i in stretch_at:
+            x -= R["kashida"]                     # the join between them is drawn this much longer
         placed = translate(solid, x, 0)
         ink += [translate(g, x, 0) for g in p.body + p.joins]
+        if joined:
+            # the join runs from this letter's foot to the one before, wherever spacing put them (a bar of
+            # one length broke on the line when a letter had to stand further off), into both by `into`
+            foot = solid.intersection(box(-1e5, -2.0, 1e5, line))
+            x0 = x + (foot.bounds[2] if not foot.is_empty else solid.bounds[2]) - R["into"]
+            x1 = prev_left + R["into"]
+            if x1 > x0 + 0.5:
+                rise = min(R["join_rise"], 0.14 * (x1 - x0))
+                ink.append(_poly([(x0, -1.0 + rise), (x1, -1.0), (x1, R["J"] - 1.0), (x0, R["J"] - 1.0)]))
         holes += [translate(g, x, 0) for g in p.holes]
         bodies.append(placed)
         groups += [(len(bodies) - 1, translate(g, x, 0), alt) for g, alt in p.marks]
@@ -940,6 +982,7 @@ def typeset_blocks(word: str, st: Style):
                                  parts=[("block", "قطعة")]))
         prev_body, prev_left = placed, x + left
         prev_joins = form in ("I", "M")
+        prev_top = p.join_top if p.join_top is not None else line + 0.5
         n += 1
     whole = _union(ink)
     if holes:

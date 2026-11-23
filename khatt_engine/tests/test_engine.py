@@ -1451,6 +1451,43 @@ def test_kashida_lengthens_the_join_and_keeps_the_word():
     assert width(long) - width(plain) > 3 * 1.5 * U * 0.8
 
 
+def test_joins_are_one_band_below_the_joining_line_and_a_slit_above():
+    """As كيوانو joins (ي→و, ن→و): two joined letters merge in one band up to the joining line, and
+    above it they stand the slit apart. The band runs from foot to foot wherever spacing put them (a
+    join of one length used to break on the line, and the slit used to begin only at 26.8)."""
+    from shapely.affinity import translate
+    from shapely.geometry import Polygon, box
+    from shapely.ops import unary_union
+    from khatt.blocks import rules
+    st = _block(); R = rules(st); line = R["join_line"]
+    for w in ("حلم", "نعم", "تعلم", "حديقة", "مسجد", "صبح", "سنبلة", "بستان"):
+        lay = typeset(w, st)
+        ink = unary_union([Polygon(sh[0], sh[1:]) for sh in lay.shapes])
+        for a, b in zip(lay.placed, lay.placed[1:]):
+            if a.form not in ("I", "M") or b.form not in ("M", "F") or a.char in "كک":
+                continue
+            ga = translate(unary_union([Polygon(sh[0], sh[1:]) for sh in a.glyph.shapes]), a.x, 0)
+            gb = translate(unary_union([Polygon(sh[0], sh[1:]) for sh in b.glyph.shapes]), b.x, 0)
+            lo, hi = sorted((gb.bounds[2] - 2, a.x + a.glyph.left + 2))
+            band = box(lo, 3, hi, line - 3)
+            assert ink.intersection(band).area > 0.97 * band.area, (w, a.char, b.char)      # no break
+            up = box(-1e4, line + 1, 1e4, 1e4)
+            assert ga.intersection(up).distance(gb.intersection(up)) > R["slit"] - 1.0, (w, a.char, b.char)
+
+
+def test_kashida_once_per_word_at_a_chosen_join():
+    """One kashida a word (alreq 7.2.5), between two joined letters: after the floor of س ص when there
+    is one, otherwise before the last joined letter; a word that holds a ـ keeps only that."""
+    from khatt.blocks import kashida_join, ligatures
+    from khatt.typeset import shape_forms
+    at = lambda w: [ligatures(shape_forms(w))[i - 1][0] + ligatures(shape_forms(w))[i][0] for i in sorted(kashida_join(ligatures(shape_forms(w))))]
+    assert at("محمد") == ["مد"] and at("بستان") == ["ست"] and at("سلام") == ["سلا"]
+    assert at("حمد لله") == ["مد", "له"] and at("مـحمد") == [] and at("وردة") == []
+    plain, long = typeset("محمد", _block()), typeset("محمد", _block(kashida=40.0))
+    width = lambda lay: max(x for sh in lay.shapes for x, _ in sh[0]) - min(x for sh in lay.shapes for x, _ in sh[0])
+    assert abs(width(long) - width(plain) - 40.0) < 2.0
+
+
 def test_one_rule_for_the_head():
     """The two و of كيوانو are not one head turned (one transform from the second to the first leaves
     corners 9 px and the tail 22 px apart): the first is its designer's own cut. The rule draws every
