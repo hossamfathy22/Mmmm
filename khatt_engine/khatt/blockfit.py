@@ -33,7 +33,8 @@ import numpy as np
 from .style import Style
 
 FRACTIONS = ("flare_h", "kaf_end_n", "kaf_corner_n")
-FIXED = ("space", "touch", "slit", "into", "rock")
+# every number is the logo's to measure: none is kept from another logo
+FIXED: Tuple[str, ...] = ()
 
 
 def raster(lay, size: Tuple[int, int], origin: Tuple[float, float], ss: int = 4) -> np.ndarray:

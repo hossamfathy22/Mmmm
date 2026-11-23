@@ -119,7 +119,7 @@ class Style:
     # flat pen, cut at its ends, set by the designer's hand, the construction of كيوانو). The model
     # chooses it on seeing how the logo was built, and gives the construction's measures:
     construction: str = "parts"
-    block: Dict[str, float] = field(default_factory=dict)       # blocks.KIVANO's rules, as this logo measures them
+    block: Dict[str, float] = field(default_factory=dict)       # the block rules this logo measures (blocks.start_rules, blockfit.fit)
     # the logo's measured parts (blockfit.cut_parts): "letter.form" -> {"polys": its outline, "marks": its
     # dots}, in the letter's coordinates. They check the measures (blockfit.rebuild) and are never
     # written into a word: words are drawn from the rules (Style.block), as بيدوناق was from سیرنگ's

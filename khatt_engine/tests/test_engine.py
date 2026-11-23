@@ -1353,7 +1353,10 @@ def test_the_editor_offers_the_kit_suggestions_and_a_board_to_draw_on(tmp_path):
 
 # ---------------------------------------------------------------- the block construction (blocks.py)
 def _block(parts=None, **rules):
-    return Style(construction="block", slant=0.0, block=rules, block_parts=parts or {})
+    """A block logo of the tests' own: its basic measures given, every other rule started from them
+    (blocks.start_rules) unless the test sets it. No real logo's numbers."""
+    return Style(construction="block", slant=0.0, stem=26.0, hair=17.0, x_height=70.0, ascender=22.0,
+                 descender=27.0, white=12.0, block=rules, block_parts=parts or {})
 
 
 def _area(lay):
@@ -1377,8 +1380,8 @@ def test_blocks_leave_nothing_to_chance():
     lean, and with no lean it stands upright."""
     a, b = typeset("بيت سلام", _block()), typeset("بيت سلام", _block())
     assert [s[0] for s in a.shapes] == [s[0] for s in b.shapes]
-    upright = typeset("ا", _block(lean_alef=0.0))
-    leaning = typeset("ا", _block(lean_alef=6.0))
+    upright = typeset("ا", _block(lean_alef=0.0, lean_mode="turn"))
+    leaning = typeset("ا", _block(lean_alef=6.0, lean_mode="turn"))
     assert [s[0] for s in upright.shapes] != [s[0] for s in leaning.shapes]
     assert max(y for sh in upright.shapes for _, y in sh[0]) > 80
 
@@ -1415,7 +1418,9 @@ def test_joined_letters_keep_the_slit_and_the_others_touch():
     lay = typeset("ننن", _block(slit=6.0))
     bodies = [Polygon(sh[0], sh[1:]) for sh in lay.shapes]
     from shapely.ops import unary_union
-    upper = unary_union(bodies).intersection(box(-1e4, 35, 1e4, 60))
+    from khatt.blocks import rules
+    line = rules(_block(slit=6.0))["join_line"]
+    upper = unary_union(bodies).intersection(box(-1e4, line + 0.5, 1e4, 60))   # above the join: the slit
     teeth = sorted(getattr(upper, "geoms", [upper]), key=lambda q: -q.bounds[2])
     assert len(teeth) >= 2 and abs(teeth[0].distance(teeth[1]) - 6.0) < 0.8
     lay = typeset("اد", _block(touch=0.0))
@@ -1569,10 +1574,10 @@ def test_choices_of_taste_change_only_their_letter():
     assert g("عمر").symmetric_difference(g("عمر", ain_medial="closed")).area < 1.0
     # no lean: ا stands upright; as on the logo: every ا leans to the left
     from shapely.geometry import box
-    up = g("ا", lean_mode="none")
+    up = g("ا", lean_mode="none", lean_alef=6.0)
     foot, head = up.intersection(box(-1e3, 0, 1e3, 10)), up.intersection(box(-1e3, 75, 1e3, 85))
     assert abs(foot.centroid.x - head.centroid.x) < 0.6                  # its top stands over its foot
-    first, second = (g("اا", lean_mode=m) for m in ("logo", "turn"))
+    first, second = (g("اا", lean_mode=m, lean_alef=6.0) for m in ("logo", "turn"))
     assert first.symmetric_difference(second).area > 50
 
 
@@ -1714,3 +1719,27 @@ def test_the_professional_exam_measures_every_rule_and_names_what_is_missing():
         assert by[k]["ok"], by[k]
     assert "31/31" in by["joins"]["measure"]                                         # every join on the line
     assert report(res).startswith("قواعد الخط الاحترافي")
+
+
+# ---------------------------------------------------------------- the engine keeps no logo
+def test_the_engine_keeps_no_logo_and_each_logo_starts_from_itself():
+    """Every logo is read afresh: the block construction starts from the logo's own measures (twice
+    the logo, twice every length), no table of any logo's numbers lives in the engine, and a logo's
+    result is the same whether another logo was read before it or not."""
+    import subprocess, sys
+    from khatt import blocks
+    assert not hasattr(blocks, "KIVANO")
+    small = Style(stem=20.0, hair=10.0, x_height=60.0, ascender=30.0, descender=20.0, white=10.0)
+    big = Style(stem=40.0, hair=20.0, x_height=120.0, ascender=60.0, descender=40.0, white=20.0)
+    a, b = blocks.start_rules(small), blocks.start_rules(big)
+    for k, v in a.items():
+        if isinstance(v, float) and not k.endswith(("_a", "_n", "angle", "flare_h")) and k not in ("lean_alef", "lean_tooth", "top_cut"):
+            assert abs(b[k] - 2 * v) < 1e-6, k
+    code = ("import sys, json; sys.path.insert(0, %r)\n"
+            "from pathlib import Path\nfrom khatt.pipeline import run\nout = None\n"
+            "for n in sys.argv[1:]:\n"
+            "    out = run((Path(%r) / n).read_bytes(), 'بيدوناق')['style']\n"
+            "print(json.dumps(out, sort_keys=True, default=str))") % (str(Path(__file__).parent.parent), str(EXAMPLE.parent))
+    alone = subprocess.run([sys.executable, "-c", code, "round_square.png"], capture_output=True, text=True).stdout
+    after = subprocess.run([sys.executable, "-c", code, "bidonaq.png", "round_square.png"], capture_output=True, text=True).stdout
+    assert alone and alone == after

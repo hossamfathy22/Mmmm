@@ -6,7 +6,7 @@ way بيدوناق was written from سیرنگ: its rules are measured on the lo
 from them, cleanly, from scratch. No letter and no piece of the logo is copied into a word: the logo
 is its designer's work; what is taken from it is how it is built.
 
-The rules (`Style.block`; KIVANO below is كيوانو's, measured): one pen; uprights that widen towards
+The rules (`Style.block`, measured on each logo; see start_rules): one pen; uprights that widen towards
 their top, their top cut at an angle rising to the side they lean to; a tooth joined on both sides
 that stands upright and flares at its foot into its joins; the head, a block with its corners cut
 and a narrow slot with a pointed foot; a tail thrown down to the left; a join lighter than the pen;
@@ -14,7 +14,7 @@ a dot that is a square; two dots that are one bar; a white between joined letter
 between the others (they touch); and the letters with a free upright (ا, ل, a tooth that begins a
 word) lean, in turn to one side and the other, as the logo's do.
 
-How كيوانو was measured, and the checks: README, "طريقة البناء بالكتل".
+How a block logo is measured, and the checks: blockfit.py and README, "طريقة البناء بالكتل".
 
 Coordinates as in letters.py: a letter's right edge at x = 0, it grows to the left, baseline y = 0,
 y up. All lengths in pixels of the logo.
@@ -32,75 +32,60 @@ from .style import Style
 
 Pt = Tuple[float, float]
 
-# كيوانو, measured on its clean outline (the corners where its measured edge lines meet), each value then
-# measured again by code on the logo's word drawn by these rules alone (blockfit.fit) and kept where
-# the two agree; where they did not (the tooth's foot cut, the top cut, the head's top left corner,
-# the left end of the kaf's base) the direct measure is kept: the fit was making up for something else
-KIVANO: Dict[str, float] = dict(
-    U=26.0,            # the pen (uprights 24-30.5; the kaf's riser 30)
-    T=69.9,            # x-height: the tops of teeth and heads
-    A=91.5,            # the top of ا (at its high corner)
-    D=26.9,            # the depth of tails, cups and the bar of dots under the baseline
-    J=17.5,            # a join along the baseline (measured 15-18.5), lighter than the pen
-    join_rise=4.0,     # its bottom rises towards the left by up to this much (7-14 degrees over a short join)
-    # a tooth joined on one side (ن): 24 wide at 22 above the baseline, 26.4 at its top; under 22 its foot
-    # is cut back to 20 on the side it leans to (where the slit between it and its neighbour opens)
-    tooth_foot=23.3, tooth_top=26.3, tooth_chamfer=4.9, tooth_knee=20.9, tooth_foot_cut=4.0,
-    # a tooth joined on both sides (ي): upright, its foot flared into both joins, 0.93 of the x-height
-    flare_foot=40.7, flare_top=23.0, flare_h=0.93,
-    # ا: 24 at its foot, 30.5 at its top; its high top corner cut 6
-    alef_foot=24.0, alef_top=30.0, alef_chamfer=6.0,
-    top_cut=7.0,       # every top is cut this many degrees, rising to the side the letter leans to (6-9)
-    lean_alef=5.4,     # ا leans this many degrees ...
-    lean_tooth=3.0,    # ... a tooth that begins a word this many; to one side and the other in turn
-    # the head (the و that stands upright): 68.5 x 70 standing on its join, top right corner cut 23 x 22,
-    # bottom left 25 x 9, top left 6.5 x 4; its walls 24 (left) and 30 (right)
-    head_w=67.0, head_bottom=5.0, head_tr_x=24.5, head_tr_y=22.7, head_bl_x=24.8, head_bl_y=7.8,
-    head_tl_x=6.1, head_tl_y=4.3,
-    # its slot: 12.6 wide, its centre 36.5 from the right, its top 57.5 falling 3.3 to the right, its
-    # right side down to 26.5, a point at 18 (4 from its right side), its left side down to 33
-    slot_w=12.6, slot_x=36.2, slot_top=56.0, slot_fall=3.3, slot_right_low=25.6, slot_point=17.8,
-    slot_point_dx=5.5, slot_left_low=31.5,
-    # the tail: from the head's foot (38.4 to 4.8 from its right edge) down at 63 degrees to the depth;
-    # its tip's bottom rises 10 degrees to the left, its outer tip corner cut 7
-    tail_root_l=38.8, tail_root_r=4.8, tail_angle=63.4, tail_tip_rise=7.4, tail_tip_cut=5.1,
-    bar=24.8,          # a bar along the baseline (the kaf's base, the bottom of a cup)
-    arm=21.0,          # an arm (the kaf's bar, a flag)
-    r_low=24.0, r_high=21.0,   # the outer corners of the kaf's right end, rounded (bottom, top)
-    dot=26.3, dot_chamfer=6.6, dot_turn=2.6,   # a dot: a square, its bottom left corner cut, turned
-    # two dots: one bar 58.6 long, 13.4 high at its left end, 21.4 at its right, its top right corner
-    # cut 5.3, its bottom flat; under a tooth its right end is 8.9 past the tooth's right edge
-    dash_l=58.6, dash_h0=13.4, dash_h1=21.4, dash_chamfer=6.0, dash_dx=8.9, dash_top=6.0,
-    # the kaf, by its measured angles: its base 167 long, its top flat at 24.8, its bottom falling from 3.9
-    # at its left end to -3 under its right end; its right end a long curve like a D (from the base's
-    # bottom 20.5 left of its right edge, rising to the right edge at 49.2: a superellipse of exponent
-    # 1.6; then a nearly straight corner to the top at 68.2, 26.7 left of the right edge: exponent 1.3);
-    # its riser 33.5 wide; its tip's high corner 165.7 left of the right edge at 54.2; the slash's upper
-    # edge from there at 41.6 degrees, 63.1 long, its end cut (17.4 right and 11.9 down, then 5.4 down);
-    # its lower edge back at 37.1 degrees to where it meets the top of the bar; the bar's top rising 6.7
-    # degrees to the right end, its bottom 4.2 degrees from 17.2 right and 17.3 below the tip; the tip cut
-    # 10 right and 20.8 down
-    kaf_l=167.0, kaf_riser=32.2, kaf_top=68.2, kaf_base_top=24.8, kaf_base_left=3.9, kaf_base_right=-2.2,
-    kaf_end_x=20.5, kaf_side_y=48.3, kaf_end_n=1.6, kaf_corner_x=26.4, kaf_corner_n=1.3,
-    kaf_tip_x=165.7, kaf_tip_high=54.2, kaf_slash_a=41.1, kaf_slash_l=63.7, kaf_slash_low_a=36.4,
-    kaf_bar_rise_top=6.9, kaf_bar_rise_low=4.2, kaf_bar_dx=17.6, kaf_bar_dy=17.3, kaf_tip_cut_dx=10.8, kaf_tip_cut_dy=20.8,
-    # choices of taste where the logo has no witness (the designer's, as the size of و's head was in
-    # بيدوناق): ه starting a word ("slots": two slots side by side; "stem": a head with an upright on
-    # its left); ع in the middle ("v": a V open at the top; "closed": a small closed head); how free
-    # uprights lean ("turn": to one side and the other in turn; "logo": always as on the logo, ا to
-    # the left and a tooth to the right; "none")
-    heh_initial="slots", ain_medial="v", lean_mode="turn", hah_end="bowl",
-    slit=6.0,          # white between joined letters, above their join (5-8)
-    join_line=16.5,    # joined letters merge in one band up to here, the top of the join (ي→و 16, ن→و 17)
-    kashida=0.0,       # how much one join of the word is drawn longer (0: none)
-    touch=0.0,         # white between letters that do not join: they touch
-    space=45.0,        # between words
-    into=4.0,          # a join runs this far into the letter it reaches
-)
+# The rules of the block construction carry no logo: each logo's are measured on it (blockfit: the
+# outline, its parts, then every rule fitted to the logo's own word drawn by the rules alone). Before
+# that fit, and for a rule the logo gives no evidence of, a rule starts from the logo's own basic
+# measures (its pen, its x-height, ascender, descender, hairline, white) in plain proportions: a
+# square dot as wide as the pen, a head as wide as it is high, uprights as wide as the pen, nothing
+# leaning, nothing cut. These are a start for the fit, not a design; no number of any logo is kept
+# here (a logo's measured rules belong to its own record, never to the engine).
+# The choices of taste (where a logo may show no witness) start at the first option and are the
+# designer's to set: ه starting a word ("slots" two slots side by side, "stem" a head with an upright
+# on its left); ع in the middle ("v" open at the top, "closed"); free uprights ("none", "turn" to one
+# side and the other in turn, "logo" as the logo leans them); ح ending a word ("bowl", "leg").
+CHOICES = {"heh_initial": ("slots", "stem"), "ain_medial": ("v", "closed"), "lean_mode": ("none", "turn", "logo"),
+           "hah_end": ("bowl", "leg")}
+
+
+def start_rules(st: Style) -> Dict[str, float]:
+    """The rules a logo's fit starts from: its own measures in plain proportions (see above)."""
+    U = float(st.stem)
+    T = float(st.x_height)
+    A = T + float(st.ascender)
+    D = float(st.descender)
+    J = float(min(st.hair, U))
+    W = float(st.white)
+    return dict(
+        U=U, T=T, A=A, D=D, J=J, join_rise=0.0,
+        tooth_foot=U, tooth_top=U, tooth_chamfer=0.0, tooth_knee=0.3 * T, tooth_foot_cut=0.0,
+        flare_foot=1.5 * U, flare_top=U, flare_h=1.0,
+        alef_foot=U, alef_top=U, alef_chamfer=0.0,
+        top_cut=0.0, lean_alef=0.0, lean_tooth=0.0,
+        head_w=T, head_bottom=0.0, head_tr_x=0.25 * T, head_tr_y=0.25 * T, head_bl_x=0.25 * T, head_bl_y=0.1 * T,
+        head_tl_x=0.0, head_tl_y=0.0,
+        slot_w=0.5 * U, slot_x=0.5 * T, slot_top=0.8 * T, slot_fall=0.0, slot_right_low=0.35 * T,
+        slot_point=0.25 * T, slot_point_dx=0.2 * U, slot_left_low=0.45 * T,
+        tail_root_l=1.5 * U, tail_root_r=0.2 * U, tail_angle=60.0, tail_tip_rise=0.0, tail_tip_cut=0.0,
+        bar=U, arm=0.8 * U, r_low=0.5 * U, r_high=0.5 * U,
+        dot=U, dot_chamfer=0.0, dot_turn=0.0,
+        dash_l=2.2 * U, dash_h0=0.7 * U, dash_h1=0.7 * U, dash_chamfer=0.0, dash_dx=0.3 * U, dash_top=0.25 * U,
+        kaf_l=2.4 * T, kaf_riser=1.2 * U, kaf_top=T, kaf_base_top=U, kaf_base_left=0.0, kaf_base_right=0.0,
+        kaf_end_x=0.8 * U, kaf_side_y=0.7 * T, kaf_end_n=2.0, kaf_corner_x=U, kaf_corner_n=2.0,
+        kaf_tip_x=2.35 * T, kaf_tip_high=0.8 * T, kaf_slash_a=40.0, kaf_slash_l=0.9 * T, kaf_slash_low_a=40.0,
+        kaf_bar_rise_top=0.0, kaf_bar_rise_low=0.0, kaf_bar_dx=0.7 * U, kaf_bar_dy=0.7 * U,
+        kaf_tip_cut_dx=0.4 * U, kaf_tip_cut_dy=0.8 * U,
+        **{k: v[0] for k, v in CHOICES.items()},
+        slit=0.5 * W,          # white between joined letters, above their join
+        join_line=J,           # joined letters merge in one band up to the top of the join
+        kashida=0.0,           # how much one join of the word is drawn longer (0: none)
+        touch=W,               # white between letters that do not join (a professional typeface: one white)
+        space=3.0 * W,         # between words
+        into=0.15 * U,         # a join runs this far into the letter it reaches
+    )
 
 
 def rules(st: Style) -> Dict[str, float]:
-    R = dict(KIVANO)
+    R = start_rules(st)
     R.update(st.block or {})
     return R
 
