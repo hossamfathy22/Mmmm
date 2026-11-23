@@ -22,7 +22,7 @@ import numpy as np
 from .critic import critique
 from .letters import LETTERS
 from .pipeline import TAKE_MIN, analyse, own_text
-from .recipes import SHAPE_LETTERS, SKELETON, choices, handle_rule, handles, is_handle
+from .recipes import SHAPE_LETTERS, base, choices, handle_rule, handles, is_handle
 from .render import to_svg
 from .selfcheck import check_and_take
 from .style import Style
@@ -128,7 +128,7 @@ def draw(style: Dict[str, Any], word: str, params: Optional[Dict[str, float]] = 
             continue
         h["used"] = (any(c == h["letters"] and f == h["form"] or (c == h["letters"] and {f, h["form"]} in ({"i", "F"}, {"I", "M"}))
                          for c, f in forms) if "letters" in h and h["letters"] else bool(in_word & set(SHAPE_LETTERS.get(h["shape"], ""))))
-    present = {(SKELETON.get(c, c), f) for c, f in forms} | set(forms)
+    present = {(base(c, f), f) for c, f in forms} | set(forms)
     cs = [dict(c, form_ar=FORM_AR[c["form"]]) for c in choices(st) if (c["letter"], c["form"]) in present]
     # the letters the logo gave nothing to (no letter of its, no piece): the engine's own drawing, which
     # the user is told of, to complete in the kit if they wish

@@ -64,7 +64,7 @@ def held_out(folder: Path) -> List[Dict]:
     hidden letter is drawn with them and matched on the logo. Compared with the same letter drawn with
     the engine's general rules. Nothing is cut: a cut is the logo's own drawing, not understanding."""
     from ..pipeline import TAKE_MIN, analyse
-    from ..recipes import SKELETON
+    from ..recipes import base as body_of
     from ..selfcheck import _Trial, fit_letters, self_check
     from ..style import Style
     texts = json.loads((folder / "texts.json").read_text(encoding="utf-8"))
@@ -90,7 +90,7 @@ def held_out(folder: Path) -> List[Dict]:
                 continue
             fitted, chosen, traits = fit_letters(L, text, st, k, trial=t)
             # the hidden letter is not a letter of the logo: it takes the manner, not its own measure
-            on = " ".join(sorted({f"{SKELETON.get(y['letter'], y['letter'])}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i}))
+            on = " ".join(sorted({f"{body_of(y['letter'], y['form'])}.{y['form']}" for j, y in enumerate(base["letters"]) if j != i}))
             r = self_check(L, text, Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on}), k)
             if not r or len(r["letters"]) != len(base["letters"]):
                 continue

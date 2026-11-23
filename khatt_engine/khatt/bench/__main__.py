@@ -18,7 +18,8 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy import ndimage as ndi
 
-from ..critic import MARK_NAMES, SAME
+from .. import anatomy
+from ..critic import MARK_NAMES
 from ..critic import SKELETONS as _SK
 from ..letters import LETTERS
 from ..pipeline import analyse
@@ -157,14 +158,11 @@ def font_shapes(face: fonts.Face) -> Dict[Tuple[str, str], Shape]:
     return out
 
 
-JOINED_SAME = [set("بني"), set("فق")]        # one body when joined to the next letter; only the dots differ
-
-
-def _same(a: str, b: str, form: str = "") -> bool:
-    """Two letters that share a body are one answer: the reading looks at bodies, the dots are left out."""
-    if a == b or any(a in g and b in g for g in SAME):
-        return True
-    return form in ("I", "M") and any(a in g and b in g for g in JOINED_SAME)
+def _same(a: str, b: str, form: str = "i") -> bool:
+    """Two letters drawn on one basic shape in `form` are one answer: the reading looks at bodies, the
+    dots are left out. Which letters those are is khatt.anatomy's (Unicode's joining groups, checked on
+    eight typefaces): ن ق ل alone are not ب ف ك, joined ن is ب and ق is ف."""
+    return a == b or anatomy.same_body(a, b, form or "i")
 
 
 KEY_FORMS = [("ب", "M"), ("ح", "I"), ("س", "M"), ("ص", "I"), ("ع", "M"), ("م", "I"), ("ه", "M"), ("ر", "i"), ("ل", "F"), ("و", "i")]

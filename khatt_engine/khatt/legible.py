@@ -89,11 +89,10 @@ def reads_as(glyph: Glyph, char: str, form: str, st: Style) -> Optional[str]:
 def legible(glyph: Glyph, char: str, form: str, st: Style) -> bool:
     """True when the drawing reads as `char` (or a letter of the same body: the reading leaves the dots out)."""
     from .bench.__main__ import _same
-    from .recipes import SKELETON
     got = reads_as(glyph, char, form, st)
     if got is None:
         return True
-    return _same(got, SKELETON.get(char, char), form) or _same(got, char, form)
+    return _same(got, char, form)
 
 
 _KEPT: Dict[Tuple, bool] = {}
@@ -103,7 +102,6 @@ def keeps_reading(engine: Glyph, drawn: Glyph, char: str, form: str, st: Style) 
     """True when `drawn` (the letter with the logo's parts) reads as the engine's own drawing of it
     does, or as the letter itself: the parts changed its look, not what it is."""
     from .bench.__main__ import _same
-    from .recipes import SKELETON
     # the parts by what they are, not by where they sit in memory (a dict freed and made again can
     # land at the same address with other parts in it)
     parts = tuple((q, v.get("from"), tuple(tuple(p) for p in v["polys"][0][:4])) for q, v in sorted(st.parts.items()) if v.get("polys"))
@@ -111,7 +109,7 @@ def keeps_reading(engine: Glyph, drawn: Glyph, char: str, form: str, st: Style) 
     if key in _KEPT:
         return _KEPT[key]
     def fine(now, was):
-        return now is None or now == was or _same(now, SKELETON.get(char, char), form) or _same(now, char, form)
+        return now is None or now == was or _same(now, char, form)
     # two judges: the engine's alphabet of this style, and real typefaces' letters
     ok = fine(reads_as(drawn, char, form, st), reads_as(engine, char, form, st))
     if ok:

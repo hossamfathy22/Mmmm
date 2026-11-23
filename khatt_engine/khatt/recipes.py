@@ -19,6 +19,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple
 
+from . import anatomy
 from .style import Style
 
 MEASURED, DERIVED, FITTED, BY_EYE = "مقيس", "مشتق", "مضبوط على الخطوط", "بالعين"
@@ -118,7 +119,7 @@ def rule_value(st: Style, name: str) -> float:
         # a letter form of the logo takes its own measure; the same letter in another form does not (the
         # first م of موتنرو measured tall with a small counter drew its last م as a box)
         letter, _, form = cur.partition(".")
-        if f"{SKELETON.get(letter, letter)}.{form}" in st.measured_on.split():
+        if f"{base(letter, form)}.{form}" in st.measured_on.split():
             return float(v) if v is not None else general_rule(st, name)
         return trait_rule(st, name)                           # any other letter: the logo's manner
     return float(v) if v is not None else trait_rule(st, name)
@@ -247,8 +248,14 @@ def declare(letter: str, forms: str, options: List[Tuple[str, str]], default: Ca
 SHAPE_LETTERS = {"الميم": "م", "العين": "عغ", "الفاء والقاف": "فڤق", "الهاء": "هة", "الياء": "يیىئ", "الحاء": "حجخچ",
                  "الكأس": "نلقسشصضيیىئ", "الكأس الراجع": "حجخچعغ", "العروة": "صضطظ", "الصاد": "صض", "الباء": "بتثپ", "النون": "ن",
                  "الدال": "دذ", "الراء": "رزژ", "الكاف": "كکگ", "النقاط": "بتثپنيیئجخچذزژشضظغفڤقة"}
-SKELETON = {"غ": "ع", "ج": "ح", "خ": "ح", "چ": "ح", "ة": "ه", "ی": "ي", "ى": "ي", "ئ": "ي", "ڤ": "ف", "ق": "ف",
-            "ض": "ص", "ظ": "ط", "ش": "س", "ذ": "د", "ز": "ر", "ژ": "ر", "ت": "ب", "ث": "ب", "پ": "ب"}
+
+
+def base(letter: str, form: str) -> str:
+    """The letter whose body `letter` is drawn on in `form`, among the engine's letters (khatt.anatomy,
+    from Unicode's joining groups): ق on ف's joined and on its own alone, ن ي on ب's joined, ة on ه's,
+    أ إ آ on ا's, گ on ك's joined."""
+    from .letters import LETTERS
+    return anatomy.representative(letter, form, among=LETTERS)
 
 
 REFERENCE = "من المرجع"         # the variant: built on the structure of the logo's reference typeface
@@ -256,22 +263,11 @@ ON_REH = "على الراء"           # the variant: ا or ل drawn on the stro
 TEETH_CHOICE = "أسنان الشعار"   # the variant: س ش built of the logo's own tooth (typeset.teeth_from_logo)
 
 
-# Letters that share one body and differ only by their marks, in the forms where they do: what the
-# logo draws of one of them (a letter cut from it) draws the others, with their own marks.
-BODIES: List[Tuple[str, str]] = [
-    ("بتثپنيیئ", "IM"), ("بتثپ", "iF"), ("يیى", "iF"), ("جحخچ", "iIMF"), ("دذ", "iF"), ("رزژ", "iF"),
-    ("سش", "iIMF"), ("صض", "iIMF"), ("طظ", "iIMF"), ("عغ", "iIMF"), ("فقڤ", "IM"), ("فڤ", "iF"),
-    ("كک", "iIMF"), ("هة", "iF"),
-]
-
-
 def siblings(letter: str, form: str) -> List[str]:
-    """The other letters drawn with the same body as `letter` in `form`."""
-    out: List[str] = []
-    for letters, forms in BODIES:
-        if letter in letters and form in forms:
-            out += [c for c in letters if c != letter and c not in out]
-    return out
+    """The other letters drawn with the same body as `letter` in `form` (khatt.anatomy): what the logo
+    draws of one of them (a letter cut from it) draws the others, with their own marks."""
+    from .letters import LETTERS
+    return anatomy.siblings(letter, form, among=list(LETTERS))
 
 
 # ------------------------------------------------------------------ what a designer can move
@@ -355,9 +351,9 @@ def choices(st: Style) -> List[Dict]:
                 key = f"{c}.{f}"
                 if key in st.seen.split() or key in st.taken:
                     continue
-                entry = have.get((c, f)) or have.get((SKELETON.get(c, c), f))
+                entry = have.get((c, f)) or have.get((base(c, f), f))
                 from .typeset import REF_LETTERS, _logo_source
-                auto = (st.ref_auto and st.seen and SKELETON.get(c, c) in REF_LETTERS and key not in st.variants
+                auto = (st.ref_auto and st.seen and base(c, f) in REF_LETTERS and key not in st.variants
                         and not _logo_source(st, c, f, None, parts=False))
                 if entry is not None and not any(o["name"] in ("من الشعار", "المحرك") for o in entry["options"]):
                     entry["options"].append({"name": REFERENCE, "note": note})

@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 from . import geometry as g
 from .letters import JOIN, LETTERS, Glyph, top_joins
 from .library import Compound, Tagged
-from .recipes import BUILDING, ON_REH, PARAMS, TEETH_CHOICE, READS, REFERENCE, SKELETON, siblings, stretch_of, value
+from .recipes import BUILDING, ON_REH, PARAMS, TEETH_CHOICE, READS, REFERENCE, base, siblings, stretch_of, value
 from .style import Style
 
 TOOTH_END = set("بتثپنيیئسشصضطظلكکگ")     # letters whose joining forms end with a tooth or a stem on the left
@@ -522,7 +522,9 @@ def stem_from_reh(st: Style, c: str, form: str) -> Optional[dict]:
                    and all(b - a <= 2.2 * st.stem for a, b in mid + low)
                    and abs((mid[0][0] + mid[0][1]) - (low[0][0] + low[0][1])) / 2 <= 0.6 * st.stem)
         if upright:
-            built = LETTERS[c][1](st, form)
+            # ك on the ر's stroke is the stem and arm construction, whichever the engine draws joined
+            from .letters import kaf_stem
+            built = kaf_stem(st, form, None, "arabic") if c == "ك" else LETTERS[c][1](st, form)
             top = max(y for sh in flat(built.shapes) for poly in sh for _, y in poly)
             dy = -y0 if (c == "ا" or form in ("I", "M")) else 0.0     # set on the baseline, or left hanging
             yc = 0.55 * X + dy
@@ -811,17 +813,17 @@ def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
         BUILDING.reset(ltok)
         # a letter of few logos (ح ص ط ع ف ق ه ...) the logo lacks and has no letter of its own for (no
         # cut, no sibling's body): on the reference typeface's outline (see REF_LETTERS)
-        auto = (st.ref_auto and st.seen and SKELETON.get(c, c) in REF_LETTERS and f"{c}.{form}" not in st.seen.split()
+        auto = (st.ref_auto and st.seen and base(c, form) in REF_LETTERS and f"{c}.{form}" not in st.seen.split()
                 and st.variants.get(f"{c}.{form}") is None and not _logo_source(st, c, form, glyph, parts=False))
         if st.reference and (st.ref_all or auto or (f"{c}.{form}" not in st.seen.split()
                                                     and REFERENCE in (st.variants.get(f"{c}.{form}"),
-                                                                      st.variants.get(f"{SKELETON.get(c, c)}.{form}")))):
+                                                                      st.variants.get(f"{base(c, form)}.{form}")))):
             # a letter the logo lacks, asked of the logo's reference typeface: built on its structure
             # with the logo's pen (the examination found this no better than the engine on average,
             # so it is the designer's choice, not the default)
             from .reference import ref_glyph, with_logo_head
             got = ref_glyph(st.reference, c, form, st, st.ref_wide, engine=glyph)
-            if got is not None and SKELETON.get(c, c) in HEADED and st.parts.get("رأس"):
+            if got is not None and base(c, form) in HEADED and st.parts.get("رأس"):
                 # the logo's own head on the reference's neck (ف ق): the logo's part where it has one
                 got = with_logo_head(got, st) or got
             if got is not None:

@@ -719,7 +719,7 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     not contain.
 
     Returns (parameters, constructions, manner) for `style.fitted`, `style.chosen`, `style.traits`."""
-    from .recipes import DECLARED, PARAMS, SKELETON, TRAIT_GRID, TRAITS, VARIANTS, general_rule
+    from .recipes import DECLARED, PARAMS, TRAIT_GRID, TRAITS, VARIANTS, base, general_rule
     t = trial or _Trial(L, text, Style(**{**st.__dict__, "fitted": {}, "chosen": {}, "traits": {}}), k)
     if not t.ok:
         return {}, {}, {}
@@ -730,7 +730,7 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     for c, f in dict.fromkeys(t.placed):
         if (c, f) == hidden:
             continue
-        for letter in dict.fromkeys((c, SKELETON.get(c, c))):
+        for letter in dict.fromkeys((c, base(c, f))):
             key = f"{letter}.{f}"
             names = [v.name for v in VARIANTS.get(key, [])] or [n for n, _ in DECLARED.get(key, ([], None))[0]]
             if len(names) > 1 and key not in st.variants and letter not in st.variants and ("v:" + key) in reads:
@@ -1086,9 +1086,9 @@ def _measure_rules(L: Line, text: str, st: Style, k: float, first: Dict[str, Any
     fitted, chosen, traits = fit_letters(L, text, st, k)
     if not fitted and not chosen and not traits:
         return first
-    from .recipes import SKELETON
+    from .recipes import base
     from .typeset import shape_forms
-    on = " ".join(sorted({f"{SKELETON.get(c, c)}.{f}" for c, f in shape_forms(text) if c in LETTERS and f in "iIMF"}))
+    on = " ".join(sorted({f"{base(c, f)}.{f}" for c, f in shape_forms(text) if c in LETTERS and f in "iIMF"}))
     trial = Style(**{**st.__dict__, "fitted": fitted, "chosen": chosen, "traits": traits, "measured_on": on})
     r = self_check(L, text, trial, k)
     if not r or r["overall"] < first["overall"] + 0.01:

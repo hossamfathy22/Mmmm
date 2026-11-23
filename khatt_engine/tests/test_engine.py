@@ -1574,3 +1574,128 @@ def test_choices_of_taste_change_only_their_letter():
     assert abs(foot.centroid.x - head.centroid.x) < 0.6                  # its top stands over its foot
     first, second = (g("اا", lean_mode=m) for m in ("logo", "turn"))
     assert first.symmetric_difference(second).area > 50
+
+
+# ---------------------------------------------------------------- the anatomy: one sourced basis
+def test_the_anatomy_reads_every_letter_from_unicode():
+    """Skeleton and marks come from Unicode's joining groups and schematic names, not from a list."""
+    from khatt import anatomy as A
+    assert len(A.UCD) >= 150
+    assert (A.skeleton("ت", "i"), A.marks("ت")) == ("BEH", ("2 DOTS ABOVE",))
+    assert (A.skeleton("ج", "M"), A.marks("ج")) == ("HAH", ("DOT BELOW",))
+    assert A.marks("أ") == ("HAMZA ABOVE",) and A.skeleton("أ", "i") == "ALEF"
+    assert A.marks("ة") == ("2 DOTS ABOVE",) and A.skeleton("ة", "F") == "HEH"
+    # ی has its dots only when joined to the next letter; Jawi ڽ moves its dots below when joined
+    assert A.marks("ی", "i") == () and A.marks("ی", "I") == ("2 DOTS BELOW",)
+    assert A.marks("ڽ", "F") == ("3 DOTS ABOVE",) and A.marks("ڽ", "M") == ("3 DOTS BELOW",)
+    assert A.marks("گ") == ("SARKASH ABOVE",)                       # the gaf's second stroke is a mark
+    assert (A.forms("ا"), A.forms("ء"), A.forms("ب"), A.forms("ـ")) == ("iF", "i", "iIMF", "iIMF")
+
+
+def test_the_anatomy_says_which_letters_share_a_body_in_which_form():
+    from khatt import anatomy as A
+    assert A.same_body("ب", "ن", "I") and not A.same_body("ب", "ن", "i")
+    assert A.same_body("ف", "ق", "M") and not A.same_body("ف", "ق", "F")
+    assert A.same_body("ك", "گ", "I") and A.same_body("ک", "گ", "i") and not A.same_body("ك", "ک", "i")
+    assert not any(A.same_body("ك", "ل", f) for f in "iIMF")
+    assert A.same_body("ي", "ى", "F") and A.same_body("ي", "ب", "M") and A.same_body("ه", "ة", "i")
+    assert A.representative("ق", "I") == "ف" and A.representative("ق", "i") == "ق"
+    assert A.representative("ئ", "M") == "ب" and A.representative("إ", "i") == "ا"
+    # every basic shape of the core set has its parts named in the established terms
+    shapes = A.basic_shapes(A.ARABIC_CORE)
+    assert len(shapes) == 59 and all(form in A.PARTS[sk] for sk, form in shapes)
+    assert set(A.TERMS) >= {"head", "body", "eye", "tooth", "neck", "cup", "ascender", "descender"}
+    assert [f for f, _ in A.FEATURES][:6] == ["ccmp", "isol", "fina", "medi", "init", "rlig"]
+
+
+def test_the_anatomy_agrees_with_real_typefaces():
+    """For every two letters of the core set in a form the anatomy says one body or two; in eight open
+    typefaces their bodies (dots left out) coincide or not. Where several disagree it is an alternate:
+    the joined tooth of Naskh typefaces raised for its neighbours, ة alone drawn apart from ه, and the
+    bowl of ج خ alone or last drawn apart from ح's in three Kufi typefaces, to make room for the dot."""
+    import itertools
+    from khatt import anatomy as A
+    from khatt.bench.fonts import load
+    from khatt.bench.score import BASE_ROW, CANVAS, PX, RIGHT_COL
+    from khatt.bench.truth import letter_mask, x_height
+    from khatt.reference import faces, family
+    fams = ['noto-naskh-arabic', 'amiri', 'vazirmatn', 'noto-kufi-arabic', 'reem-kufi', 'cairo', 'tajawal', 'kufam']
+    paths = {family(f): f for f in faces() if f.endswith('-400.woff2')}
+    if not all(f in paths for f in fams):
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    letters = 'ابتثجحخدذرزسشصضطظعغفقكلمنهويىةپچژکگی'
+    agree = total = 0
+    off = {}
+    for fam in fams:
+        face = load(paths[fam]); cmap = face.tt.getBestCmap(); X = x_height(face)
+        M = {}
+        for c in letters:
+            for f in A.forms(c):
+                m = letter_mask(face, c, f, PX, CANVAS, BASE_ROW, RIGHT_COL, X) if ord(c) in cmap else None
+                if m is not None and m.any():
+                    M[(c, f)] = m
+        for (a, fa), (b, fb) in itertools.combinations(M, 2):
+            if fa == fb:
+                ma, mb = M[(a, fa)], M[(b, fb)]
+                same = (ma & mb).sum() / max(1, (ma | mb).sum()) > 0.92
+                total += 1
+                if same == A.same_body(a, b, fa):
+                    agree += 1
+                else:
+                    off.setdefault((A.skeleton(a, fa), A.skeleton(b, fb), fa), set()).add(fam)
+    assert agree / total > 0.985
+    # what three or more typefaces do otherwise are the alternates the anatomy names (see ALTERNATES)
+    common = {k for k, v in off.items() if len(v) >= 3}
+    assert common <= {("BEH", "BEH", "I"), ("BEH", "BEH", "M"), ("HEH", "HEH", "i"), ("HAH", "HAH", "F"), ("HAH", "HAH", "i")}, off
+
+
+def test_the_old_tables_are_the_anatomys_now():
+    """The skeleton tables once written in five modules are one: the critic's letters are one per
+    Unicode joining group, the reading counts ن ق ل alone as themselves, siblings come from Unicode."""
+    from khatt import anatomy as A
+    from khatt.bench.__main__ import _same
+    from khatt.critic import SKELETONS
+    from khatt.recipes import base, siblings
+    groups = [A.skeleton(c, "i") for c in SKELETONS]
+    assert len(set(groups)) == len(groups) == 18
+    assert set(groups) | {"HAMZA"} == {A.skeleton(c, "i") for c in A.ARABIC_CORE}
+    assert not _same("ب", "ن", "i") and not _same("ف", "ق", "i") and not _same("ك", "ل", "M")
+    assert _same("ب", "ن", "I") and _same("ف", "ق", "M") and _same("ک", "ك", "I")
+    assert "ا" in siblings("أ", "i") and "و" in siblings("ؤ", "F") and "ي" in siblings("ئ", "F")
+    assert "ف" not in siblings("ق", "i") and "ف" in siblings("ق", "I") and set("کگ") <= set(siblings("ك", "M"))
+    assert base("ن", "I") == "ب" and base("ن", "i") == "ن" and base("ة", "F") == "ه"
+
+
+def test_joined_kaf_is_the_keheh_and_not_a_lam():
+    """Joined ك ک گ are the keheh, as every open typeface measured draws them: an arm rising to the
+    top right from a vertex on the left, and the bottom closed on the right. The stem with an arm at
+    its top stays as the designer's choice (square kufi), and for a ك built on the logo's ر."""
+    from khatt.critic import _norm, typeset as _t
+    from khatt.letters import KEHEH, STEM_ARM
+    st = Style(slant=0.0)
+    for f in "IM":
+        k, l = _norm(_t(("ـ{}ـ" if f == "M" else "{}ـ").format("ك"), st)), _norm(_t(("ـ{}ـ" if f == "M" else "{}ـ").format("ل"), st))
+        assert (k & l).sum() / (k | l).sum() < 0.6                            # the stem-and-arm ك was 0.95
+    g = LETTERS["ك"][1](st, "I")
+    shape = [sh for sh in flat(g.shapes) if getattr(sh, "name", "") == "زاوية الكاف"]
+    assert shape
+    pts = [p for sh in shape for poly in sh for p in poly]
+    top = max(y for _, y in pts)
+    assert abs(top - (st.x_height + st.ascender)) < 1.0                       # on the ascender line
+    left = min(x for x, _ in pts); top_x = [x for x, y in pts if y > top - 2.0]
+    assert min(top_x) > left + 0.6 * st.x_height                              # the top far right of the vertex
+    gaf = LETTERS["گ"][1](st, "M")
+    bar = [p for sh in flat(gaf.shapes) if getattr(sh, "name", "") == "شرطة الگاف" for poly in sh for p in poly]
+    assert bar and max(y for _, y in bar) <= st.x_height + st.ascender + 1e-6
+    old = LETTERS["ك"][1](Style(slant=0.0, variants={"ك.I": STEM_ARM}), "I")
+    assert any(getattr(sh, "name", "") == "ذراع الكاف" for sh in flat(old.shapes)) and KEHEH != STEM_ARM
+
+
+def test_joined_kaf_reads_as_kaf_among_real_typefaces():
+    from khatt.legible import reads_as_real
+    from khatt.reference import faces
+    if not [f for f in faces() if "vazirmatn-400" in f]:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    st = Style(slant=0.0)
+    got = [reads_as_real(LETTERS["ك"][1](st, f), f, st) for f in "IM"]
+    assert "ل" not in got

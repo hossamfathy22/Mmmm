@@ -24,6 +24,7 @@ import numpy as np
 from PIL import Image, ImageChops, ImageDraw
 from scipy import ndimage as ndi
 
+from . import anatomy
 from .style import Style
 from .typeset import Layout, typeset
 
@@ -166,12 +167,10 @@ def critique(lay: Layout, where: str = "") -> List[Defect]:
 # ---------------------------------------------------------------- the whole alphabet
 FORMS = {"i": "{}", "I": "{}ـ", "M": "ـ{}ـ", "F": "ـ{}"}
 FORM_NAMES = {"i": "منفصل", "I": "أول", "M": "وسط", "F": "آخر"}
-# one letter per skeleton: letters that differ only by their dots share a skeleton
+# one letter per skeleton of the core set: Unicode's joining groups (khatt.anatomy, checked in the tests);
+# which letters share a body in which form is the anatomy's to say, not a table here
 SKELETONS = "ا ب ح د ر س ص ط ع ف ق ك ل م ن ه و ی".split()
-SAME = [set("بتثپن"), set("حجخچ"), set("دذ"), set("رزژ"), set("سش"), set("صض"), set("طظ"), set("عغ"),
-        set("فڤق"), set("كکگل"), set("یيى")]
-JOINING = "بحسصطعفقكلمنهی"
-SAME_JOINED = [set("بنی")]        # initial and medial ب ن ی are one tooth; only their dots differ
+JOINING = "".join(c for c in SKELETONS if anatomy.joining(c) == "D")
 
 
 def specimen_defects(st: Style, letters: Optional[str] = None) -> List[Defect]:
@@ -220,7 +219,7 @@ def confusable(st: Style, limit: float = 0.86) -> List[Defect]:
             if lay.shapes:
                 shapes[c] = _norm(lay)
         for a, b in itertools.combinations(shapes, 2):
-            if any(a in g and b in g for g in SAME + (SAME_JOINED if f == "M" else [])):
+            if anatomy.same_body(a, b, f):
                 continue
             A, B = shapes[a], shapes[b]
             iou = float((A & B).sum() / max(1, (A | B).sum()))

@@ -865,7 +865,111 @@ param("kaf.width", lambda st: 2.2 * st.pitch, "طول قاعدة الكاف ال
 param("kaf.post", lambda st: 0.7 * st.x_height, "ارتفاع طرف الكاف الأخيرة = 0.7 × ارتفاع الحروف", FITTED, "الكاف")
 
 
+# Joined ك ک گ are one body (Unicode puts them in one shape joined; khatt.anatomy), the keheh, and all 17
+# open typefaces measured draw it so, Naskh, Kufi and display alike: an arm rising to the top right from
+# a vertex on the left, and from the vertex a stroke back to the right that turns down at the right edge
+# to the baseline (a curve in a Naskh, a corner in a Kufi), then the base running left to the join. On
+# the 53 styles of the bench (medians, x-heights): the vertex at 0.63 of the height, 1.28 in from the
+# right edge, the top 0.26 in. The bottom closed on the right is what tells it from the initial ع, whose
+# hook is open there. A stem with an arm at its top (a square kufi's ك) is told from ل by its arm alone:
+# in the engine's pen 47 of 53 typefaces' readers took that initial ك for ل.
+KEHEH, STEM_ARM = "مائلة", "جذع وذراع"
+param("kaf.reach", lambda st: 1.28 * st.x_height,
+      "مدى الكاف الموصولة من حافتها اليمنى إلى زاويتها = 1.28 × ارتفاع الحروف (وسيط 53 خطًا)", MEASURED, "الكاف")
+param("kaf.vertex", lambda st: 0.63 * (st.x_height + st.ascender),
+      "ارتفاع زاوية الكاف الموصولة = 0.63 من ارتفاعها (وسيط 53 خطًا)", MEASURED, "الكاف")
+_KAF_LETTER = {"arabic": "ك", "keheh": "ک", "gaf": "گ"}
+
+
+def _keheh(st: Style, form: str, variant: str) -> Glyph:
+    """ك ک گ joined: the keheh. One pen stroke from the top right down to the vertex on the left and
+    back to the baseline on the right, the outside of the turn filled by the pen's footprints (a bevel)
+    and the foot cut level on the baseline, then the base to the join. The gaf's second stroke (its
+    «sarkash», a mark in Unicode's terms) runs parallel above the upper arm, as far from it as the old
+    gaf's bar was from its arm (1.6 hairlines of white), both under the ascender line."""
+    from shapely.geometry import Polygon, box
+    from shapely.ops import unary_union
+    U, X, A, h = st.stem, st.x_height, st.ascender, st.hair
+    top = X + A
+    reach = val(st, "kaf.reach")
+    right = 0.0 if form == "I" else -0.25 * X          # medial: the join from the right runs in under it
+
+    def stroke(pts):
+        rings = g.solid_stroke(st, g.path(*[g.line(a, b, 24) for a, b in zip(pts, pts[1:])]))
+        return unary_union([Polygon(r).buffer(0) for r in rings if len(r) >= 3])
+
+    def arms(T, V, B):
+        # from the vertex the stroke runs right at its height and turns down at the right edge: round in
+        # a curved logo, a corner in an angular one
+        C = (B[0], V[1])
+        if st.angular >= 0.5:
+            body = stroke([T, V, C, B])
+        else:
+            rings = g.solid_stroke(st, g.path(g.line(T, V, 24),
+                                              g.cubic(V, (V[0] + 0.55 * (C[0] - V[0]), C[1]), (C[0], C[1] - 0.05 * (C[1] - B[1])),
+                                                      (C[0], C[1] - 0.55 * (C[1] - B[1])), 40),
+                                              g.line((C[0], C[1] - 0.55 * (C[1] - B[1])), B, 12)))
+            body = unary_union([Polygon(r).buffer(0) for r in rings if len(r) >= 3])
+        # the acute inside of the vertex filled with a small round where its white is thinner than the
+        # pen can leave (the critic's seam), as a designer fills it; outer corners stay as they are
+        r = 0.3 * min(h, 0.3 * U)
+        body = body.buffer(r, 16).buffer(-r, 16)
+        return body.intersection(box(-1e6, 0.0, 1e6, 1e6))      # cut level on the baseline
+
+    def rings_of(geom) -> g.Shape:
+        out: g.Shape = []
+        for poly in getattr(geom, "geoms", [geom]):
+            if poly.geom_type == "Polygon" and not poly.is_empty:
+                out.append([(float(x), float(y)) for x, y in list(poly.exterior.coords)[:-1]])
+                out += [[(float(x), float(y)) for x, y in list(r.coords)[:-1]] for r in poly.interiors]
+        return out
+
+    def layout(up):
+        # the vertex at its measured height, but low enough that the arm rises at 32 degrees at least
+        # (the typefaces' arms rise at 37): in a short-ascender logo a flatter arm piles ink at the vertex
+        vy = min(val(st, "kaf.vertex") * up / top, up - math.tan(math.radians(32)) * (reach - 0.26 * X))
+        T, V, B = (-0.26 * X, up), (-reach, vy), (-0.5 * U, -0.5 * U)
+        x0, _, x1, y1 = arms(T, V, B).bounds
+        # the ink's top on its line and its right edge on the letter's: the pen's width taken in
+        dx, dy = right - x1, up - y1
+        return (T[0] + dx, T[1] + dy), (V[0] + dx, V[1]), (B[0] + dx, B[1])
+
+    up = top
+    if variant == "gaf":
+        T, V, _ = layout(top)
+        L = math.hypot(V[0] - T[0], V[1] - T[1])
+        d = ((V[0] - T[0]) / L, (V[1] - T[1]) / L)
+        n = (d[1], -d[0])                                 # the normal pointing up, away from the vertex
+        D = st.width_at(d[1]) + 1.6 * h                   # centre to centre: the pen's width and the white
+        up = top - D * n[1]
+    T, V, B = layout(up)
+    body = arms(T, V, B)
+    x0, _, x1, _ = body.bounds
+    foot = body.intersection(box(-1e6, 0.0, 1e6, h))
+    base_left = x0 - 0.1 * X
+    base_right = 0.0 if form == "M" else (foot.bounds[2] if not foot.is_empty else x1)
+    shapes: List[g.Shape] = [_named(rings_of(body), "زاوية الكاف"), _named(g.connector(st, base_left, base_right), "قاعدة الكاف")]
+    if variant == "gaf":
+        S1 = (T[0] + D * n[0], T[1] + D * n[1])
+        S2 = (S1[0] + 0.5 * (V[0] - T[0]), S1[1] + 0.5 * (V[1] - T[1]))
+        bar = stroke([S1, S2])
+        over = bar.bounds[3] - top                         # its square end may stand above the line
+        if over > 0:
+            from shapely.affinity import translate
+            bar = translate(bar, 0.0, -over)
+        shapes.append(_named(rings_of(bar), "شرطة الگاف"))
+    return Glyph(shapes, left=base_left, entry_x=0.0, entry_edge=0.0, exit_x=base_left, exit_edge=base_left)
+
+
 def kaf(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
+    """ك ک گ. Joined, the keheh (see above) unless the designer asks for the stem and arm."""
+    c = _KAF_LETTER[variant]
+    if form in ("I", "M") and (pick(st, f"{c}.{form}", c, f"ك.{form}", "ك") or KEHEH) == KEHEH:
+        return _keheh(st, form, variant)
+    return kaf_stem(st, form, mark, variant)
+
+
+def kaf_stem(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
     """ك ک گ: a stem to the ascender with a hairline arm to the left at its top (the gaf has a
     second, floating bar above the arm; both stay under the ascender line). Final and isolated
     forms add the baseline and a short post on the left, like ب; Arabic ك carries a small dash."""
@@ -1009,6 +1113,10 @@ declare("ه", "I", [("عينان", "رأس عريض بقاطع يصنع عيني
         lambda st: "حلقة وجذع" if st.angular >= 0.5 else "عينان")
 declare("ي", "i", [("رأس وكأس", "رأس مفتوح إلى اليمين ثم كأس واسع"), ("كأس", "كأس فقط")],
         lambda st: "كأس" if st.angular >= 0.5 else "رأس وكأس")
+for _k in "كکگ":
+    declare(_k, "IM", [(KEHEH, "ذراع يصعد إلى أعلى اليمين من زاوية على اليسار ثم يعود إلى السطر: كما ترسمها الخطوط المفتوحة كلها"),
+                       (STEM_ARM, "جذع إلى الصاعد وذراع إلى اليسار في أعلاه: بناء الكوفي المربع، لا يفرّقها عن اللام إلا الذراع")],
+            lambda st: KEHEH)
 
 
 # ---------------------------------------------------------------- the table
