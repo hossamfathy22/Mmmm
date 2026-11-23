@@ -1743,3 +1743,22 @@ def test_the_engine_keeps_no_logo_and_each_logo_starts_from_itself():
     alone = subprocess.run([sys.executable, "-c", code, "round_square.png"], capture_output=True, text=True).stdout
     after = subprocess.run([sys.executable, "-c", code, "bidonaq.png", "round_square.png"], capture_output=True, text=True).stdout
     assert alone and alone == after
+
+
+def test_the_logo_chooses_its_construction():
+    """A new logo is not assumed pen or blocks: its own word is drawn both ways from its own measures
+    and the one that rebuilds it better is kept. A logo made of blocks (drawn here by the engine from
+    rules the test knows) is found to be blocks, and its rules come back from its ink: its pen, its
+    touching letters, the cut of its tops. A pen logo stays a pen."""
+    truth = Style(construction="block", slant=0.0, stem=26.0, hair=17.0, x_height=70.0, ascender=22.0, descender=28.0,
+                  white=12.0, block={"top_cut": 7.0, "slit": 5.0, "touch": 0.0}, block_parts={})
+    logo = to_png(typeset("بيدوناق", truth), 220)
+    r = run(logo, "سلام", texts=["بيدوناق"])
+    c = r["construction"]
+    assert c["construction"] == "block" and c["block"] >= 0.85 and c["block"] > c["pen"] + 0.2
+    st = Style(**{k: v for k, v in r["style"].items() if k in Style.__dataclass_fields__})
+    R = st.block
+    scale = R["T"] / 70.0
+    assert abs(R["U"] / scale - 26.0) < 3.0 and R["touch"] == 0.0 and abs(R["top_cut"] - 7.0) < 2.0
+    pen = run(EXAMPLE.read_bytes(), "سلام", texts=["بيدوناق"])
+    assert pen["construction"]["construction"] == "pen" and pen["style"]["construction"] != "block"

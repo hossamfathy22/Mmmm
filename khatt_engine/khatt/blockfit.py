@@ -224,7 +224,7 @@ def rebuild(parts: Dict, keys: Sequence[str], st: Style):
 
 # ---------------------------------------------------------------- 3. the rules
 def fit(word: str, st: Style, ink: np.ndarray, origin: Tuple[float, float], cycles: int = 2,
-        log: Callable[[str], None] = print) -> Style:
+        log: Callable[[str], None] = print, keys: Optional[Sequence[str]] = None, iters: int = 40) -> Style:
     """Fit the rules of the block construction (`Style.block`) to the logo's ink (a boolean mask), the
     logo's `word` drawn by the rules alone (no part of the logo), its right edge at origin[0] and its
     baseline at origin[1]. Each rule is searched alone, in turn."""
@@ -250,9 +250,10 @@ def fit(word: str, st: Style, ink: np.ndarray, origin: Tuple[float, float], cycl
     log(f"start {100 * score():.2f}%")
     for cycle in range(cycles):
         # the numbers only: the choices of taste (words) are the designer's, not the logo's measures
-        for k in [k for k in block if k not in FIXED and isinstance(block[k], (int, float))]:
+        for k in [k for k in (keys or block) if k not in FIXED and isinstance(block[k], (int, float))]:
             def put(x, k=k):
                 block[k] = float(x[0])
-            search(put, np.array([block[k]]), np.array([0.03 if k in FRACTIONS else 0.5 if k == "round" else 1.5]), 40)
+            step = 0.03 if k in FRACTIONS else max(0.5, 0.08 * abs(block[k]))
+            search(put, np.array([block[k]]), np.array([step]), iters)
         log(f"cycle {cycle}: rules {100 * score():.2f}%")
     return cur

@@ -205,7 +205,7 @@ def own_text(R) -> str:
 
 
 def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
-            overrides: Optional[Dict[str, Any]] = None, read: bool = True) -> Dict[str, Any]:
+            overrides: Optional[Dict[str, Any]] = None, read: bool = True, construction: bool = True) -> Dict[str, Any]:
     """Stages 1-4 alone: guard the picture, measure and read every line, and turn the chosen line
     into drawing rules. Nothing is drawn. This is all a caller needs to typeset words in the logo's
     style, and all the benchmark needs to test the measuring."""
@@ -247,8 +247,18 @@ def analyse(image: bytes, *, texts: Optional[List[str]] = None, line: Optional[i
         elif got:
             R.drawn_match = got["match"]
         health = assess(lines, readings, src, notes)
-    return {"work": work, "ink": ink, "scale": scale, "k": k, "inverted": inverted, "lines": lines, "readings": readings,
-            "src": src, "health": health, "lib": lib, "feats": feats, "style": style}
+    an = {"work": work, "ink": ink, "scale": scale, "k": k, "inverted": inverted, "lines": lines, "readings": readings,
+          "src": src, "health": health, "lib": lib, "feats": feats, "style": style, "construction": None}
+    # the construction is the logo's: its own word drawn both ways from its own measures, the one that
+    # rebuilds it better kept (construction.py). It needs the word: typed, or read whole.
+    word = own_text(R)
+    if construction and R.script == "arabic" and word and "construction" not in (overrides or {}):
+        from .construction import choose
+        got = choose(an, word)
+        an["construction"] = {k_: v for k_, v in got.items() if k_ != "style"}
+        if got["construction"] == "block":
+            an["style"] = got["style"]
+    return an
 
 
 def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Optional[int] = None,
@@ -296,7 +306,7 @@ def run(image: bytes, word: str, *, texts: Optional[List[str]] = None, line: Opt
         "stages": STAGES,
         "image": {"width": round(work.width * k), "height": round(work.height * k), "inverted": inverted},
         "lines": lines_js, "observations": obs, "source_line": src,
-        "input": health,
+        "input": health, "construction": an["construction"],
         "parts": lib.summary(), "parts_json": parts_json, "features": feats,
         "style": style.to_dict(), "recipes": recipes, "skipped": lay.skipped,
         "handles": handles(lay.style), "choices": choices(lay.style),
