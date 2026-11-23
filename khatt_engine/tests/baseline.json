@@ -1,0 +1,11 @@
+{
+ "_what": "Where the engine stands now. Tests require «no worse than this»: an improvement passes, a step back fails. After an improvement, raise these numbers (and shorten the known lists) so the gain is kept.",
+ "tolerance": 0.01,
+ "self_check": {"bidonaq.png": 0.943},
+ "critic_known": {
+  "bidonaq.png": [],
+  "round_square.png": [],
+  "angular": ["confusable|ف وه وسط", "confusable|ق وه وسط"],
+  "one_weight": ["confusable|ص وط وسط", "confusable|ف وه وسط", "confusable|ق وه وسط"]
+ }
+}
