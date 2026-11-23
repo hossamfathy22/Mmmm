@@ -1762,3 +1762,22 @@ def test_the_logo_chooses_its_construction():
     assert abs(R["U"] / scale - 26.0) < 3.0 and R["touch"] == 0.0 and abs(R["top_cut"] - 7.0) < 2.0
     pen = run(EXAMPLE.read_bytes(), "سلام", texts=["بيدوناق"])
     assert pen["construction"]["construction"] == "pen" and pen["style"]["construction"] != "block"
+
+
+def test_the_gallery_keeps_each_logo_with_its_own_record(tmp_path, monkeypatch):
+    """A logo given to the gallery is read afresh and kept in a folder of its own: the picture, the
+    record (construction and its evidence, every measure with its source), the sheet of its letters;
+    anything typed is drawn in its style; and it can be removed. The gallery lives with the user's
+    data, not in the code."""
+    from khatt import gallery
+    monkeypatch.setenv("KHATT_DATA", str(tmp_path))
+    r = gallery.add(EXAMPLE.read_bytes(), "بيدوناق", "بيدوناق", exam=False)
+    folder = tmp_path / "gallery" / r["id"]
+    assert (folder / "logo.png").read_bytes() == EXAMPLE.read_bytes() and (folder / "specimen.png").exists()
+    assert r["construction"]["construction"] == "pen" and r["measures"]["الجذع"] > 0
+    assert len(r["sources"]) > 40 and all(s["source"] for s in r["sources"])
+    assert [x["id"] for x in gallery.items()] == [r["id"]] and gallery.get(r["id"])["name"] == "بيدوناق"
+    assert gallery.write(r["id"], "محمد كتب")["svg"].startswith("<svg")
+    with pytest.raises(ValueError):
+        gallery.get("../etc")
+    assert gallery.remove(r["id"]) and gallery.items() == []

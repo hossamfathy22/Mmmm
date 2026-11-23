@@ -2,6 +2,8 @@
 
 /           the editor: read a logo, write a word, move the handles, save the edits
 /report     the full report of one run (measuring sheets, parts, construction)
+/gallery    every logo read, each with its record: its construction, measures and their sources, letters,
+            the professional exam, and a box to write anything in its style
 """
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ from typing import Any, Dict, Optional
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from khatt import editor
+from khatt import editor, gallery
 from khatt.pipeline import run
 
 app = FastAPI(title="Khatt — logo construction engine")
@@ -138,3 +140,69 @@ async def api_run(image: UploadFile = File(...), word: str = Form(...), texts: s
     if r.get("self_check_png"):
         r["self_check_png"] = base64.b64encode(r["self_check_png"]).decode("ascii")
     return editor._plain(r)
+
+
+# ------------------------------------------------------------------ the gallery
+@app.get("/gallery")
+def gallery_page() -> FileResponse:
+    return FileResponse(STATIC / "gallery.html")
+
+
+@app.get("/api/gallery")
+def api_gallery() -> Dict[str, Any]:
+    return {"items": gallery.items()}
+
+
+@app.post("/api/gallery")
+async def api_gallery_add(image: UploadFile = File(...), name: str = Form(""), word: str = Form("")) -> Dict[str, Any]:
+    """Read a logo afresh and keep its record in the gallery."""
+    data = await _image(image)
+    try:
+        return gallery.add(data, name.strip() or Path(image.filename or "logo").stem, word)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except OSError:
+        raise HTTPException(400, "تعذّر فتح الصورة. استعمل PNG أو JPG أو WebP.")
+
+
+def _record(rid: str) -> Dict[str, Any]:
+    try:
+        r = gallery.get(rid)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if r is None:
+        raise HTTPException(404, "لا يوجد هذا الشعار في المعرض.")
+    return r
+
+
+@app.get("/api/gallery/{rid}")
+def api_gallery_get(rid: str) -> Dict[str, Any]:
+    return _record(rid)
+
+
+@app.get("/api/gallery/{rid}/{kind}")
+def api_gallery_file(rid: str, kind: str) -> FileResponse:
+    _record(rid)
+    f = gallery.file(rid, kind)
+    if f is None:
+        raise HTTPException(404, "الملف غير موجود.")
+    return FileResponse(f)
+
+
+@app.post("/api/gallery/{rid}/write")
+def api_gallery_write(rid: str, body: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """Anything typed, in this logo's style."""
+    _record(rid)
+    text = str(body.get("text", "")).strip()
+    if not text:
+        raise HTTPException(400, "اكتب نصًا.")
+    try:
+        return gallery.write(rid, text)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.delete("/api/gallery/{rid}")
+def api_gallery_delete(rid: str) -> Dict[str, Any]:
+    _record(rid)
+    return {"removed": gallery.remove(rid)}

@@ -86,7 +86,8 @@ def read_logo(image: bytes, text: str = "") -> Dict[str, Any]:
         if after:
             check["overlay_after_png"] = base64.b64encode(after).decode("ascii")
     return _plain({
-        "style": st.to_dict(), "health": an["health"], "read": R.text_given or R.text_guess, "read_sure": bool(own),
+        "style": st.to_dict(), "health": an["health"], "construction": an.get("construction"),
+        "read": R.text_given or R.text_guess, "read_sure": bool(own),
         "read_how": "given" if R.text_given else ("drawn" if R.text_drawn else "stems"), "read_match": R.drawn_match,
         "self_check": check, "self_check_png": overlay,
         "reference": ({"font": Path(ref["path"]).stem, "match": round(ref["match"], 3), "engine": round(ref["engine"], 3)}

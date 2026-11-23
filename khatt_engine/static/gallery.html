@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>معرض الشعارات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;700&family=Vazirmatn:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#eef1f4;--surface:#fff;--line:#d5dce4;--fg:#16202c;--muted:#5b6878;--accent:#0b8a96;--chip:#e3e9ef;--board:#fff;
+  --ok:#23895f;--warn:#b7791f;--bad:#cf3f53;
+  --f-display:"Readex Pro","Vazirmatn",system-ui,sans-serif;--f-body:"Vazirmatn",Tahoma,system-ui,sans-serif;--f-data:"IBM Plex Mono",ui-monospace,monospace;--r:10px}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141a;--surface:#171e26;--line:#2a3440;--fg:#e4eaf0;--muted:#97a3b1;--accent:#3cc3cf;--chip:#222c37;--board:#f4f6f8;--ok:#4cc48f;--warn:#e2a64a;--bad:#ff7084;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.7}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:baseline;margin-bottom:16px}
+h1{font-family:var(--f-display);font-size:clamp(24px,3.4vw,32px);margin:0}
+h1 b{color:var(--accent)}
+.lede{margin:0;color:var(--muted);flex:1 1 320px}
+a{color:var(--accent)}
+h2{font-family:var(--f-display);font-size:17px;margin:0 0 8px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+form.add{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end}
+@media (max-width:760px){form.add{grid-template-columns:1fr}}
+label{display:block;font-size:13px;color:var(--muted)}
+input[type=text],input[type=file],textarea{width:100%;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+button{font:inherit;font-weight:500;border:0;border-radius:8px;padding:9px 16px;background:var(--accent);color:#fff;cursor:pointer}
+button.ghost{background:var(--chip);color:var(--fg)}
+button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+button:disabled{opacity:.55;cursor:wait}
+.status{margin-top:8px;color:var(--muted);min-height:1.7em}
+.status.err{color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:border-color .15s}
+.card:hover,.card:focus-visible{border-color:var(--accent);outline:none}
+.card .img{background:var(--board);height:130px;display:flex;align-items:center;justify-content:center;padding:10px}
+.card img{max-width:100%;max-height:110px;object-fit:contain}
+.card .meta{padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.card .name{font-family:var(--f-display);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--chip);border-radius:99px;padding:1px 10px;font-size:12.5px;color:var(--muted)}
+.chip.ok{color:var(--ok)}.chip.warn{color:var(--warn)}
+.empty{color:var(--muted);text-align:center;padding:40px 10px}
+.detail{display:none;margin-top:16px;gap:14px}
+.detail.on{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media (max-width:900px){.detail.on{grid-template-columns:1fr}}
+.span{grid-column:1/-1}
+.board{background:var(--board);border-radius:8px;border:1px solid var(--line);padding:14px;display:flex;align-items:center;justify-content:center;min-height:120px;overflow-x:auto}
+.board img{max-width:100%;max-height:220px}
+.board svg{max-width:100%;height:auto;max-height:260px}
+.board svg path,.board svg polygon{fill:#111}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.write textarea{font-size:18px;min-height:54px;resize:vertical}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500}
+td.num{font-family:var(--f-data);direction:ltr;text-align:left;white-space:nowrap}
+.exam li{margin:4px 0}
+.exam .ok{color:var(--ok)}.exam .no{color:var(--bad)}
+.exam small{display:block;color:var(--muted)}
+details summary{cursor:pointer;color:var(--accent)}
+.src{font-size:12.5px;color:var(--muted)}
+.specimen{max-width:100%;border-radius:8px;border:1px solid var(--line);background:var(--board)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>معرض <b>الشعارات</b></h1>
+    <p class="lede">كل شعار يُقرأ من الصفر ويُحفظ هنا بسجله: طريقة بنائه، وقياساته ومصدر كل رقم، وحروفه، وامتحان الخط الاحترافي. اختر شعارًا واكتب ما تريد بخطه. <a href="/">المحرر</a></p>
+  </header>
+
+  <section class="panel">
+    <h2>أضف شعارًا</h2>
+    <form class="add" id="add">
+      <div><label for="f">صورة الشعار</label><input type="file" id="f" accept="image/png,image/jpeg,image/webp" required></div>
+      <div><label for="n">اسمه</label><input type="text" id="n" placeholder="مثل: سفينة"></div>
+      <div><label for="w">الكلمة المكتوبة فيه</label><input type="text" id="w" placeholder="تجعل القراءة أوثق"></div>
+      <button id="go" type="submit">اقرأ واحفظ</button>
+    </form>
+    <div class="status" id="st" role="status"></div>
+  </section>
+
+  <div class="grid" id="grid"></div>
+
+  <section class="detail" id="detail">
+    <div class="panel span">
+      <div class="top">
+        <h2 id="d-name"></h2>
+        <div class="chips" id="d-chips"></div>
+        <div><button class="ghost" id="back" type="button">كل الشعارات</button> <button class="danger" id="del" type="button">احذف</button></div>
+      </div>
+      <div class="board"><img id="d-logo" alt="الشعار"></div>
+    </div>
+    <div class="panel span write">
+      <h2>اكتب بخطه</h2>
+      <textarea id="txt" dir="rtl">محمد كتب على السبورة</textarea>
+      <div class="status" id="wst"></div>
+      <div class="board" id="out"></div>
+    </div>
+    <div class="panel">
+      <h2>طريقة البناء</h2>
+      <div id="d-cons"></div>
+      <h2 style="margin-top:14px">القياسات الأساسية</h2>
+      <table id="d-meas"></table>
+    </div>
+    <div class="panel">
+      <h2>امتحان الخط الاحترافي</h2>
+      <ul class="exam" id="d-exam"></ul>
+    </div>
+    <div class="panel span">
+      <h2>كل قاعدة ومصدرها</h2>
+      <details><summary id="d-src-sum"></summary><table id="d-src"></table></details>
+    </div>
+    <div class="panel span">
+      <h2>الحروف بصورها</h2>
+      <img class="specimen" id="d-spec" alt="لوحة الحروف">
+    </div>
+  </section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const CONS={pen:"قلم",block:"كتل"};
+let cur=null,timer=null;
+
+async function api(url,opt){const r=await fetch(url,opt);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||"حدث خطأ.");return j}
+
+async function list(){
+  const {items}=await api("/api/gallery");
+  $("grid").innerHTML=items.length?items.map(it=>`
+    <div class="card" tabindex="0" data-id="${esc(it.id)}">
+      <div class="img"><img src="/api/gallery/${encodeURIComponent(it.id)}/logo" alt="${esc(it.name)}" loading="lazy"></div>
+      <div class="meta"><span class="name">${esc(it.name)}</span>
+        <div class="chips"><span class="chip">${CONS[it.construction]||it.construction}</span>
+        ${it.match!=null?`<span class="chip ${it.match>=0.9?"ok":"warn"}">مطابقة ${(it.match*100).toFixed(1)}%</span>`:""}
+        ${it.exam?`<span class="chip">الامتحان ${it.exam}</span>`:""}</div>
+        <span class="src">${esc(it.created)}</span></div>
+    </div>`).join(""):`<div class="empty">المعرض فارغ. أضف أول شعار.</div>`;
+  document.querySelectorAll(".card").forEach(c=>{c.onclick=()=>open(c.dataset.id);c.onkeydown=e=>{if(e.key==="Enter")open(c.dataset.id)}});
+}
+
+async function open(id){
+  const r=await api(`/api/gallery/${encodeURIComponent(id)}`);cur=r;
+  $("grid").style.display="none";$("detail").classList.add("on");
+  $("d-name").textContent=r.name;
+  const c=r.construction||{};
+  $("d-chips").innerHTML=`<span class="chip">${CONS[c.construction]||"قلم"}</span>`+
+    (r.self_check&&r.self_check.overall!=null?`<span class="chip">إعادة بناء كلمته ${(r.self_check.overall*100).toFixed(1)}%</span>`:"")+
+    (r.read?`<span class="chip">قرأ: ${esc(r.read)}</span>`:"");
+  $("d-logo").src=`/api/gallery/${encodeURIComponent(id)}/logo`;
+  $("d-spec").src=`/api/gallery/${encodeURIComponent(id)}/specimen`;
+  $("d-cons").innerHTML=c.construction?`<p>رُسمت كلمته «${esc(c.word)}» بالطريقتين من قياساته: القلم أعاد بناءه ${(c.pen*100).toFixed(1)}%، والكتل ${(c.block*100).toFixed(1)}%؛ فاختير <b>${CONS[c.construction]}</b>${c.sure?"":" (حكم غير أكيد: لم تُعده أي منهما جيدًا)"}.</p>`
+    :`<p class="src">لم يُحكم على طريقة البناء: كلمة الشعار لم تُكتب ولم تُقرأ كاملة، فبقي القلم.</p>`;
+  $("d-meas").innerHTML=Object.entries(r.measures||{}).map(([k,v])=>`<tr><th>${esc(k)}</th><td class="num">${typeof v==="number"?v.toFixed(1):esc(v)}</td></tr>`).join("");
+  $("d-exam").innerHTML=(r.exam||[]).map(x=>`<li class="${x.ok?"ok":"no"}">${x.ok?"✓":"✗"} <b>${esc(x.name)}</b><small>${esc(x.measure)}</small></li>`).join("")||"<li>لم يُمتحن.</li>";
+  const src=r.sources||[];const by={};src.forEach(s=>by[s.source||"—"]=(by[s.source||"—"]||0)+1);
+  $("d-src-sum").textContent=`${src.length} قاعدة: `+Object.entries(by).map(([k,v])=>`${k} ${v}`).join("، ");
+  $("d-src").innerHTML="<tr><th>القاعدة</th><th>القيمة</th><th>كيف</th><th>المصدر</th></tr>"+src.map(s=>`<tr><td>${esc(s.shape?s.shape+" · ":"")}${esc(s.name)}</td><td class="num">${typeof s.value==="number"?s.value.toFixed(2):esc(s.value)}</td><td class="src">${esc(s.rule||"")}</td><td>${esc(s.source)}</td></tr>`).join("");
+  write();window.scrollTo({top:0,behavior:"smooth"});
+}
+
+async function write(){
+  if(!cur)return;const t=$("txt").value.trim();if(!t){$("out").innerHTML="";return}
+  $("wst").textContent="…";
+  try{const j=await api(`/api/gallery/${encodeURIComponent(cur.id)}/write`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t})});
+    $("out").innerHTML=j.svg;$("wst").textContent=j.skipped&&j.skipped.length?`لم تُرسم: ${j.skipped.join(" ")}`:"";$("wst").className="status"}
+  catch(e){$("wst").textContent=e.message;$("wst").className="status err"}
+}
+$("txt").addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(write,350)});
+$("back").onclick=()=>{$("detail").classList.remove("on");$("grid").style.display="";cur=null;list()};
+$("del").onclick=async()=>{if(!cur||!confirm(`احذف «${cur.name}» من المعرض؟`))return;await api(`/api/gallery/${encodeURIComponent(cur.id)}`,{method:"DELETE"});$("back").onclick()};
+$("add").onsubmit=async e=>{
+  e.preventDefault();const f=$("f").files[0];if(!f)return;
+  const fd=new FormData();fd.append("image",f);fd.append("name",$("n").value);fd.append("word",$("w").value);
+  $("go").disabled=true;$("st").className="status";$("st").textContent="يقرأ الشعار من الصفر ويقيسه ويمتحنه… قد يستغرق دقيقة.";
+  try{const r=await api("/api/gallery",{method:"POST",body:fd});$("st").textContent=`حُفظ «${r.name}».`;$("add").reset();await list();open(r.id)}
+  catch(err){$("st").className="status err";$("st").textContent=err.message}
+  finally{$("go").disabled=false}
+};
+list();
+</script>
+</body>
+</html>
