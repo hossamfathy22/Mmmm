@@ -89,7 +89,7 @@ KIVANO: Dict[str, float] = dict(
     # its left); ع in the middle ("v": a V open at the top; "closed": a small closed head); how free
     # uprights lean ("turn": to one side and the other in turn; "logo": always as on the logo, ا to
     # the left and a tooth to the right; "none")
-    heh_initial="slots", ain_medial="v", lean_mode="turn",
+    heh_initial="slots", ain_medial="v", lean_mode="turn", hah_end="bowl",
     slit=6.0,          # white between joined letters, above their join (5-8)
     join_line=16.5,    # joined letters merge in one band up to here, the top of the join (ي→و 16, ن→و 17)
     kashida=0.0,       # how much one join of the word is drawn longer (0: none)
@@ -581,8 +581,46 @@ def _seen(p: Pen, form, mark):
     return body_left
 
 
+def _stroke(top: Pt, foot: Pt, w: float):
+    """A stroke of the pen falling from `top` to `foot`, `w` wide across."""
+    (x0, y0), (x1, y1) = top, foot
+    return _poly([(x0 - w / 2, y0), (x0 + w / 2, y0), (x1 + w / 2, y1), (x1 - w / 2, y1)])
+
+
+def _leg(p: Pen, x_left: float):
+    """The tail of the logo's و falling from the line at a letter's left end: in a heavy face the bowl
+    under the line becomes a leg (as the block kufic Blaka draws ح and ع), there is no room for a
+    counter under so shallow a line."""
+    p.tail(x_left + p.R["tail_root_l"], b=2.0)
+
+
 def _jeem(p: Pen, form, mark):
-    """ج ح خ: a hat on the left at the top, and from its right end a stroke falling to the right, to the
+    """ج ح خ as the reference (Kufam) builds them: one stroke falling from the top left to the line at
+    the right, and the base running on to the left. Alone or last it keeps the bowl thrown back to the
+    left (hah_end="bowl"): with the و's tail falling from the base instead (hah_end="leg", Blaka's way)
+    the stroke and the leg read as ر (صبح as صبر)."""
+    R = p.R
+    if form in ("i", "F") and R.get("hah_end", "bowl") == "bowl":
+        return _jeem_bowl(p, form, mark)
+    U, T = R["U"], R["T"]
+    w = 2.6 * U
+    top, foot = (-w + 0.75 * U, T), (-0.6 * U, 0.0)
+    p.body.append(_stroke(top, foot, 1.15 * U))
+    p.body.append(_poly([(-w, -1.0), (foot[0] + 0.55 * U, -1.0), (foot[0] + 0.55 * U, R["bar"] - 4.0), (-w, R["bar"] - 4.0)]))
+    if form in ("i", "F"):
+        _leg(p, -w)
+    if mark == "b1":
+        p.dot(-0.55 * w + R["dot"] / 2, (-R["dash_top"] if form in ("I", "M") else -R["slit"]) - R["dot"])
+    elif mark == "a1":
+        p.mark("a1", -w + 0.6 * U, T)
+    elif mark == "b3":
+        p.mark("b3", -0.55 * w, 0.0, 0.0)
+    _exit(p, form, -w, -4.0)
+    return -w
+
+
+def _jeem_bowl(p: Pen, form, mark):
+    """ج ح خ (the choice hah_end="bowl"): a hat on the left at the top, and from its right end a stroke falling to the right, to the
     join (joined) or, alone or last, on into a bowl thrown back under the baseline to the left."""
     R = p.R
     U, T = R["U"], R["T"]
@@ -615,6 +653,27 @@ def _jeem(p: Pen, form, mark):
 
 
 def _ain(p: Pen, form, mark):
+    """ع غ. Starting a word: the reference's open head ('c', Kufam) drawn in blocks as a chevron open to
+    the right, standing on the line (the sister of the medial V; a slotted block read as a head, م);
+    alone or last, the same with the و's tail falling from its left end. In the middle: the V or the
+    closed head (the choice ain_medial)."""
+    R = p.R
+    if form != "M":
+        U, T = R["U"], R["T"]
+        w, top = 2.2 * U, 0.95 * T
+        px, py = -w + 0.2 * U, 0.45 * top
+        p.body.append(_poly([(-0.15 * U, top), (-1.25 * U, top), (px - 0.1 * U, py), (-w + 0.9 * U, -1.0), (-0.1 * U, -1.0),
+                             (-0.1 * U, R["bar"] - 4.0), (px + 1.1 * U, py)]))
+        if form in ("i", "F"):
+            _leg(p, -w)
+        if mark:
+            p.mark(mark, -0.6 * U, top + 2.0)
+        _exit(p, form, -w, -4.0)
+        return -w
+    return _ain_middle(p, form, mark)
+
+
+def _ain_middle(p: Pen, form, mark):
     """ع غ. Starting a word: a ⊏ open to the right, as square kufic draws it: an arm at the top, a back
     on the left, the join along the baseline; alone, the same ⊏ falling into the bowl of ح. In the
     middle: a V open at the top, standing on the join; last: the V falling into the bowl of ح."""

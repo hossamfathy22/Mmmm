@@ -1447,8 +1447,8 @@ def test_kashida_lengthens_the_join_and_keeps_the_word():
     xs = [q.x for q in long.placed]
     assert all(a > b for a, b in zip(xs, xs[1:]))                        # every letter left of the one before
     width = lambda lay: max(x for sh in lay.shapes for x, _ in sh[0]) - min(x for sh in lay.shapes for x, _ in sh[0])
-    U = rules(_block())["U"]
-    assert width(long) - width(plain) > 3 * 1.5 * U * 0.8
+    R = rules(_block())
+    assert width(long) - width(plain) > 3 * (1.5 * R["U"] - R["into"] - R["slit"])   # each at least its length less overlap and slit
 
 
 def test_joins_are_one_band_below_the_joining_line_and_a_slit_above():
