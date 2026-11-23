@@ -39,6 +39,10 @@ PANGRAM = "نص حكيم له سر قاطع وذو شأن عظيم مكتوب ع
 # 43%), the ink along the pangram in windows of an x-height by 30-41% (median 32%). A style passes when
 # it is as even as the median typeface.
 SPACING_CV, COLOR_CV = 0.43, 0.32
+# how often a real typeface's letter is read as itself among another typeface's letters (the bench's 53
+# styles, each read against 8 typefaces of other families): the reader's own limit, the yardstick of
+# identity. ص is read as س by it in half the typefaces: the engine is not asked to do better than that.
+REAL_READ = {"ا.i": 1.0, "ا.F": 0.95, "ب.i": 0.55, "ب.I": 0.82, "ب.M": 0.92, "ب.F": 0.56, "ح.i": 0.38, "ح.I": 0.43, "ح.M": 0.38, "ح.F": 0.33, "د.i": 0.62, "د.F": 0.61, "ر.i": 0.88, "ر.F": 0.81, "س.i": 0.64, "س.I": 0.79, "س.M": 0.74, "س.F": 0.65, "ص.i": 0.5, "ص.I": 0.52, "ص.M": 0.54, "ص.F": 0.51, "ط.i": 0.78, "ط.I": 0.68, "ط.M": 0.68, "ط.F": 0.83, "ع.i": 0.43, "ع.I": 0.39, "ع.M": 0.33, "ع.F": 0.43, "ف.i": 0.58, "ف.I": 0.42, "ف.M": 0.48, "ف.F": 0.68, "ق.i": 0.53, "ق.I": 0.44, "ق.M": 0.48, "ق.F": 0.65, "ك.i": 0.63, "ك.I": 0.43, "ك.M": 0.42, "ك.F": 0.61, "ل.i": 0.65, "ل.I": 0.79, "ل.M": 0.87, "ل.F": 0.7, "م.i": 0.7, "م.I": 0.65, "م.M": 0.62, "م.F": 0.67, "ن.i": 0.52, "ن.I": 0.79, "ن.M": 0.87, "ن.F": 0.54, "ه.i": 0.71, "ه.I": 0.56, "ه.M": 0.54, "ه.F": 0.87, "و.i": 0.82, "و.F": 0.88, "ي.i": 0.44, "ي.I": 0.86, "ي.M": 0.84, "ي.F": 0.56}
 
 
 def _rule(key: str, ok: bool, measure: str, detail: Optional[List[str]] = None) -> Dict:
@@ -322,8 +326,10 @@ def identity(st: Style, defects: List, fonts: bool = True) -> Dict:
                     else:
                         wrong.append(f"{c}.{f}←{got}")
             n = right + len(wrong)
-            measure += f"؛ تُقرأ بين حروف خطوط حقيقية {right}/{n}"
-            ok &= right >= 0.9 * n
+            # as real typefaces are read by the same reader: the count they would read right, less two
+            expect = sum(REAL_READ.get(f"{'ي' if c == 'ی' else c}.{f}", 0.6) for c in SKELETONS for f in anatomy.forms(c))
+            measure += f"؛ تُقرأ بين حروف خطوط حقيقية {right}/{n} (الخطوط الحقيقية نفسها نحو {expect:.0f}/{n})"
+            ok &= right >= expect - 2
             detail += [f"تُقرأ حرفًا آخر: {' '.join(wrong)}"] if wrong else []
     return _rule("identity", ok, measure, detail)
 

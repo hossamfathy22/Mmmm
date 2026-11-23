@@ -1056,9 +1056,35 @@ param("heh.mid_top", lambda st: 1.16 * st.x_height,
       "ارتفاع الهاء الوسطى = 1.16 × ارتفاع الحروف (مضبوط على 53 خطًا: ترتفع فوق الأسنان كما في الخطوط، 1.28 وسيطها)", FITTED, "الهاء")
 
 
+param("heh.init_top", lambda st: 1.5 * st.x_height,
+      "ارتفاع الهاء الأولى = 1.5 × ارتفاع الحروف (وسيط 53 خطًا)، لا تتجاوز الصاعد", MEASURED, "الهاء")
+
+
 def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, A, h = st.stem, st.stem / 2, st.x_height, st.ascender, st.hair
     xl, w = head_box(st)
+    if form == "I" and (pick(st, "ه.I") or "عين داخلية") == "عين داخلية":
+        # هـ as the typefaces draw it (53 styles): a loop 1.5 x-heights tall, 1.3 wide, and inside it,
+        # where the stroke curls back, a small eye 0.47-0.97 of the height, 0.53-0.97 x-heights in from
+        # the right; the curl stands on the loop's floor and the join leaves from the loop's left
+        top = min(val(st, "heh.init_top"), X + A)
+        W = st.white
+        ew = max(0.44 * X, 0.7 * W)                       # the eye's white, as measured (and open for the pen)
+        er = min(-0.53 * X + U, -U - 0.7 * W)              # its right side, a white from the loop's right side
+        el = er - ew - 2 * U
+        xl = min(-1.3 * X, el - 0.7 * W - U)               # the loop, wide enough for both whites
+        ey1 = min(0.97 * X + h, top - h - 0.6 * W)
+        ey0 = min(0.47 * X - h, ey1 - max(0.5 * X, 0.7 * W) - 2 * h)
+        if ey0 - h < 0.7 * W:
+            # no white for the pen between the eye and the floor: the eye stands on the floor, as in
+            # the heavy typefaces (Cairo, Tajawal)
+            ey0 = 0.0
+        eye = _named(g.ring(st, el, er, ey0, ey1), "عين الهاء")
+        shapes = [_ring(st, xl, 0, 0, top), eye]
+        if ey0 > 0:
+            shapes.append(g.stem(st, el + u, ey0 + h, 0.0))       # the curl down to the floor
+        shapes += marks(st, mark, xl / 2, above_ref=top)
+        return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
     if form == "I" and pick(st, "ه.I") != "حلقة وجذع" and st.angular < 0.5:
         # هـ in the typefaces: a wide head with a stroke across it that makes two eyes
         wide = 2 * U + val(st, "heh.counter")
@@ -1121,8 +1147,9 @@ declare("ط", "iIMF", [("قطرة", "عروة كالقطرة"), ("حلقة", "ح
 declare("ح", "iIMF", [("أنف", "شرطة شعرية وأنف قائم بسمك الجذع: لقلم التباين"),
                       ("ذراع مائل", "ذراع ينحدر إلى أنف مستدير: لقلم السمك الواحد")],
         lambda st: "مربّع" if st.angular >= 0.5 else _hah_default(st))
-declare("ه", "I", [("عينان", "رأس عريض بقاطع يصنع عينين"), ("حلقة وجذع", "حلقة منخفضة وجذع قائم على يمينها")],
-        lambda st: "حلقة وجذع" if st.angular >= 0.5 else "عينان")
+declare("ه", "I", [("عين داخلية", "حلقة طويلة في داخلها عين صغيرة يلتف إليها الخط: كما في الخطوط المفتوحة"),
+                   ("عينان", "رأس عريض بقاطع يصنع عينين"), ("حلقة وجذع", "حلقة منخفضة وجذع قائم على يمينها")],
+        lambda st: "عين داخلية")
 declare("ي", "i", [("رأس وكأس", "رأس مفتوح إلى اليمين ثم كأس واسع"), ("كأس", "كأس فقط")],
         lambda st: "كأس" if st.angular >= 0.5 else "رأس وكأس")
 for _k in "كکگ":
