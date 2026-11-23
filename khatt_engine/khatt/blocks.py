@@ -717,9 +717,52 @@ def _hamza(p: Pen, form, mark):
 
 
 def _tatweel(p: Pen, form, mark):
+    """The kashida: the join itself drawn longer, the same bar at the same height and thickness as
+    every join (the connecting stroke of the script, W3C alreq 7.2.5), reaching into the letter before.
+    It is the letter's body too, so the word keeps its letters apart by its length."""
     R = p.R
-    p.join(-1.5 * R["U"], 0.0)
+    g = p.join(-1.5 * R["U"], R["into"])
+    p.body.append(g)
     return -1.5 * R["U"]
+
+
+LAM_ALEF = {"ا": None, "أ": "ha", "إ": "hb", "آ": "md"}
+
+
+def _lam_alef(p: Pen, form, mark):
+    """لا, the ligature every style of the script writes for lam followed by alef (W3C alreq 4.2.6:
+    "ignoring this ligature ... leads to incorrectly rendered text"). The lam and the alef stand on one
+    base as one letter: the lam on the right, the alef on the left, leaning away from each other as
+    the logo leans its uprights (upright when it does not lean), their feet joined by a base as thick
+    as a join. Only its right side joins (to the letter before), as the alef does."""
+    R = p.R
+    sign = abs(p.sign)
+    p.sign = -sign                                     # the lam leans to the right
+    left_l = p.alef(0.0)
+    xr = left_l - R["slit"] - 0.35 * R["U"]
+    p.sign = sign                                      # the alef to the left
+    left_a = p.alef(xr)
+    p.bar(left_a + 2.0, -2.0, -1.0, R["J"] + 2.0, cut_l=0.0)
+    if mark in ("ha", "md"):
+        p.mark(mark, xr - R["alef_foot"] / 2 - math.tan(math.radians(R["lean_alef"] * sign)) * R["A"], R["A"] + 3.0)
+    elif mark == "hb":
+        p.mark(mark, xr - R["alef_foot"] / 2, R["A"], 0.0)
+    return left_a
+
+
+def ligatures(pairs):
+    """Lam followed by an alef that joins it becomes the one letter لا (لأ لإ لآ): isolated when the lam
+    began its group, final when a letter before joined it."""
+    out, i = [], 0
+    while i < len(pairs):
+        c, form = pairs[i]
+        if c == "ل" and form in ("I", "M") and i + 1 < len(pairs) and pairs[i + 1][0] in LAM_ALEF and pairs[i + 1][1] == "F":
+            out.append(("ل" + pairs[i + 1][0], "i" if form == "I" else "F"))
+            i += 2
+            continue
+        out.append((c, form))
+        i += 1
+    return out
 
 
 BUILD = {
@@ -737,14 +780,22 @@ BUILD = {
 }
 
 
+def is_lam_alef(c: str) -> bool:
+    return len(c) == 2 and c[0] == "ل" and c[1] in LAM_ALEF
+
+
 def leans(c: str, form: str) -> bool:
-    """A letter with a free upright leans: ا ل, and a tooth that begins a word."""
+    """A letter with a free upright leans: ا ل (and لا), and a tooth that begins a word."""
+    if is_lam_alef(c):
+        return True
     how = BUILD.get(c, (None, None))[0]
     return c in LEANS or (how in ("beh", "noon", "yeh") and form == "I")
 
 
 def build(c: str, form: str, p: Pen) -> float:
     """Draw letter `c` in `form` with pen `p`; returns the body's left edge."""
+    if is_lam_alef(c):
+        return _lam_alef(p, form, LAM_ALEF[c[1]])
     how, mark = BUILD[c]
     if how == "beh":
         return _tooth_letter(p, form, mark, c) if form in ("I", "M") else _beh_end(p, form, mark, c)
@@ -845,13 +896,13 @@ def typeset_blocks(word: str, st: Style):
     prev_body, prev_left, prev_joins = None, 0.0, False
     n, leaning = 0, 0
     ink, holes, bodies, groups = [], [], [], []
-    for c, form in shape_forms(word):
+    for c, form in ligatures(shape_forms(word)):
         if form == " ":
             if prev_body is not None:
                 prev_left = prev_left - R["space"]
                 prev_body = None
             continue
-        if form == "?" or c not in BUILD:
+        if form == "?" or (c not in BUILD and not is_lam_alef(c)):
             lay.skipped.append(c)
             continue
         sign = 1.0
@@ -868,11 +919,16 @@ def typeset_blocks(word: str, st: Style):
         hole = _union(p.holes)
         solid = body.difference(hole) if not hole.is_empty else body
         joined = form in ("M", "F") and prev_joins
+        prev_above = above(prev_body, jy if joined else 0.0) if prev_body is not None else None
+        this_above = above(solid, jy if joined else 0.0)
         if prev_body is None:
             x = 0.0 if n == 0 else prev_left - (solid.bounds[2] if not solid.is_empty else 0.0)
+        elif joined and (prev_above.is_empty or this_above.is_empty):
+            # a kashida has nothing above the joining line: the letters meet on the join itself
+            # (spacing them by what stands above it put every letter after a kashida at the word's start)
+            x = prev_left - (solid.bounds[2] if not solid.is_empty else 0.0) + R["into"]
         else:
-            x = gap_shift(above(prev_body, jy if joined else 0.0), above(solid, jy if joined else 0.0),
-                          R["slit"] if joined else R["touch"])
+            x = gap_shift(prev_above, this_above, R["slit"] if joined else R["touch"])
         placed = translate(solid, x, 0)
         ink += [translate(g, x, 0) for g in p.body + p.joins]
         holes += [translate(g, x, 0) for g in p.holes]

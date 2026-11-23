@@ -1422,6 +1422,35 @@ def test_joined_letters_keep_the_slit_and_the_others_touch():
     assert len(lay.shapes) == 1                                           # ا and د touch: one piece
 
 
+def test_lam_alef_is_one_letter():
+    """لا is the ligature every style writes (W3C alreq 4.2.6): one letter, two uprights on one base,
+    isolated or joined from the right as the alef is; لأ carries its hamza."""
+    from shapely.geometry import Polygon, box
+    from shapely.ops import unary_union
+    from khatt.blocks import rules
+    lay = typeset("لا", _block())
+    assert [(q.char, q.form) for q in lay.placed] == [("لا", "i")]
+    g = unary_union([Polygon(sh[0], sh[1:]) for sh in lay.shapes])
+    assert len(getattr(g, "geoms", [g])) == 1                            # one piece: the base joins them
+    top = g.intersection(box(-1e4, 60, 1e4, 1e4))
+    assert len(getattr(top, "geoms", [top])) == 2                        # two uprights
+    assert [(q.char, q.form) for q in typeset("سلام", _block()).placed] == [("س", "I"), ("لا", "F"), ("م", "i")]
+    A = rules(_block())["A"]
+    assert any(min(y for _, y in sh[0]) > A for sh in typeset("لأ", _block()).shapes)   # the hamza above
+
+
+def test_kashida_lengthens_the_join_and_keeps_the_word():
+    """A kashida is the join drawn longer (W3C alreq 7.2.5): the word grows by its length and every
+    letter after it stays in its place (they used to fall back to the word's start)."""
+    from khatt.blocks import rules
+    plain, long = typeset("محمد", _block()), typeset("مـحـمـد", _block())
+    xs = [q.x for q in long.placed]
+    assert all(a > b for a, b in zip(xs, xs[1:]))                        # every letter left of the one before
+    width = lambda lay: max(x for sh in lay.shapes for x, _ in sh[0]) - min(x for sh in lay.shapes for x, _ in sh[0])
+    U = rules(_block())["U"]
+    assert width(long) - width(plain) > 3 * 1.5 * U * 0.8
+
+
 def test_one_rule_for_the_head():
     """The two و of كيوانو are not one head turned (one transform from the second to the first leaves
     corners 9 px and the tail 22 px apart): the first is its designer's own cut. The rule draws every
