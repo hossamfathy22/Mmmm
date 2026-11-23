@@ -1047,6 +1047,15 @@ param("heh.cut_top", lambda st: 0.3, "رأس قاطع الهاء الأولى ع
 param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى على 0.62 من عرضها من اليمين (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الهاء")
 
 
+# medial ه rises above the teeth in real typefaces (1.28 x-heights, the median of the bench's 53 styles),
+# where ف's head on its neck stops in the engine: at the teeth line the two were alike in a short-
+# descender logo (the critic's look-alike limit, measured on the same typefaces). Tried from 1.0 to
+# 1.28: any rise ends the likeness, 1.16 draws it closest to the typefaces' own (distance 0.146 ->
+# 0.138); one style of 53 (Kufam bold) then reads it as ف
+param("heh.mid_top", lambda st: 1.16 * st.x_height,
+      "ارتفاع الهاء الوسطى = 1.16 × ارتفاع الحروف (مضبوط على 53 خطًا: ترتفع فوق الأسنان كما في الخطوط، 1.28 وسيطها)", FITTED, "الهاء")
+
+
 def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     U, u, X, A, h = st.stem, st.stem / 2, st.x_height, st.ascender, st.hair
     xl, w = head_box(st)
@@ -1070,7 +1079,7 @@ def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
         side = val(st, "heh.lower_side")
         wl = max(val(st, "heh.lower_w") * w, 2 * side + 0.45 * st.white)
         cx = xl / 2
-        shapes = [_ring(st, xl, 0, 0, X),
+        shapes = [_ring(st, xl, 0, 0, val(st, "heh.mid_top")),
                   _named(g.ring(st, cx - wl / 2, cx + wl / 2, -st.descender, h, side=side), "عين سفلى")]
     else:
         shapes = [_ring(st, xl, 0, 0, X)]

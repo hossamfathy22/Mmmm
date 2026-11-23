@@ -1,11 +1,18 @@
 {
  "_what": "Where the engine stands now. Tests require «no worse than this»: an improvement passes, a step back fails. After an improvement, raise these numbers (and shorten the known lists) so the gain is kept.",
  "tolerance": 0.01,
- "self_check": {"bidonaq.png": 0.943},
+ "self_check": {
+  "bidonaq.png": 0.943
+ },
  "critic_known": {
   "bidonaq.png": [],
   "round_square.png": [],
-  "angular": ["confusable|ف وه وسط", "confusable|ق وه وسط"],
-  "one_weight": ["confusable|ص وط وسط", "confusable|ف وه وسط", "confusable|ق وه وسط"]
+  "angular": [],
+  "one_weight": [
+   "confusable|ص وط وسط"
+  ]
+ },
+ "_known_why": {
+  "one_weight: confusable|ص وط وسط": "the style's ascender is 0.69 x-heights (real typefaces about 1.9): ط's stem barely rises over its loop. A measure of the style, not a fault to draw away."
  }
 }
