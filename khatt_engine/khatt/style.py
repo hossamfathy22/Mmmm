@@ -16,6 +16,7 @@ class Style:
     slant: float = 14.0         # degrees, positive leans right
     white: float = 22.0         # white between two teeth (counter width)
     dot: float = 25.0           # diameter of a dot
+    dot_gap: float = 0.0        # the logo's white between a dot and its letter, over the dot (0: not measured)
     dash_marks: bool = True     # two dots become one hairline dash
     contrast_power: float = 2.0 # how fast a curve thins from stem to hairline
     # ---- shape parameters (measured from the logo by features.py; defaults = the hand-built بيدوناق)

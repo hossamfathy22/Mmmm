@@ -100,6 +100,9 @@ def style_from(L: Line, lib, k: float, feats: Optional[Dict[str, Dict]] = None) 
     if "dot_n" in f: st.dot_n = float(np.clip(f["dot_n"], 1.6, 10))
     if "dot_rot" in f: st.dot_rot = f["dot_rot"]
     if "dot_size" in f: st.dot = float(f["dot_size"])
+    # the logo's own white between a dot and its letter wins over the general rule (letters.py: mark.gap):
+    # measured like the dot's size, the rule reads it
+    if "dot_gap" in f: st.dot_gap = float(np.clip(f["dot_gap"], 0.1, 2.0))
     if "tail_reach" in f: st.tail_reach = float(np.clip(f["tail_reach"], 1.5, 5))
     if "overshoot" in f: st.overshoot = float(np.clip(f["overshoot"], 0, 0.06 * st.x_height))
     if "seen_drop" in f: st.seen_drop = float(np.clip(f["seen_drop"], 0, 0.3 * st.x_height))

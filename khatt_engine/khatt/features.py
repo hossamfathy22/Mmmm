@@ -179,6 +179,31 @@ def _dot_shape(lines: List[Line]) -> Tuple[Optional[float], float, int, Optional
     return _median(n_vals), (45.0 if rots.count(45.0) > len(rots) / 2 else 0.0), len(n_vals), _median(sizes)
 
 
+def _dot_gap(lines: List[Line]) -> Tuple[Optional[float], int]:
+    """The white between a dot and the letter straight under or over it, over the dot's size (the
+    logo's own; the general rule, from 30 typefaces, is 0.72). Measured on the deskewed ink: in the
+    dot's columns, the nearest ink of another piece above or below it."""
+    vals = []
+    for L in lines:
+        G = np.asarray(L.G) > 0.5
+        lab = np.asarray(L.lab)
+        for p in L.dots:
+            if p.size <= 0:
+                continue
+            c0, c1 = int(round(L.col_of_x(p.x0))), int(round(L.col_of_x(p.x1)))
+            r_top, r_bot = int(round(L.row_of_y(p.y1))), int(round(L.row_of_y(p.y0)))
+            best = None
+            for c in range(max(0, c0), min(G.shape[1], c1 + 1)):
+                col = G[:, c] & (lab[:, c] != p.comp)
+                below = np.nonzero(col[r_bot + 1:])[0]
+                above = np.nonzero(col[:max(0, r_top)])[0]
+                for gap in ([below[0]] if len(below) else []) + ([r_top - 1 - above[-1]] if len(above) else []):
+                    best = gap if best is None else min(best, gap)
+            if best is not None and best < 3 * p.size:
+                vals.append(best / p.size)
+    return (_median(vals), len(vals)) if vals else (None, 0)
+
+
 # ------------------------------------------------------------------ overshoot, gaps
 def _overshoot(lines: List[Line]) -> Tuple[Optional[float], int]:
     vals = []
@@ -249,6 +274,8 @@ def measure_features(lines: List[Line], readings: List[Reading], src: int, k: fl
     put("dot_size", dsize * k if dsize is not None else None, dc, "حجم النقطة (ضلع صندوقها)", "px")
     if dc:
         put("dot_rot", drot, dc, "دوران النقطة (45° = معيّن)", "°")
+    dg, dgn = _dot_gap(lines)
+    put("dot_gap", dg, dgn, "البياض بين النقطة وحرفها ÷ حجم النقطة")
     reaches = [L.stems[t.stem].x - t.x0 for t in R.tails if t.stem is not None and t.direction == "left"]
     put("tail_reach", (_median(reaches) / L.stem) if reaches else None, len(reaches), "امتداد الذيل إلى اليسار بوحدة الجذع")
     ov, oc = _overshoot(lines)

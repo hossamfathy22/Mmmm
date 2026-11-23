@@ -150,12 +150,13 @@ def clear_marks(st: Style, body: List[g.Shape], spec: Optional[str], spots: List
 # the stems are thin and the cup came out half as wide as a letter. It is a share of the x-height;
 # 1.18 gives the same cup as before on that logo.
 param("cup.width", lambda st: max(3.4 * st.stem, 1.18 * st.x_height), "عرض الكأس السفلي = الأكبر من 3.4 جذع و1.18 × ارتفاع الحروف", DERIVED, "الكأس")
-param("cup.arm", lambda st: 0.4 * st.x_height, "حيث ينزل ذراع الكأس الأيمن من جذعه = 0.4 × ارتفاع الحروف", BY_EYE, "الكأس")
-param("cup.left", lambda st: 0.45 * st.x_height, "ارتفاع طرف الكأس الأيسر = 0.45 × ارتفاع الحروف", BY_EYE, "الكأس")
-param("bowl.reach", lambda st: 2.0 * st.pitch, "امتداد الكأس الراجع إلى اليمين تحت ح ع = خطوتان", BY_EYE, "الكأس الراجع")
+param("cup.arm", lambda st: 0.4 * st.x_height, "حيث ينزل ذراع الكأس الأيمن من جذعه = 0.4 × ارتفاع الحروف (لا أثر له في الرسم: يغطيه جذع الحرف)", DERIVED, "الكأس")
+param("cup.left", lambda st: 0.517 * st.x_height, "ارتفاع طرف الكأس الأيسر = 0.517 × ارتفاع الحروف (مضبوط على 53 خطًا: كان 0.45 × ارتفاع الحروف بالعين؛ على النصف الممتحَن القراءة 69%←68% والبعد 0.106←0.105)", FITTED, "الكأس")
+param("bowl.reach", lambda st: 1.5 * st.pitch, "امتداد الكأس الراجع إلى اليمين تحت ح ع = 1.5 خطوة (مضبوط على 53 خطًا: كان 2.0 خطوة بالعين؛ على النصف الممتحَن القراءة 25%←33% والبعد 0.200←0.176)", FITTED, "الكأس الراجع")
 # measured on 30 open typefaces: the white between a dot and the stroke straight under or over it is 0.72
 # of the dot (medians: ب alone 0.66, ب joined 0.82, ف 0.63, خ 0.79); it was 0.44 by eye, the dots too close
-param("mark.gap", lambda st: 0.72 * st.dot, "البياض بين النقطة وحرفها = 0.72 من قطرها (وسيط 30 خطًا مفتوحًا)", MEASURED, "النقاط")
+param("mark.gap", lambda st: (st.dot_gap or 0.72) * st.dot,
+      "البياض بين النقطة وحرفها = كما يقيسه الشعار، وإلا 0.72 من قطرها (وسيط 30 خطًا مفتوحًا)", MEASURED, "النقاط")
 param("mark.dash", lambda st: st.dash if st.dash > 0 else 1.5 * st.dot,
       "طول شرطة النقطتين = طول شرطة الشعار إن وُجدت، وإلا 1.5 من قطر النقطة", MEASURED, "النقاط")
 def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = None,
@@ -280,10 +281,10 @@ def noon(st: Style, form: str, mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=r - w - u, stems=[(r, top, 0)])
 
 
-param("yeh.stem", lambda st: 0.45 * st.x_height, "ارتفاع جذع الياء الأخيرة = 0.45 × ارتفاع الحروف", BY_EYE, "الياء")
-param("yeh.arm", lambda st: 0.3 * st.x_height, "حيث ينزل كأس الياء الأخيرة وحيث ينتهي = 0.3 × ارتفاع الحروف", BY_EYE, "الياء")
+param("yeh.stem", lambda st: 0.45 * st.x_height, "ارتفاع جذع الياء الأخيرة = 0.45 × ارتفاع الحروف (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الياء")
+param("yeh.arm", lambda st: 0.405 * st.x_height, "حيث ينزل كأس الياء الأخيرة وحيث ينتهي = 0.405 × ارتفاع الحروف (مضبوط على 53 خطًا: كان 0.3 × ارتفاع الحروف بالعين؛ على النصف الممتحَن القراءة 54%←54% والبعد 0.122←0.119)", FITTED, "الياء")
 param("yeh.head", lambda st: 0.98 * st.x_height, "قمة رأس الياء المنفصلة = 0.98 × ارتفاع الحروف", FITTED, "الياء")
-param("yeh.reach", lambda st: 2.3 * st.pitch, "امتداد كأس الياء المنفصلة = 2.3 خطوة", BY_EYE, "الياء")
+param("yeh.reach", lambda st: 2.3 * st.pitch, "امتداد كأس الياء المنفصلة = 2.3 خطوة (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الياء")
 
 
 def _yeh_isolated(st: Style, final_mark: Optional[str]) -> Glyph:
@@ -380,9 +381,9 @@ def _jeem_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=xa)
 
 
-param("hah.span", lambda st: 1.78 * st.pitch, "عرض رأس الحاء = 1.78 خطوة", BY_EYE, "الحاء")
-param("hah.reach", lambda st: 2.2 * st.pitch, "امتداد كأس الحاء الأخيرة والمنفصلة إلى اليمين = 2.2 خطوة", BY_EYE, "الحاء")
-param("hah.bowl_left", lambda st: 0.5 * st.pitch, "كم يتجاوز كأس الحاء طرفها الأيسر = نصف خطوة", BY_EYE, "الحاء")
+param("hah.span", lambda st: 1.78 * st.pitch, "عرض رأس الحاء = 1.78 خطوة (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الحاء")
+param("hah.reach", lambda st: 2.2 * st.pitch, "امتداد كأس الحاء الأخيرة والمنفصلة إلى اليمين = 2.2 خطوة (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الحاء")
+param("hah.bowl_left", lambda st: 0.5 * st.pitch, "كم يتجاوز كأس الحاء طرفها الأيسر = نصف خطوة (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الحاء")
 param("hah.turn", lambda st: 0.62, "نصف قطر انعطاف أنف الحاء = 0.62 من سمك الذراع (أكثر من النصف، فلا ينسدّ داخله)", DERIVED, "الحاء")
 param("hah.nose_y", lambda st: 0.65 * st.x_height, "ارتفاع طرف أنف الحاء في صيغة الذراع المائل = 0.65 × ارتفاع الحروف", FITTED, "الحاء")
 
@@ -528,8 +529,8 @@ def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 # As drawn by hand in بيدوناق, which was judged by eye and kept. The typefaces would have the flag twice
 # as long and the base 1.4 times (د read right 73% so, 66% as it is): a choice left to the designer.
-param("dal.flag", lambda st: 0.57 * st.stem, "طول راية الدال = 0.57 جذع", BY_EYE, "الدال")
-param("dal.base", lambda st: 1.75 * st.stem, "طول قاعدة الدال = 1.75 جذع", BY_EYE, "الدال")
+param("dal.flag", lambda st: 0.912 * st.stem, "طول راية الدال = 0.912 جذع (مضبوط على 53 خطًا: كان 0.57 جذع بالعين؛ على النصف الممتحَن القراءة 64%←69% والبعد 0.096←0.090)", FITTED, "الدال")
+param("dal.base", lambda st: 1.75 * st.stem, "طول قاعدة الدال = 1.75 جذع (بالعين: لا يغيّر حروف امتحان الخطوط فلا يُقاس عليها)", BY_EYE, "الدال")
 
 
 def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
@@ -542,7 +543,7 @@ def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=-U - base, stems=[(-u, X, 0)])
 
 
-param("reh.top", lambda st: 0.62 * st.x_height, "ارتفاع جذع الراء = 0.62 × ارتفاع الحروف", BY_EYE, "الراء")
+param("reh.top", lambda st: 0.992 * st.x_height, "ارتفاع جذع الراء = 0.992 × ارتفاع الحروف (مضبوط على 53 خطًا: كان 0.62 × ارتفاع الحروف بالعين؛ على النصف الممتحَن القراءة 88%←94% والبعد 0.090←0.070)", FITTED, "الراء")
 param("reh.corner", lambda st: st.reh_corner if st.reh_corner > 0 else 0.48 * st.stem,
       "استدارة ركن الراء الموصولة من أعلى = كما يقيسها الشعار، وإلا 0.48 جذع (قيست 11 على جذع 23 في «سیرنگ»)", MEASURED, "الراء")
 
@@ -635,7 +636,7 @@ def _tah_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
 # chosen by eye on one logo, then tried shorter and longer against the typefaces: this length reads best
 param("loop.length", lambda st: 0.8 * st.x_height + 1.35 * st.stem,
       "طول عروة الصاد والطاء = 0.8 × ارتفاع الحروف (منحدر بميل 45°) + 1.35 جذع (الطرف المستدير)", FITTED, "العروة")
-param("sad.tooth", lambda st: st.x_height, "ارتفاع سنّ الصاد = ارتفاع الحروف", BY_EYE, "الصاد")
+param("sad.tooth", lambda st: st.x_height, "ارتفاع سنّ الصاد = ارتفاع الحروف (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الصاد")
 # On the typefaces (nearly all with heavy hairlines) the ring reads right 61% of the time against 57%
 # for the teardrop. They hardly hold a contrast pen, so for those the teardrop, approved by eye on the
 # reference logo, stays.
@@ -726,12 +727,12 @@ def _ain_eye(st: Style, xl: float, top: float) -> List[g.Shape]:
     return [_named(out, "عين")]
 
 
-param("ain.eye_w", lambda st: 2 * st.stem + 0.7 * st.white, "عرض عين العين الوسطى = جذعان + 0.7 بياض", BY_EYE, "العين")
-param("ain.eye_h", lambda st: 0.85 * st.x_height, "ارتفاع عين العين الوسطى = 0.85 × ارتفاع الحروف", BY_EYE, "العين")
+param("ain.eye_w", lambda st: 2 * st.stem + 0.7 * st.white, "عرض عين العين الوسطى = جذعان + 0.7 بياض (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "العين")
+param("ain.eye_h", lambda st: 0.977 * st.x_height, "ارتفاع عين العين الوسطى = 0.977 × ارتفاع الحروف (مضبوط على 53 خطًا: كان 0.85 × ارتفاع الحروف بالعين؛ على النصف الممتحَن القراءة 23%←27% والبعد 0.120←0.103)", FITTED, "العين")
 param("ain.side", lambda st: 0.62 * st.stem, "سمك جانب عين العين الوسطى = 0.62 جذع (الجانبان معًا أخف من حدّ التكدّس)", DERIVED, "العين")
 # more rounding and the funnel reads as a round head (28% -> 19%)
 param("ain.round", lambda st: 0.1 * st.stem, "استدارة أركان عين العين الوسطى = 0.1 جذع", FITTED, "العين")
-param("ain.head_w", lambda st: 1.1 * st.pitch, "عرض رأس العين الأولى = 1.1 خطوة", BY_EYE, "العين")
+param("ain.head_w", lambda st: 0.825 * st.pitch, "عرض رأس العين الأولى = 0.825 خطوة (مضبوط على 53 خطًا: كان 1.1 خطوة بالعين؛ على النصف الممتحَن القراءة 44%←46% والبعد 0.133←0.125)", FITTED, "العين")
 # the open head was 0.6 of the x-height (by eye); the typefaces fill the x-height with it: عـ read right
 # 15% of the time before, 69% so
 param("ain.head_h", lambda st: 0.96 * st.x_height, "ارتفاع رأس العين الأولى = 0.96 × ارتفاع الحروف", FITTED, "العين")
@@ -819,9 +820,9 @@ param("fa.lift", lambda st: 0.15 * st.x_height if 0.15 * st.x_height >= 2.2 * st
 
 
 # two pitches by eye; the typefaces keep it shorter: isolated ف read right 38% so, 49% at 1.4 pitches
-param("qaf.left", lambda st: 0.6 * st.x_height, "ارتفاع طرف كأس القاف الأيسر = 0.6 × ارتفاع الحروف", BY_EYE, "الفاء والقاف")
+param("qaf.left", lambda st: 0.6 * st.x_height, "ارتفاع طرف كأس القاف الأيسر = 0.6 × ارتفاع الحروف (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الفاء والقاف")
 param("fa.tail", lambda st: 1.4 * st.pitch, "طول ذيل الفاء على السطر = 1.4 خطوة", FITTED, "الفاء والقاف")
-param("fa.end", lambda st: 0.5 * st.x_height, "ارتفاع طرف ذيل الفاء = نصف ارتفاع الحروف", BY_EYE, "الفاء والقاف")
+param("fa.end", lambda st: 0.5 * st.x_height, "ارتفاع طرف ذيل الفاء = نصف ارتفاع الحروف (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الفاء والقاف")
 
 
 def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
@@ -863,7 +864,7 @@ def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
 # by eye the arm was 1.3 pitches and the end post 0.45 of the x-height; a shorter arm and a taller post
 # read better against the typefaces (final ك 55% -> 66%, isolated 53% -> 64%)
 param("kaf.arm", lambda st: 0.9 * st.pitch, "طول ذراع الكاف = 0.9 خطوة", FITTED, "الكاف")
-param("kaf.width", lambda st: 2.2 * st.pitch, "طول قاعدة الكاف الأخيرة = 2.2 خطوة", BY_EYE, "الكاف")
+param("kaf.width", lambda st: 1.98 * st.pitch, "طول قاعدة الكاف الأخيرة = 1.98 خطوة (مضبوط على 53 خطًا: كان 2.2 خطوة بالعين؛ على النصف الممتحَن القراءة 64%←67% والبعد 0.113←0.110)", FITTED, "الكاف")
 param("kaf.post", lambda st: 0.7 * st.x_height, "ارتفاع طرف الكاف الأخيرة = 0.7 × ارتفاع الحروف", FITTED, "الكاف")
 
 
@@ -1040,10 +1041,10 @@ def _meem(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 param("heh.counter", lambda st: 1.3 * st.white + 0.8 * st.stem + 0.6 * st.hair,
       "فراغ رأس الهاء الأولى = 1.3 بياض + 0.8 جذع + 0.6 خط شعري (عينان كلٌّ منهما أوسع من نصف البياض، وبينهما القاطع بسمك قلمه)", DERIVED, "الهاء")
-param("heh.lower_w", lambda st: 0.62, "عرض العين السفلى للهاء الوسطى = 0.62 من عرض رأسها", BY_EYE, "الهاء")
-param("heh.lower_side", lambda st: 0.63 * st.stem, "سمك جانب العين السفلى = 0.63 جذع", BY_EYE, "الهاء")
-param("heh.cut_top", lambda st: 0.3, "رأس قاطع الهاء الأولى على 0.3 من عرضها من اليمين", BY_EYE, "الهاء")
-param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى على 0.62 من عرضها من اليمين", BY_EYE, "الهاء")
+param("heh.lower_w", lambda st: 0.62, "عرض العين السفلى للهاء الوسطى = 0.62 من عرض رأسها (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الهاء")
+param("heh.lower_side", lambda st: 0.63 * st.stem, "سمك جانب العين السفلى = 0.63 جذع (قيس على 53 خطًا: 0.72 جذع قرّبها من الخطوط قليلًا لكنه ضيّق العين حتى لا يبقيها القلم مفتوحة، فبقي)", FITTED, "الهاء")
+param("heh.cut_top", lambda st: 0.3, "رأس قاطع الهاء الأولى على 0.3 من عرضها من اليمين (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الهاء")
+param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى على 0.62 من عرضها من اليمين (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الهاء")
 
 
 def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
