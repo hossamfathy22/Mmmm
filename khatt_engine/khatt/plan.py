@@ -102,18 +102,91 @@ def _cut(src, spec: Dict[str, Any], cuts: Dict[str, Any]):
         g = affinity.scale(g, -1, 1, origin=(float(spec["mirror_x"]), 0))
     if spec.get("parts"):                                    # a cut put together from others
         from shapely.ops import unary_union
-        g = unary_union([g] + [_part(src, q, cuts) for q in spec["parts"]]) if spec.get("from") else \
-            unary_union([_part(src, q, cuts) for q in spec["parts"]])
+        g = unary_union([g] + [_part(src, q, cuts, spec.get("pen")) for q in spec["parts"]]) if spec.get("from") else \
+            unary_union([_part(src, q, cuts, spec.get("pen")) for q in spec["parts"]])
     if spec.get("dx") or spec.get("dy"):
         g = affinity.translate(g, float(spec.get("dx", 0.0)), float(spec.get("dy", 0.0)))
     return g.buffer(0)
 
 
-def _part(src, q: Dict[str, Any], cuts: Dict[str, Any]):
-    from shapely.geometry import box
+PEN = {"thick": 10.0, "thin": 5.6, "p": 4.0}     # overridden by the plan's style["pen"]: the logo's measured pen
+
+
+def _path_points(path, n: int = 48):
+    """A centre line ["M", x, y], ["L", x, y], ["C", x1, y1, x2, y2, x, y] as points with unit tangents."""
+    pts, cur = [], None
+    for cmd in path:
+        if cmd[0] == "M":
+            cur = (float(cmd[1]), float(cmd[2]))
+            continue
+        if cmd[0] == "L":
+            a, b = np.array(cur), np.array(cmd[1:3], float)
+            d = b - a
+            L = float(np.hypot(*d)) or 1.0
+            seg = [(*(a + d * t), *(d / L)) for t in np.linspace(0, 1, max(4, int(L / 1.5)))]
+            cur = tuple(b)
+        else:
+            P = [np.array(cur)] + [np.array(cmd[i:i + 2], float) for i in (1, 3, 5)]
+            seg = []
+            for t in np.linspace(0, 1, n):
+                m = 1 - t
+                p = m ** 3 * P[0] + 3 * m * m * t * P[1] + 3 * m * t * t * P[2] + t ** 3 * P[3]
+                d = 3 * m * m * (P[1] - P[0]) + 6 * m * t * (P[2] - P[1]) + 3 * t * t * (P[3] - P[2])
+                L = float(np.hypot(*d)) or 1.0
+                seg.append((*p, *(d / L)))
+            cur = tuple(P[3])
+        pts += seg if not pts else seg[1:]
+    return pts
+
+
+def pen_stroke(path, pen: Dict[str, float]):
+    """The logo's pen along a centre line: as thick as the pen is in each direction (thick level, thin
+    upright: thin + (thick - thin) |cos|^p), built of small quadrilaterals so that a tight inside of a
+    curve folds in on itself without a hole."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    th, tn, pw = float(pen["thick"]), float(pen["thin"]), float(pen["p"])
+    pts = _path_points(path)
+    W = lambda tx: tn + (th - tn) * abs(tx) ** pw
+    quads = []
+    for (x0, y0, tx0, ty0), (x1, y1, tx1, ty1) in zip(pts, pts[1:]):
+        w0, w1 = W(tx0) / 2, W(tx1) / 2
+        quads.append(Polygon([(x0 - ty0 * w0, y0 + tx0 * w0), (x1 - ty1 * w1, y1 + tx1 * w1),
+                              (x1 + ty1 * w1, y1 - tx1 * w1), (x0 + ty0 * w0, y0 - tx0 * w0)]).buffer(0.02))
+    return unary_union(quads).buffer(0)
+
+
+def _superellipse(cx, cy, a, b, n, N: int = 240):
+    from shapely.geometry import Polygon
+    t = np.linspace(0, 2 * np.pi, N, endpoint=False)
+    c, s = np.cos(t), np.sin(t)
+    return Polygon(np.c_[cx + a * np.sign(c) * np.abs(c) ** (2 / n), cy + b * np.sign(s) * np.abs(s) ** (2 / n)])
+
+
+def _part(src, q: Dict[str, Any], cuts: Dict[str, Any], pen: Optional[Dict[str, float]] = None):
+    """One part of a glyph or a cut: a rectangle, a polygon, a stroke of the logo's pen, a ring (an
+    outer and an inner superellipse), or a cut of the logo; any of them may be clipped, moved, mirrored."""
+    from shapely import affinity
+    from shapely.geometry import Polygon, box
     if "rect" in q:
-        return box(*q["rect"])
-    return _cut(src, q, cuts)
+        g = box(*q["rect"])
+    elif "poly" in q:
+        g = Polygon(q["poly"]).buffer(0)
+    elif "stroke" in q:
+        g = pen_stroke(q["stroke"], {**PEN, **(pen or {}), **q.get("pen", {})})
+    elif "ring" in q:
+        g = _superellipse(*q["ring"]["outer"]).difference(_superellipse(*q["ring"]["inner"])).buffer(0)
+    else:
+        return _cut(src, q, cuts)
+    if q.get("keep"):
+        g = g.intersection(_boxes(q["keep"]))
+    if q.get("drop"):
+        g = g.difference(_boxes(q["drop"]))
+    if q.get("mirror_x") is not None:
+        g = affinity.scale(g, -1, 1, origin=(float(q["mirror_x"]), 0))
+    if q.get("dx") or q.get("dy"):
+        g = affinity.translate(g, float(q.get("dx", 0.0)), float(q.get("dy", 0.0)))
+    return g.buffer(0)
 
 
 # ---------------------------------------------------------------- the glyphs
@@ -123,20 +196,43 @@ def _band_min_x(g, y0: float, y1: float) -> Optional[float]:
     return None if s.is_empty else s.bounds[0]
 
 
-def level_joins(g, hair: float, reach: float = 0.8, step: float = 0.5):
+def level_joins(g, hair: float, reach: float = 0.8, step: float = 0.5,
+                notch_depth: float = 0.3, notch_width: float = 1.0):
     """The joins that sit on the baseline set exactly on it: where the glyph's lowest ink is within
     `reach` of the baseline (a join, not a tail or a cup), its bottom made level at 0. The logo's join is
     one bar; drawn by hand, and pieced together from two places of the logo, its bottom wavers by a
-    fraction of a pixel, and the eye sees each step where two pieces meet."""
+    fraction of a pixel, and the eye sees each step where two pieces meet.
+
+    A notch in a join's bottom where two pieces meet (white under the bar, ink on the baseline on either
+    side of it, no deeper than `notch_depth` and no wider than `notch_width` of the pen's height) is
+    filled too. A deeper or wider arch is the designer's (the arch under the belly of a ه) and is kept."""
     from shapely.geometry import LineString, box
     from shapely.ops import unary_union
     x0, _, x1, _ = g.bounds
     xs = np.arange(x0, x1 + step, step)
-    on = []
+    on, lows = [], []
     for x in xs:
         s = g.intersection(LineString([(x, -50.0), (x, hair)]))
         ys = [c[1] for gm in getattr(s, "geoms", [s]) if not gm.is_empty for c in gm.coords]
+        lows.append(min(ys) if ys else None)
         on.append(bool(ys) and -reach < min(ys) < reach)
+    fills, i, n = [], 0, len(xs)
+    while i < n:
+        lo = lows[i]
+        if lo is not None and reach <= lo < notch_depth * hair:
+            j = i
+            while j < n and lows[j] is not None and reach <= lows[j] < notch_depth * hair:
+                j += 1
+            bounded = i > 0 and j < n and lows[i - 1] is not None and lows[j] is not None and \
+                lows[i - 1] < reach and lows[j] < reach
+            if bounded and xs[j] - xs[i - 1] <= notch_width * hair:
+                fills.append(box(xs[i - 1], 0.0, xs[j], max(lows[i:j]) + 0.3))
+                on[i:j] = [True] * (j - i)
+            i = j
+        else:
+            i += 1
+    if fills:
+        g = g.union(unary_union(fills)).buffer(0)
     runs, start = [], None
     for x, o in zip(list(xs) + [xs[-1] + step], on + [False]):      # a run reaching the end is closed too
         if o and start is None:
@@ -152,8 +248,34 @@ def level_joins(g, hair: float, reach: float = 0.8, step: float = 0.5):
     return g.difference(cut).union(add.intersection(g.buffer(reach + 0.05))).buffer(0)
 
 
+def fill_join(g, hair: float, edge: float, side: str, stub: float = 3.0):
+    """The join at one end of a glyph made one solid bar: white left in the join's band between the
+    glyph's edge (x = `edge`) and its bar, under a fillet or a head that reaches past the end of the bar
+    with nothing under it, is filled from the edge to the bar. `side` is "right" (the join arriving) or
+    "left" (the join leaving)."""
+    from shapely.geometry import LineString, box
+    reach = 4.0 * hair
+    gap = None
+    for f in (0.15, 0.5, 0.85):
+        y = f * hair
+        if side == "right":
+            s = g.intersection(LineString([(edge - reach, y), (edge, y)]))
+            ends = [q.bounds[2] for q in getattr(s, "geoms", [s]) if not q.is_empty]
+            if ends and max(ends) < edge - stub:
+                gap = max(ends) if gap is None else min(gap, max(ends))
+        else:
+            s = g.intersection(LineString([(edge, y), (edge + reach, y)]))
+            starts = [q.bounds[0] for q in getattr(s, "geoms", [s]) if not q.is_empty]
+            if starts and min(starts) > edge + stub:
+                gap = min(starts) if gap is None else max(gap, min(starts))
+    if gap is None:
+        return g
+    fill = box(gap - 0.3, 0.0, edge, hair) if side == "right" else box(edge, 0.0, gap + 0.3, hair)
+    return g.union(fill).buffer(0)
+
+
 def build_glyph(src, key: str, spec: Dict[str, Any], cuts: Dict[str, Any], frame: Dict[str, Any],
-                hair: float, x_height: float) -> Optional[Dict[str, Any]]:
+                hair: float, x_height: float, pen: Optional[Dict[str, float]] = None) -> Optional[Dict[str, Any]]:
     """One letter form: its parts put together, its corners rounded, the seams closed; lifted onto
     the engine's baseline, its right edge at x = 0, and its join points and marks' places worked out
     for its form (the right end of a form joined from the right is where the join arrives; the left
@@ -161,9 +283,12 @@ def build_glyph(src, key: str, spec: Dict[str, Any], cuts: Dict[str, Any], frame
     from shapely import affinity
     from shapely.ops import unary_union
     form = key.split(".")[1]
-    g = unary_union([_part(src, q, cuts) for q in spec["parts"]]).buffer(0)
+    g = unary_union([_part(src, q, cuts, pen) for q in spec["parts"]]).buffer(0)
     if spec.get("drop"):
         g = g.difference(_boxes(spec["drop"]))
+    if spec.get("holes"):                                    # counters cut out of the union (a loop's white)
+        from shapely.geometry import Polygon as _Pg
+        g = g.difference(unary_union([_Pg(h).buffer(0) for h in spec["holes"]]))
     for x, y, r, sx, sy in spec.get("round", []):
         g = round_corner(g, x, y, r, sx, sy)
     r = float(spec.get("close", 1.5))
@@ -172,7 +297,9 @@ def build_glyph(src, key: str, spec: Dict[str, Any], cuts: Dict[str, Any], frame
     if g.is_empty:
         return None
     lift = float(frame.get("lift", 0.0))
-    right = g.bounds[2]
+    # the glyph's right edge: where a join from the right arrives, or where the letter begins; a part may
+    # reach further right below the baseline (the bowl of ى and ح runs on under the letter before it)
+    right = float(spec["right"]) if spec.get("right") is not None else g.bounds[2]
     g = affinity.translate(g, -right, lift)
     if spec.get("level", True):
         g = level_joins(g, hair)
@@ -185,10 +312,12 @@ def build_glyph(src, key: str, spec: Dict[str, Any], cuts: Dict[str, Any], frame
     from shapely.geometry import box as _box
     stub = float(spec.get("stub", 3.0))
     if entry:
+        g = fill_join(g, hair, 0.0, "right", stub)
         g = g.difference(_box(-stub, -1.0, 0.01, hair + 1.0)).union(_box(-stub, 0.0, 0.0, hair)).buffer(0)
     if exits:
         ex0 = _band_min_x(g, 0.3 * hair, 0.7 * hair)
         if ex0 is not None:
+            g = fill_join(g, hair, ex0, "left", stub)
             g = g.difference(_box(ex0 - 0.01, -1.0, ex0 + stub, hair + 1.0)).union(_box(ex0, 0.0, ex0 + stub, hair)).buffer(0)
     body_low = -0.15 * x_height
     above = g.intersection(_boxes([[-1e6, body_low, 1e6, 1e6]]))
@@ -218,7 +347,7 @@ def execute(plan: Dict[str, Any], grey: np.ndarray) -> Dict[str, Any]:
     xh = float(style.get("x_height", 40.0))
     glyphs, failed = {}, []
     for key, spec in plan.get("glyphs", {}).items():
-        got = build_glyph(W, key, spec, cuts, frame, hair, xh)
+        got = build_glyph(W, key, spec, cuts, frame, hair, xh, style.get("pen"))
         if got is None:
             failed.append(key)
         else:
@@ -277,7 +406,9 @@ def glyph_for(st, c: str, form: str):
             else:
                 return None                                   # the plan gives no place for this letter's marks
         else:
-            if "below" in m:
+            if "inside_below" in m:
+                shapes += marks(st, spec, m["inside_below"][0], at=m["inside_below"][1])
+            elif "below" in m:
                 shapes += marks(st, spec, m["below"][0], below_ref=m["below"][1])
             else:
                 return None

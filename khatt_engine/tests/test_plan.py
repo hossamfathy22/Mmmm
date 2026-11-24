@@ -104,3 +104,26 @@ def test_joins_on_the_baseline_are_levelled():
         s = out.intersection(LineString([(x, -5), (x, 30)]))
         assert s.bounds[1] == pytest.approx(0.0, abs=1e-6)
     assert out.bounds[1] == pytest.approx(-20.0, abs=1e-6)
+
+
+def test_a_join_under_an_overhang_is_filled():
+    """A fillet reaching past the end of the bar, white under it, leaves no slit where the join arrives."""
+    from khatt.plan import fill_join
+    from shapely.ops import unary_union
+    g = unary_union([box(-30, 0, -5.2, 10), box(-12, 9, 0, 16)])       # bar ends 5.2 short of the edge
+    out = fill_join(g, 10.0, 0.0, "right")
+    for x in (-4.0, -1.0):
+        s = out.intersection(LineString([(x, -5), (x, 30)]))
+        assert s.bounds[1] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_shallow_notches_are_filled_and_the_designers_arch_kept():
+    from shapely.ops import unary_union
+    notch = unary_union([box(-40, 0, -22, 10), box(-22, 2, -18, 10), box(-18, 0, 0, 10)])
+    out = level_joins(notch, 10.0)
+    s = out.intersection(LineString([(-20, -5), (-20, 30)]))
+    assert s.bounds[1] == pytest.approx(0.0, abs=1e-6)
+    arch = unary_union([box(-60, 0, -40, 12), box(-40, 5, -18, 12), box(-18, 0, 0, 12)])
+    out = level_joins(arch, 10.0)
+    s = out.intersection(LineString([(-30, -5), (-30, 30)]))
+    assert s.bounds[1] == pytest.approx(5.0, abs=1e-6)
