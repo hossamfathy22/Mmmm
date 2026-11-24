@@ -1824,3 +1824,23 @@ def test_the_gallery_keeps_each_logo_with_its_own_record(tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         gallery.get("../etc")
     assert gallery.remove(r["id"]) and gallery.items() == []
+
+
+@pytest.mark.slow
+def test_a_real_reader_judges_whole_words():
+    """Tesseract's Arabic model reads the proof's words: real typefaces' words it reads right (it is
+    worth something as a judge), and it reads the engine's words of a style. Skipped without it."""
+    from khatt import ocr_judge as J
+    from khatt.bench.fonts import load
+    from khatt.bench.truth import word_image
+    from khatt.reference import faces
+    if not J.available():
+        pytest.skip("tesseract with its Arabic model is not installed")
+    fs = [f for f in faces() if "vazirmatn-400" in f]
+    if not fs:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    face = load(fs[0])
+    right = sum(J.read(np.array(word_image(face, w, J.X_PX)[0].convert("L")) < 128) == w for w in ("خط", "ظل", "هلال", "فلك"))
+    assert right >= 3
+    r = J.judge(Style(slant=0.0), ["خط", "فلك"])
+    assert set(r) >= {"words", "letters", "read", "real"} and len(r["read"]) == 2
