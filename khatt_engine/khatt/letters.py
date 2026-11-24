@@ -177,9 +177,16 @@ def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = Non
     return shapes, xs
 
 
+# a logo may draw its cups shallower than its tails go (هاکوپیان: ن's cup 11 under the line, و's tail
+# 21): the cup's depth is its own rule, the descender unless the logo's letters measure it otherwise
+param("cup.depth", lambda st: st.descender, "عمق الكأس تحت السطر = النازل، ما لم تقسه حروف الشعار", DERIVED, "الكأس")
+# and its medial teeth lower than its initial ones (پ's tooth 42 above the line, ی's 32)
+param("tooth.mid", lambda st: st.x_height, "ارتفاع السنّ الوسطى = ارتفاع الحروف، ما لم تقسه حروف الشعار", DERIVED, "الباء")
+
+
 def bowl_down(st: Style, r: float, top: float, width: float, left_top: float) -> g.Shape:
     """Arm at x = r goes down below the baseline, across, and up on the left (ن ل ق س ص ي)."""
-    D, h, X = st.descender, st.hair, st.x_height
+    D, h, X = val(st, "cup.depth"), st.hair, st.x_height
     Lx, yb, k = r - width, -D + h / 2, 0.08 * X
     if st.angular >= 0.5:      # a logo that turns with corners: a square cup
         return _named(g.angular_stroke(st, [(r, top), (r, yb), (Lx, yb), (Lx, left_top)], st.corner_r), "كأس سفلي")
@@ -253,9 +260,10 @@ param("beh.width", lambda st: 2.2 * st.pitch, "المسافة بين طرفي ا
 def beh(st: Style, form: str, mark: Optional[str]) -> Glyph:
     u, P, X = st.stem / 2, st.pitch, st.x_height
     if form in ("I", "M"):
-        shapes, xs = teeth(st, 1, _e(form), _x(form))
-        shapes += marks(st, mark, xs[0])
-        return Glyph(shapes, left=-st.stem, exit_x=-st.stem, exit_edge=-st.stem, stems=[(xs[0], X, 0)])
+        top = val(st, "tooth.mid") if form == "M" else X
+        shapes, xs = teeth(st, 1, _e(form), _x(form), top=top)
+        shapes += marks(st, mark, xs[0], above_ref=top)
+        return Glyph(shapes, left=-st.stem, exit_x=-st.stem, exit_edge=-st.stem, stems=[(xs[0], top, 0)])
     post = val(st, "beh.post")
     xr, xl = -u, -u - val(st, "beh.width")
     shapes = [g.stem(st, xr, post, entry=_e(form), exit=True, round_br=not _e(form)),
