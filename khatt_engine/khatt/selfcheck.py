@@ -797,12 +797,81 @@ def fit_letters(L: Line, text: str, st: Style, k: float, trial: Optional[_Trial]
     return fitted, chosen, traits
 
 
+# where a letter cut from the logo is tried in new words: its form between other letters
+CONTEXT = {"i": "{}", "I": "{}مد", "M": "ب{}د", "F": "ب{}"}
+
+
+def serves_new_words(st: Style, taken: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+    """A letter cut from the logo is kept only if it serves new words, not only the logo's own: tried in
+    words it was not cut from (its form between other letters, and the proof words that hold it), with
+    the cut and without, it must break no join, and the real reader (ocr_judge, when installed) must
+    read no fewer of those words. On هاکوپیان five letters taken for the logo's word broke the joins of
+    10 words in 14 and halved the reading of the proof (60% without them, 27% with)."""
+    from . import ocr_judge as J
+    from .letters import LETTERS
+    from .professional import JOIN_WORDS, _ink, _runs
+    from .recipes import siblings
+    from .typeset import shape_forms, typeset
+    reader = J.available()
+    kept, dropped = dict(taken), []
+    for key in list(taken):
+        c, _, f = key.partition(".")
+        # a cut serves its siblings too (find_cut): they are tried as well
+        kin = [c] + [q for q in siblings(c, f) if q in LETTERS]
+        words = [CONTEXT.get(f, "{}").format(q) for q in kin]
+        words += [w for w in J.WORDS + JOIN_WORDS if any((q, f) in shape_forms(w) for q in kin)]
+        without = Style(**{**st.__dict__, "taken": {q: v for q, v in kept.items() if q != key}})
+        withit = Style(**{**st.__dict__, "taken": dict(kept)})
+        def pieces(lay, s_):
+            # the body's pieces: a piece no bigger than a few dots is a mark the cut carried with it
+            ink = _ink(lay, s_)
+            if ink is None:
+                return 0
+            return sum(1 for q in getattr(ink, "geoms", [ink]) if q.area > 1.5 * s_.dot ** 2)
+        broken = False
+        for w in words:
+            lay = typeset(w, withit)
+            if pieces(lay, withit) > len(_runs(lay)) and pieces(typeset(w, without), without) <= len(_runs(lay)):
+                broken = True
+                break
+        worse = False
+        if not broken and reader:
+            a = sum(J.read(J.word_mask(w, withit)) == w for w in words)
+            b = sum(J.read(J.word_mask(w, without)) == w for w in words)
+            worse = a < b
+        if broken or worse:
+            kept.pop(key)
+            dropped.append(f"«{c}» ({FORM_AR.get(f, f)}): " + ("يقطع الوصل في كلمات جديدة" if broken else "تُقرأ الكلمات الجديدة به أقل"))
+    # and the whole proof: while it reads better without one of the cuts, that cut goes
+    if reader and kept:
+        def score(t):
+            s_ = Style(**{**st.__dict__, "taken": t})
+            return sum(J.read(J.word_mask(w, s_)) == w for w in J.WORDS)
+        cur = score(kept)
+        while kept:
+            trials = [(score({q: v for q, v in kept.items() if q != key}), key) for key in kept]
+            best, key = max(trials)
+            if best <= cur:
+                break
+            kept.pop(key); cur = best
+            c, _, f = key.partition(".")
+            dropped.append(f"«{c}» ({FORM_AR.get(f, f)}): تُقرأ كلمات الإثبات بدونه أكثر")
+    return kept, dropped
+
+
 def check_and_take(L: Line, text: str, st: Style, k: float, take: bool = True) -> Optional[Dict[str, Any]]:
     """The self-check and everything read off the logo's own word (see _check_and_take), and then the
     parts of its letters, cut from it for the letters it lacks."""
     r = _check_and_take(L, text, st, k, take)
     if r and take and st.take_all:
         r = _take_the_rest(L, text, st, k, r)
+    if r and take and st.taken:
+        kept, dropped = serves_new_words(st, st.taken)
+        if dropped:
+            st.taken = kept
+            r["taken"] = dict(kept)
+            r["notes"].append("رُدّ من الحروف المقصوصة ما لا يخدم الكلمات الجديدة: " + "، ".join(dropped)
+                              + ". يرسمها المحرك بقلم الشعار بدلها.")
     if r and take:
         st.parts = take_parts(L, text, st, k)
         if st.parts:

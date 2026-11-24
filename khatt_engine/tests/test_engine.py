@@ -1862,3 +1862,24 @@ def test_the_engines_words_read_no_worse_than_now():
     B = Bench()
     got = [J.read(J.word_mask(w, replace(B.styles[n], slant=0.0))) == w for n in B.names for w in J.WORDS]
     assert np.mean(got) >= BASE["ocr_words"] - BASE["tolerance"]
+
+
+def test_a_letter_cut_from_the_logo_must_serve_new_words():
+    """A cut is kept for the logo's word only if it serves new words too: tried in words it was not
+    cut from (its own and its siblings'), one that breaks their joins is given back to the engine.
+    (On هاکوپیان five cut letters broke 10 words in 14; with the gate the joins hold and the proof
+    reads 60% instead of 27%.)"""
+    from khatt.selfcheck import serves_new_words
+    from khatt.typeset import flat
+    st = Style(slant=0.0)
+    body = [[(float(x), float(y)) for x, y in ring] for sh in flat(LETTERS["ب"][1](st, "I").shapes)
+            if getattr(sh, "name", "") != "نقطة" for ring in sh if len(ring) >= 3]
+    good = {"polys": body, "at": 0}
+    # the body with a piece of ink lying apart from it, bigger than a dot: a cut that broke the letter
+    U, X = st.stem, st.x_height
+    chunk = [(1.5 * U, 0.2 * X), (3.5 * U, 0.2 * X), (3.5 * U, 0.9 * X), (1.5 * U, 0.9 * X)]
+    bad = {"polys": body + [chunk], "at": 0}
+    kept, dropped = serves_new_words(st, {"ب.I": bad})
+    assert "ب.I" not in kept and dropped and "الوصل" in dropped[0]
+    kept, dropped = serves_new_words(st, {"ب.I": good})
+    assert "ب.I" in kept or all("الوصل" not in d for d in dropped)
