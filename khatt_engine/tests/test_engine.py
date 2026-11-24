@@ -1844,3 +1844,21 @@ def test_a_real_reader_judges_whole_words():
     assert right >= 3
     r = J.judge(Style(slant=0.0), ["خط", "فلك"])
     assert set(r) >= {"words", "letters", "read", "real"} and len(r["read"]) == 2
+
+
+@pytest.mark.slow
+def test_the_engines_words_read_no_worse_than_now():
+    """The proof's fifteen words drawn by the engine in the bench's 53 typeface styles and read by the
+    real reader: no fewer read exactly than when the baseline was set (an improvement passes, a step
+    back fails)."""
+    from dataclasses import replace
+    from khatt import ocr_judge as J
+    from khatt.bench.cache import Bench
+    from khatt.reference import faces
+    if not J.available():
+        pytest.skip("tesseract with its Arabic model is not installed")
+    if not [f for f in faces() if f.endswith("-400.woff2")]:
+        pytest.skip("the open typefaces are not fetched (python -m khatt.bench)")
+    B = Bench()
+    got = [J.read(J.word_mask(w, replace(B.styles[n], slant=0.0))) == w for n in B.names for w in J.WORDS]
+    assert np.mean(got) >= BASE["ocr_words"] - BASE["tolerance"]

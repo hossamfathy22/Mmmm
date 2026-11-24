@@ -14,5 +14,6 @@
  },
  "_known_why": {
   "one_weight: confusable|ص وط وسط": "the style's ascender is 0.69 x-heights (real typefaces about 1.9): ط's stem barely rises over its loop. A measure of the style, not a fault to draw away."
- }
+ },
+ "ocr_words": 0.47
 }

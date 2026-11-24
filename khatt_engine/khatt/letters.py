@@ -312,9 +312,42 @@ def _yeh_isolated(st: Style, final_mark: Optional[str]) -> Glyph:
     return Glyph(shapes, left=-reach - u)
 
 
+# final ي ى ی as real typefaces draw them (53 styles, medians in x-heights from the right edge): the stroke
+# rises from the join to 0.56, runs left to 1.9, turns at the line and returns under the letter to 0.16
+# in from the right edge, 0.62 deep: the descender that returns (khatt.anatomy). The cup of ن it was
+# drawn with read as ن (the OCR judge: «موسيقى» read «موسيقن» in every style).
+param("yeh.final_w", lambda st: 1.9 * st.x_height, "مدى الياء الأخيرة إلى اليسار = 1.9 × ارتفاع الحروف (وسيط 53 خطًا)", MEASURED, "الياء")
+param("yeh.final_top", lambda st: 0.56 * st.x_height, "ارتفاع الياء الأخيرة = 0.56 × ارتفاع الحروف (وسيط 53 خطًا)", MEASURED, "الياء")
+param("yeh.final_depth", lambda st: min(0.62 * st.x_height, st.descender), "نزول الياء الأخيرة = 0.62 × ارتفاع الحروف (وسيط 53 خطًا)، لا يتجاوز النازل", MEASURED, "الياء")
+
+
+def _yeh_returning(st: Style, final_mark: Optional[str]) -> Glyph:
+    U, u, X, h = st.stem, st.stem / 2, st.x_height, st.hair
+    W, T, D = val(st, "yeh.final_w"), val(st, "yeh.final_top"), val(st, "yeh.final_depth")
+    S = (-u, h / 2)                                   # where the join comes in
+    A = (-0.45 * W, T - h / 2)                        # the top of the upper stroke
+    L = (-W + u, 0.02 * X)                            # the turn, on the line
+    Bt = (-0.5 * W, -D + h / 2)                       # the bottom of the return
+    E = (-0.16 * X - u, -0.45 * D)                    # its end, under the letter
+    curved = g.path(g.cubic(S, (S[0], 0.6 * T), (-0.2 * W, T - h / 2), A),
+                    g.cubic(A, (-0.75 * W, T - h / 2), (L[0], 0.6 * T), L),
+                    g.cubic(L, (L[0], -0.6 * D), (-0.8 * W, -D + h / 2), Bt),
+                    g.cubic(Bt, (-0.25 * W, -D + h / 2), (E[0] - 0.05 * W, -0.8 * D), E))
+    corners = [S, (S[0], T - h / 2), (L[0], T - h / 2), (L[0], -D + h / 2), (E[0], -D + h / 2), E]
+    shapes = [_named(_pen(st, curved, corners), "الياء")]
+    d = st.dot
+    if final_mark == "ha":
+        shapes += marks(st, "ha", -0.5 * W, above_ref=T)
+    elif final_mark:
+        shapes += marks(st, final_mark, -0.5 * W, at=-D - val(st, "mark.gap") - d / 2)
+    return Glyph(shapes, left=-W, stems=[], tail=None)
+
+
 def yeh(st: Style, form: str, mark: Optional[str], final_mark: Optional[str]) -> Glyph:
     if form in ("I", "M"):
         return beh(st, form, mark)
+    if form == "F" or (form == "i" and (pick(st, "ي.i") or "راجعة") == "راجعة"):
+        return _yeh_returning(st, final_mark)
     if form == "i" and st.angular < 0.5 and pick(st, "ي.i") != "كأس":
         return _yeh_isolated(st, final_mark)
     U, u, X, D = st.stem, st.stem / 2, st.x_height, st.descender
@@ -1041,7 +1074,7 @@ def _meem(st: Style, form: str, mark: Optional[str]) -> Glyph:
 
 param("heh.counter", lambda st: 1.3 * st.white + 0.8 * st.stem + 0.6 * st.hair,
       "فراغ رأس الهاء الأولى = 1.3 بياض + 0.8 جذع + 0.6 خط شعري (عينان كلٌّ منهما أوسع من نصف البياض، وبينهما القاطع بسمك قلمه)", DERIVED, "الهاء")
-param("heh.lower_w", lambda st: 0.62, "عرض العين السفلى للهاء الوسطى = 0.62 من عرض رأسها (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الهاء")
+param("heh.lower_w", lambda st: 1.0, "عرض العين السفلى للهاء الوسطى = عرض رأسها (كما في الخطوط المفتوحة؛ كانت 0.62 فقرأ القارئ الحقيقي «كهف» «كوف» في 30% من الخطوط: عين ضيقة تتدلى تحت رأس كالواو. بعرض الرأس: 32% ← 58%، والخطوط 66%)", FITTED, "الهاء")
 param("heh.lower_side", lambda st: 0.63 * st.stem, "سمك جانب العين السفلى = 0.63 جذع (قيس على 53 خطًا: 0.72 جذع قرّبها من الخطوط قليلًا لكنه ضيّق العين حتى لا يبقيها القلم مفتوحة، فبقي)", FITTED, "الهاء")
 param("heh.cut_top", lambda st: 0.3, "رأس قاطع الهاء الأولى على 0.3 من عرضها من اليمين (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الهاء")
 param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى على 0.62 من عرضها من اليمين (قيس على 53 خطًا: لم تقرّب قيمة أخرى الحروف من الخطوط على النصف الممتحَن)", FITTED, "الهاء")
@@ -1150,8 +1183,9 @@ declare("ح", "iIMF", [("أنف", "شرطة شعرية وأنف قائم بسم�
 declare("ه", "I", [("عين داخلية", "حلقة طويلة في داخلها عين صغيرة يلتف إليها الخط: كما في الخطوط المفتوحة"),
                    ("عينان", "رأس عريض بقاطع يصنع عينين"), ("حلقة وجذع", "حلقة منخفضة وجذع قائم على يمينها")],
         lambda st: "عين داخلية")
-declare("ي", "i", [("رأس وكأس", "رأس مفتوح إلى اليمين ثم كأس واسع"), ("كأس", "كأس فقط")],
-        lambda st: "كأس" if st.angular >= 0.5 else "رأس وكأس")
+declare("ي", "i", [("راجعة", "خط يمتد يسارًا ثم يرجع تحت الحرف إلى اليمين: كما في الخطوط المفتوحة"),
+                   ("رأس وكأس", "رأس مفتوح إلى اليمين ثم كأس واسع"), ("كأس", "كأس فقط")],
+        lambda st: "راجعة")
 for _k in "كکگ":
     declare(_k, "IM", [(KEHEH, "ذراع يصعد إلى أعلى اليمين من زاوية على اليسار ثم يعود إلى السطر: كما ترسمها الخطوط المفتوحة كلها"),
                        (STEM_ARM, "جذع إلى الصاعد وذراع إلى اليسار في أعلاه: بناء الكوفي المربع، لا يفرّقها عن اللام إلا الذراع")],
