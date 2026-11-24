@@ -46,6 +46,10 @@ class Style:
     variants: Dict[str, str] = field(default_factory=dict)
     # letters the logo draws its own way, cut out of it by the self-check: "letter.form" -> outlines
     taken: Dict[str, Dict] = field(default_factory=dict)
+    # the plan the model wrote for this logo, carried out (plan.execute): "glyphs" -> "letter.form" ->
+    # the letter put together from the logo's own pieces, with its join points and its marks' places.
+    # A letter form the plan gives is drawn so in every word, before any rule of the engine's
+    plan: Dict = field(default_factory=dict)
     # parts of letters as the logo draws them (selfcheck.take_parts): part name -> outlines, relative to
     # the right end of the engine's part; they stand in for that part in every letter the logo lacks
     parts: Dict[str, Dict] = field(default_factory=dict)

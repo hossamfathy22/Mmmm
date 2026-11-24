@@ -83,6 +83,8 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
     gap = val(st, "mark.gap")
     dash_len = val(st, "mark.dash")
     above = spec[0] in "ah" and spec != "hb"
+    if above:
+        gap = val(st, "mark.gap_above")
     ref = st.x_height if above_ref is None else above_ref
     cy = at if at is not None else (ref + gap + d / 2 if above else below_ref - gap - d / 2)
     out: List[g.Shape] = []
@@ -95,7 +97,8 @@ def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] 
 
     def dash(x, y, length):
         got = lib.dash(x, y, length) if lib is not None else None
-        return got if got is not None else _named(g.rect(x - length / 2, x + length / 2, y - h / 2, y + h / 2), "شرطة")
+        dh = val(st, "mark.dash_h")
+        return got if got is not None else _named(g.rect(x - length / 2, x + length / 2, y - dh / 2, y + dh / 2), "شرطة")
     if kind == "1":
         out.append(dot(cx, cy))
     elif kind == "2":
@@ -159,6 +162,10 @@ param("mark.gap", lambda st: (st.dot_gap or 0.72) * st.dot,
       "البياض بين النقطة وحرفها = كما يقيسه الشعار، وإلا 0.72 من قطرها (وسيط 30 خطًا مفتوحًا)", MEASURED, "النقاط")
 param("mark.dash", lambda st: st.dash if st.dash > 0 else 1.5 * st.dot,
       "طول شرطة النقطتين = طول شرطة الشعار إن وُجدت، وإلا 1.5 من قطر النقطة", MEASURED, "النقاط")
+param("mark.gap_above", lambda st: val(st, "mark.gap"),
+      "البياض بين النقاط فوق الحرف وحرفها = بياض النقاط تحته، ما لم يقسه الشعار وحده", DERIVED, "النقاط")
+param("mark.dash_h", lambda st: st.hair,
+      "سمك الشرطة = الخط الرفيع، ما لم يقسه الشعار", DERIVED, "النقاط")
 def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = None,
           x0: float = 0.0, drop_inner: bool = False) -> Tuple[List[g.Shape], List[float]]:
     """n teeth joined at the baseline, right to left, starting at right edge x0."""

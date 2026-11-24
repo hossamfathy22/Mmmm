@@ -811,67 +811,76 @@ def _typeset(word: str, st: Style, cache: Optional[dict] = None) -> Layout:
                 if rtok is not None:
                     READS.reset(rtok)
         BUILDING.reset(ltok)
-        # a letter of few logos (ح ص ط ع ف ق ه ...) the logo lacks and has no letter of its own for (no
-        # cut, no sibling's body): on the reference typeface's outline (see REF_LETTERS)
-        auto = (st.ref_auto and st.seen and base(c, form) in REF_LETTERS and f"{c}.{form}" not in st.seen.split()
-                and st.variants.get(f"{c}.{form}") is None and not _logo_source(st, c, form, glyph, parts=False))
-        if st.reference and (st.ref_all or auto or (f"{c}.{form}" not in st.seen.split()
-                                                    and REFERENCE in (st.variants.get(f"{c}.{form}"),
-                                                                      st.variants.get(f"{base(c, form)}.{form}")))):
-            # a letter the logo lacks, asked of the logo's reference typeface: built on its structure
-            # with the logo's pen (the examination found this no better than the engine on average,
-            # so it is the designer's choice, not the default)
-            from .reference import ref_glyph, with_logo_head
-            got = ref_glyph(st.reference, c, form, st, st.ref_wide, engine=glyph)
-            if got is not None and base(c, form) in HEADED and st.parts.get("رأس"):
-                # the logo's own head on the reference's neck (ف ق): the logo's part where it has one
-                got = with_logo_head(got, st) or got
-            if got is not None:
-                glyph = got
-        if (st.legible_fallback and st.seen and f"{c}.{form}" not in st.seen.split()
-                and not (cut_here := st.taken.get(f"{c}.{form}"))):
-            # a letter the logo lacks that real typefaces would not read as itself: on a reference
-            # structure that they do read, with the logo's pen
-            from .legible import readable_reference
-            better = readable_reference(glyph, c, form, st)
-            if better is not None:
-                glyph = better
-        if st.parts and f"{c}.{form}" not in st.seen.split():
-            # a letter the logo lacks: its parts as the logo draws them, where the logo has them, as
-            # long as it still reads as the letter it is
-            built = with_parts(glyph, st, f"{c}.{form}")
-            if built is not glyph:
-                from .legible import keeps_reading
-                # a part the designer has set by hand is their judgement, not the reader's
-                touched = {n.split(".")[1] for n in st.params if n.startswith("قطعة.")}
-                # and so is a part the designer drew or chose for the kit
-                touched |= {n for n, v in st.parts.items() if isinstance(v, dict) and v.get("source") in ("designer", "reference")}
-                mine = {getattr(sh, "name", "") for sh in flat(built.shapes) if getattr(sh, "source", "") == "logo"}
-                if not st.part_legible or (touched & mine) or keeps_reading(glyph, built, c, form, st):
-                    glyph = built
-        cut, borrowed, kin = find_cut(st, c, form)
-        ext = extension(st, f"{c}.{form}")
-        if cut and st.variants.get(f"{c}.{form}") != "المحرك":
-            marks = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)] if kin else None
-            if not kin and borrowed is not None:
-                # a letter whose dots the logo drew into another's (the dash over موتنرو's ت carries
-                # the ن's dot): cut without them it reads as another letter (ن as ع), so the engine's
-                # marks go over its body
-                own = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)]
-                polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
-                if own and len(_strip_marks(polys, st.x_height)) == len(polys):
-                    marks = own
-                    cxs = [x for ring in polys for x, _ in ring]
-                    exs = [x for sh in flat(glyph.shapes) if not _is_mark(sh, st) for poly in sh for x, _ in poly]
-                    if cxs and exs:
-                        cut = {**cut, "marks_dx": 0.5 * (min(cxs) + max(cxs)) - 0.5 * (min(exs) + max(exs))}
-            trim = False
-            if cut.get("ox") is not None and form in ("I", "M") and i + 1 < len(forms):
-                nc, nf = forms[i + 1]
-                ncut, nb_, nk = find_cut(st, nc, nf) if nc in LETTERS else (None, None, False)
-                trim = not (ncut and ncut.get("at") == (cut.get("at", -9) + 1) and not nb_ and not nk and not borrowed and not kin)
-            glyph = from_logo(glyph, cut, form, borrowed, st.stem, marks, st.x_height, trim_exit=trim)
-            ext = 0.0                    # the letter as the logo draws it already has the logo's length
+        # the plan the model wrote for this logo (plan.py): its letter, put together from the logo's own
+        # pieces, comes before every rule of the engine's, and the engine's join joins it
+        planned = None
+        if st.plan:
+            from .plan import glyph_for
+            planned = glyph_for(st, c, form)
+        if planned is not None:
+            glyph, ext = planned, 0.0
+        else:
+            # a letter of few logos (ح ص ط ع ف ق ه ...) the logo lacks and has no letter of its own for (no
+            # cut, no sibling's body): on the reference typeface's outline (see REF_LETTERS)
+            auto = (st.ref_auto and st.seen and base(c, form) in REF_LETTERS and f"{c}.{form}" not in st.seen.split()
+                    and st.variants.get(f"{c}.{form}") is None and not _logo_source(st, c, form, glyph, parts=False))
+            if st.reference and (st.ref_all or auto or (f"{c}.{form}" not in st.seen.split()
+                                                        and REFERENCE in (st.variants.get(f"{c}.{form}"),
+                                                                          st.variants.get(f"{base(c, form)}.{form}")))):
+                # a letter the logo lacks, asked of the logo's reference typeface: built on its structure
+                # with the logo's pen (the examination found this no better than the engine on average,
+                # so it is the designer's choice, not the default)
+                from .reference import ref_glyph, with_logo_head
+                got = ref_glyph(st.reference, c, form, st, st.ref_wide, engine=glyph)
+                if got is not None and base(c, form) in HEADED and st.parts.get("رأس"):
+                    # the logo's own head on the reference's neck (ف ق): the logo's part where it has one
+                    got = with_logo_head(got, st) or got
+                if got is not None:
+                    glyph = got
+            if (st.legible_fallback and st.seen and f"{c}.{form}" not in st.seen.split()
+                    and not (cut_here := st.taken.get(f"{c}.{form}"))):
+                # a letter the logo lacks that real typefaces would not read as itself: on a reference
+                # structure that they do read, with the logo's pen
+                from .legible import readable_reference
+                better = readable_reference(glyph, c, form, st)
+                if better is not None:
+                    glyph = better
+            if st.parts and f"{c}.{form}" not in st.seen.split():
+                # a letter the logo lacks: its parts as the logo draws them, where the logo has them, as
+                # long as it still reads as the letter it is
+                built = with_parts(glyph, st, f"{c}.{form}")
+                if built is not glyph:
+                    from .legible import keeps_reading
+                    # a part the designer has set by hand is their judgement, not the reader's
+                    touched = {n.split(".")[1] for n in st.params if n.startswith("قطعة.")}
+                    # and so is a part the designer drew or chose for the kit
+                    touched |= {n for n, v in st.parts.items() if isinstance(v, dict) and v.get("source") in ("designer", "reference")}
+                    mine = {getattr(sh, "name", "") for sh in flat(built.shapes) if getattr(sh, "source", "") == "logo"}
+                    if not st.part_legible or (touched & mine) or keeps_reading(glyph, built, c, form, st):
+                        glyph = built
+            cut, borrowed, kin = find_cut(st, c, form)
+            ext = extension(st, f"{c}.{form}")
+            if cut and st.variants.get(f"{c}.{form}") != "المحرك":
+                marks = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)] if kin else None
+                if not kin and borrowed is not None:
+                    # a letter whose dots the logo drew into another's (the dash over موتنرو's ت carries
+                    # the ن's dot): cut without them it reads as another letter (ن as ع), so the engine's
+                    # marks go over its body
+                    own = [sh for sh in flat(glyph.shapes) if _is_mark(sh, st)]
+                    polys = [[(float(x), float(y)) for x, y in ring] for ring in cut["polys"]]
+                    if own and len(_strip_marks(polys, st.x_height)) == len(polys):
+                        marks = own
+                        cxs = [x for ring in polys for x, _ in ring]
+                        exs = [x for sh in flat(glyph.shapes) if not _is_mark(sh, st) for poly in sh for x, _ in poly]
+                        if cxs and exs:
+                            cut = {**cut, "marks_dx": 0.5 * (min(cxs) + max(cxs)) - 0.5 * (min(exs) + max(exs))}
+                trim = False
+                if cut.get("ox") is not None and form in ("I", "M") and i + 1 < len(forms):
+                    nc, nf = forms[i + 1]
+                    ncut, nb_, nk = find_cut(st, nc, nf) if nc in LETTERS else (None, None, False)
+                    trim = not (ncut and ncut.get("at") == (cut.get("at", -9) + 1) and not nb_ and not nk and not borrowed and not kin)
+                glyph = from_logo(glyph, cut, form, borrowed, st.stem, marks, st.x_height, trim_exit=trim)
+                ext = 0.0                    # the letter as the logo draws it already has the logo's length
         if ext > 0 and form in ("i", "F"):
             longer = stretch_glyph(glyph, ext, st)
             if longer is not None:
