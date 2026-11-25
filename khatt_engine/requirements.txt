@@ -11,3 +11,6 @@ shapely>=2.0
 fonttools>=4.40
 uharfbuzz>=0.37
 brotli>=1.0
+# الرسم المتجه أولًا (python -m khatt.drawn): قراءة PDF من Illustrator وعمليات المنحنيات
+pymupdf>=1.24
+skia-pathops>=0.8
