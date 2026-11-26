@@ -232,7 +232,7 @@ def stage1(model, cv, starts=10, iters=500, seed=0, log=print):
             best = (h, g.detach().clone(), al.detach().clone())
     return best
 
-def stage2(model, cv, g, al, iters=1500, log=print):
+def stage2(model, cv, g, al, iters=1500, log=print, patience=150, min_gain=5e-4):
     res = [dict(D=torch.zeros(K, 2, requires_grad=True), e=torch.zeros(K, requires_grad=True)) for _ in range(model.n)]
     al = al.clone().requires_grad_(True)
     opt = torch.optim.Adam([al] + [v for r in res for v in r.values()], lr=0.01)
@@ -243,6 +243,13 @@ def stage2(model, cv, g, al, iters=1500, log=print):
         iou = soft_iou(cv.soft(st, al), cv.T)
         loss = (1 - iou) / T_LIK + r_prior(res)
         loss.backward(); opt.step(); sch.step()
+        # إيقاف مبكر: إذا لم يتحسن التطابق بأكثر من min_gain خلال patience خطوة
+        v = float(iou.detach())
+        if it == 0 or v > best_v + min_gain:
+            best_v, best_it = v, it
+        elif it - best_it > patience:
+            log(f"  stage2: early stop at step {it}")
+            break
     res = [{k: v.detach() for k, v in r.items()} for r in res]
     h = hard_iou(cv.hard(model.generate(g, res), al), cv.Tn)
     log(f"  stage2: hard IoU {h:.3f}")

@@ -17,6 +17,7 @@ from glyph import Glyph
 
 PDF, TARGET, LETTER, OUT = sys.argv[1:5]
 TRANSFER = "--transfer" in sys.argv[5:]
+STARTS = int(next((a.split("=")[1] for a in sys.argv[5:] if a.startswith("--starts=")), 3))
 os.makedirs(OUT, exist_ok=True)
 log = lambda *x: print(*x, flush=True)
 
@@ -46,7 +47,7 @@ model = E.Model(src)
 
 # ---------- 3) الملاءمة ----------
 log("stage 1: general style only")
-h1, g, al1 = E.stage1(model, cv, starts=8, iters=500, log=log)
+h1, g, al1 = E.stage1(model, cv, starts=STARTS, iters=500, log=log)
 log("stage 2: letter-specific residual")
 h2, res, al2 = E.stage2(model, cv, g, al1, log=log)
 zero = model.zero_residual()
