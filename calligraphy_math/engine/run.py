@@ -1,0 +1,123 @@
+"""
+تشغيل المحرّك:
+    python run.py <pdf سكّال> <صورة الحرف الهدف> <اسم الحرف بالإنجليزية> <مجلد المخرجات>
+مثال:
+    python run.py sakkal.pdf modern_jeem.jpg jeem out/
+"""
+import sys, os, json, math, pickle
+import numpy as np
+import torch
+from PIL import Image, ImageDraw
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import alphabet as A
+import engine as E
+import geometry as GE
+from glyph import Glyph
+
+PDF, TARGET, LETTER, OUT = sys.argv[1:5]
+os.makedirs(OUT, exist_ok=True)
+log = lambda *x: print(*x, flush=True)
+
+# ---------- 1) الأبجدية من جدول سكّال (مع ذاكرة مؤقتة) ----------
+cache = os.path.join(OUT, "glyphs.pkl")
+if os.path.exists(cache):
+    glyphs = pickle.load(open(cache, "rb"))
+else:
+    alpha = A.extract_alphabet(PDF)
+    unit = float(np.ptp(np.nonzero(alpha["jeem"]["body"])[0]))       # الوحدة: ارتفاع الجيم
+    glyphs = {}
+    for n in A.NAMES:
+        glyphs[n] = Glyph(n, alpha[n]["body"], alpha[n]["dots"], unit=unit)
+        log("glyph", n, len(glyphs[n].strokes), "strokes")
+    pickle.dump(glyphs, open(cache, "wb"))
+
+# ---------- 2) الحرف الهدف ----------
+a = np.asarray(Image.open(TARGET).convert("RGB")).astype(int)
+ink = (a.max(2) < 140) & ((a.max(2) - a.min(2)) < 40)
+from scipy import ndimage
+lab, k = ndimage.label(ink); sz = ndimage.sum(ink, lab, range(1, k + 1))
+ink = np.isin(lab, 1 + np.where(sz > 0.01 * sz.max())[0])
+cv = E.Canvas(ink, size=150)
+src = glyphs[LETTER]
+model = E.Model(src)
+
+# ---------- 3) الملاءمة ----------
+log("stage 1: general style only")
+h1, g, al1 = E.stage1(model, cv, starts=8, iters=500, log=log)
+log("stage 2: letter-specific residual")
+h2, res, al2 = E.stage2(model, cv, g, al1, log=log)
+zero = model.zero_residual()
+
+# ---------- 4) النقل إلى كل الحروف ----------
+PX, CW, CH = 120, 3.2, 2.2               # بكسل لكل وحدة، أبعاد اللوحة بالوحدات
+def render_letter(strokes, dots, colors=None, ss=3):
+    W, H = int(CW * PX), int(CH * PX)
+    P = torch.cat([c for c, _ in strokes]).detach().numpy()
+    wm = max(float(w.max()) for _, w in strokes)
+    pts = [P] + [np.array([p]) for p, _ in dots]
+    allp = np.vstack(pts); ctr = (allp.min(0) + allp.max(0)) / 2
+    img = Image.new("RGB", (W * ss, H * ss), (255, 255, 255)); dr = ImageDraw.Draw(img)
+    tf = lambda q: np.column_stack([(q[:, 0] - ctr[0]) * PX * ss + W * ss / 2, -(q[:, 1] - ctr[1]) * PX * ss + H * ss / 2])
+    for i, (c, w) in enumerate(strokes):
+        X = tf(c.detach().numpy()); r = w.detach().numpy() * PX * ss / 2
+        n = GE.normals(X); L, R = X + r[:, None] * n, X - r[:, None] * n
+        col = colors[i] if colors else (15, 15, 15)
+        for j in range(len(X) - 1):
+            dr.polygon([tuple(L[j]), tuple(R[j]), tuple(R[j + 1]), tuple(L[j + 1])], fill=col)
+    for p, r in dots:
+        x, y = tf(np.array([p]))[0]; rr = r * PX * ss
+        dr.polygon([(x, y - rr), (x + rr, y), (x, y + rr), (x - rr, y)], fill=(15, 15, 15) if not colors else (120, 120, 120))
+    return img.resize((W, H), Image.LANCZOS)
+
+def conf_color(a):
+    return (46, 140, 87) if a >= 0.7 else (214, 162, 32) if a >= 0.2 else (140, 140, 140)
+
+report = dict(letter=LETTER, target=os.path.basename(TARGET), stage1_general_IoU=round(h1, 3),
+              stage2_with_residual_IoU=round(h2, 3), general_style=dict(zip(E.GN, [round(float(x), 4) for x in g])),
+              letters={})
+naskh_imgs, modern_imgs, conf_imgs = {}, {}, {}
+identity = E.GPRIOR[:, 0].clone()
+for n in A.NAMES:
+    m = E.Model(glyphs[n], wbar=src.wbar)
+    if n == LETTER:
+        r_n, rep = res, [dict(stroke=k, nearest_target_stroke=k, distance=0.0, alpha=1.0) for k in range(m.n)]
+    else:
+        r_n, rep = E.transfer_residual(model, res, m)
+    with torch.no_grad():
+        st = m.generate(g, r_n)
+        dots = m.dots(g, st)
+        naskh = [(torch.tensor(c), torch.tensor(w)) for c, w in glyphs[n].strokes]
+    naskh_imgs[n] = render_letter(naskh, glyphs[n].dots)
+    modern_imgs[n] = render_letter(st, dots)
+    conf_imgs[n] = render_letter(st, dots, colors=[conf_color(r["alpha"]) for r in rep])
+    report["letters"][n] = rep
+    log("transferred", n, [r["alpha"] for r in rep])
+
+# ---------- 5) الأشكال ----------
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+def ov(p, t):
+    o = np.ones(t.shape + (3,)); o[t & ~p] = (0.86, 0.3, 0.3); o[p & ~t] = (0.3, 0.45, 0.9); o[p & t] = (0.12, 0.12, 0.12)
+    return o
+fig, ax = plt.subplots(1, 5, figsize=(19, 4), facecolor="white")
+ax[0].imshow(naskh_imgs[LETTER]); ax[0].set_title(f"Sakkal {LETTER} (input)")
+with torch.no_grad():
+    p1 = cv.hard(model.generate(g, zero), al1); p2 = cv.hard(model.generate(g, res), al2)
+ax[1].imshow(ov(p1, cv.Tn)); ax[1].set_title(f"stage 1: general style only\nIoU {h1:.2f}")
+ax[2].imshow(ov(p2, cv.Tn)); ax[2].set_title(f"stage 2: + letter residual\nIoU {h2:.2f}")
+ax[3].imshow(modern_imgs[LETTER]); ax[3].set_title("result")
+ax[4].imshow(Image.open(TARGET).convert("RGB")); ax[4].set_title("target")
+for x in ax: x.axis("off")
+fig.savefig(os.path.join(OUT, "1_fit.png"), dpi=110, bbox_inches="tight")
+
+for key, imgs, ttl in (("2_alphabet_modern.png", modern_imgs, "transformed alphabet"),
+                       ("3_alphabet_confidence.png", conf_imgs, "confidence: green = residual transferred (similar stroke) · yellow = partial · grey = general style only"),
+                       ("0_alphabet_naskh.png", naskh_imgs, "Sakkal Naskh input")):
+    fig, axes = plt.subplots(4, 7, figsize=(17, 9), facecolor="white")
+    for x, n in zip(axes.flat[::-1], A.NAMES):
+        x.imshow(imgs[n]); x.set_title(f"{n}  {A.ARABIC[n]}" if False else n, fontsize=9); x.axis("off")
+    fig.suptitle(ttl, fontsize=11)
+    fig.savefig(os.path.join(OUT, key), dpi=90, bbox_inches="tight")
+json.dump(report, open(os.path.join(OUT, "report.json"), "w"), ensure_ascii=False, indent=1)
+log("done", json.dumps({k: report[k] for k in ("stage1_general_IoU", "stage2_with_residual_IoU")}))
