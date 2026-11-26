@@ -63,6 +63,8 @@ class Reading:
     notes: List[str]
     spacing: Optional[float] = None      # white between unjoined letters along the slant, font units
     kerns: Dict[Tuple[str, str], float] = field(default_factory=dict)   # (right glyph, left glyph): white
+    spec: Optional[object] = None        # the logos' measures the letters were brought to (rectify.py)
+    levels: Optional[object] = None      # those measures in this drawing's units
 
 
 # ------------------------------------------------------------------ measuring

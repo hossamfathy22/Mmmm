@@ -155,6 +155,90 @@ class Builder:
         cy = 1.28 * self.xh if above else -0.35 * self.xh
         return (run[0] + run[1]) / 2 + (cy - y) * self.tan, cy
 
+    def spec_marks(self, n: int, above: bool, x_at: Tuple[float, float], body: Optional[G.Path] = None) -> List[G.Path]:
+        """The marks by the logos' measures (khatt.drawn.spec): one dot; two dots as the logos draw them (a
+        hairline dash, or two dots); three as the engine builds them (the dash where one mark stands, the dot
+        beyond it). Above the letters a mark's top touches the top line; under the line a dot's top and a
+        dash's centre stand where the logos put them. `x_at` is a point of the marks' stem line (x, y).
+        A mark keeps the white the logos keep between a dot and its letter (0.44 of the dot, as بيدوناق's
+        ن): where the letter itself stands there (the bowl of ج under the line), the marks move to the
+        nearest place that keeps it, inside the bowl or past it."""
+        S, L, tan = self.R.spec, self.R.levels, self.tan
+        k = L.k
+        dot = self.R.dot
+        db = G.bounds(dot)
+        d = db[3] - db[1]
+        hair, length = S.hair * k, S.dash * k
+
+        def at(y):                                          # x on the marks' stem line at height y
+            return x_at[0] + (y - x_at[1]) * tan
+
+        def a_dot(y):
+            return G.shift(dot, at(y), y)
+
+        def a_dash(y):
+            x = at(y)
+            return G.shift(G.band(x - length / 2 - (hair / 2) * tan, x + length / 2 - (hair / 2) * tan, hair, tan), 0.0, y - hair / 2)
+        step = 0.7125 * d                                   # dash to dot, as the engine's three marks (0.95 x 0.75)
+        if above:
+            if n == 1:
+                group = [a_dot(L.top - d / 2)]
+            elif n == 2:
+                group = ([a_dash(L.top - hair / 2)] if S.two_dots == "dash" else
+                         [G.shift(a_dot(L.top - d / 2), -0.52 * d, 0), G.shift(a_dot(L.top - d / 2), 0.52 * d, 0)])
+            else:
+                yd = L.top - d / 2
+                group = [a_dash(yd), a_dot(yd + step)]
+        else:
+            top = -S.below_dot * k
+            yc = -S.below_dash * k
+            if n == 1:
+                group = [a_dot(top - d / 2)]
+            elif n == 2:
+                group = ([a_dash(yc)] if S.two_dots == "dash" else
+                         [G.shift(a_dot(top - d / 2), -0.52 * d, 0), G.shift(a_dot(top - d / 2), 0.52 * d, 0)])
+            else:
+                group = [a_dash(yc), a_dot(yc - step)]
+        return self._clear(group, body, 0.44 * d, above, d) if body is not None else group
+
+    def _clear(self, group: List[G.Path], body: G.Path, white: float, above: bool, d: float) -> List[G.Path]:
+        """The group moved (along the stem lines and up or down) to the nearest place where it keeps
+        `white` from the letter."""
+        def grown(m):
+            b = G.bounds(m)
+            cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+            sx = 1 + 2 * white / max(1.0, b[2] - b[0])
+            sy = 1 + 2 * white / max(1.0, b[3] - b[1])
+            return G.transformed(m, (sx, 0, 0, sy, cx * (1 - sx), cy * (1 - sy)))
+
+        def free(ms):
+            return all(G.bounds(G.intersect(grown(m), body)) is None for m in ms)
+        if free(group):
+            return group
+        bb = G.bounds(body)
+        sign = 1 if above else -1
+        best = None
+        for j in range(0, 41):
+            # away from the letter first, and back towards it as far: the opening of a bowl (ج) is a place
+            for dy in ((0.0,) if j == 0 else (sign * j * d / 4, -sign * j * d / 4)):
+                if -sign * dy > 1.2 * self.xh:
+                    continue
+                for i in range(0, 13):
+                    for dx in ((0.0,) if i == 0 else (i * d / 4, -i * d / 4)):
+                        if best is not None and (dx * dx + dy * dy) >= best[0]:
+                            continue
+                        moved = [G.shift(m, dx + dy * self.tan, dy) for m in group]
+                        if free(moved):
+                            best = (dx * dx + dy * dy, moved)
+            if best is not None and (j * d / 4) ** 2 >= best[0]:
+                break
+        if best is not None:
+            return best[1]
+        # nowhere near: past the letter, on the side the marks belong to
+        gb = [G.bounds(m) for m in group]
+        dy = (bb[3] + white - min(b[1] for b in gb)) if above else (bb[1] - white - max(b[3] for b in gb))
+        return [G.shift(m, dy * self.tan, dy) for m in group]
+
     @staticmethod
     def centre(ms: List[G.Path]) -> Optional[Tuple[float, float]]:
         if not ms:
@@ -254,6 +338,14 @@ def build_glyphs(R: Reading) -> Tuple[List[Glyph], List[str]]:
             n, above = A.DOTS_JOINED_ONLY[unit] if form in ("init", "medi") else (0, True)
         if n == 0:
             return []
+        if B.R.spec is not None:
+            # every letter's marks by the logos' measures: where the designer put the marks of this
+            # drawing on this side, their stem line; else above or below the letter's middle
+            ref = None
+            if b.origin is not None:
+                ds = [m for m in b.origin.marks if _round(m) and ((G.bounds(m)[1] > 0.45 * B.xh) == above)]
+                ref = B.centre(ds)
+            return B.spec_marks(n, above, ref if ref is not None else B.dot_place(b, above, None), b.path)
         if b.source == "drawn" and len(b.dots) == n:
             return b.dots                           # the designer's own dots, as drawn
         # the designer's dots on this very drawing, on the same side: the new group stands where they stood
