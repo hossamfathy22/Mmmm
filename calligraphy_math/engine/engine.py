@@ -150,16 +150,32 @@ class Canvas:
         s = tau * torch.logsumexp((r[None] - d) / tau, dim=1)
         return torch.sigmoid(s / eps).reshape(self.H, self.W)
 
-    def hard(self, strokes, al, ss=3):
-        img = Image.new("L", (self.W * ss, self.H * ss), 0); dr = ImageDraw.Draw(img)
-        for c, w in strokes:
-            X = self.to_pix(c.detach(), al.detach()).numpy() * ss
-            r = w.detach().numpy() * float(al[0]) * self.H * ss / 2
-            n = GE.normals(X); L, R = X + r[:, None] * n, X - r[:, None] * n
-            for i in range(len(X) - 1):
-                dr.polygon([tuple(L[i]), tuple(R[i]), tuple(R[i + 1]), tuple(L[i + 1])], fill=255)
-        img = img.resize((self.W, self.H), Image.BILINEAR)
-        return np.asarray(img) > 127
+    def hard(self, strokes, al):
+        """الشكل نفسه الذي حسّنه النموذج (عتبة 0.5 على التغطية) — لا رسم بديل مختلف عنه."""
+        with torch.no_grad():
+            return self.soft([(c.detach(), w.detach()) for c, w in strokes], al.detach()).numpy() > 0.5
+
+def implicit_image(strokes, px_per_unit, ctr, W, H, ss=2, tau=0.6, eps=0.6, chunk=40000):
+    """رسم عالي الدقة بالتعريف الرياضي نفسه المستخدم في الملاءمة (اتحاد أقراص ناعم)."""
+    X = torch.cat([c.detach() for c, _ in strokes]).float()
+    r = torch.cat([w.detach() for _, w in strokes]).float() / 2
+    k = px_per_unit * ss
+    Xp = torch.stack([(X[:, 0] - ctr[0]) * k + W * ss / 2, -(X[:, 1] - ctr[1]) * k + H * ss / 2], 1)
+    rp = r * k; t = tau * ss; e = eps * ss
+    yy, xx = torch.meshgrid(torch.arange(H * ss) + 0.5, torch.arange(W * ss) + 0.5, indexing="ij")
+    P = torch.stack([xx.flatten(), yy.flatten()], 1).float()
+    out = torch.empty(len(P))
+    for i in range(0, len(P), chunk):
+        d = torch.cdist(P[i:i + chunk], Xp)
+        out[i:i + chunk] = torch.sigmoid(t * torch.logsumexp((rp[None] - d) / t, 1) / e)
+    img = out.reshape(H * ss, W * ss).numpy()
+    return np.asarray(Image.fromarray((img * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS)) / 255.0
+
+def edge_err(a, b):
+    """متوسط المسافة المتناظرة بين الحواف، نسبة مئوية من ارتفاع اللوحة."""
+    ea = a & ~ndimage.binary_erosion(a); eb = b & ~ndimage.binary_erosion(b)
+    da = ndimage.distance_transform_edt(~eb)[ea].mean(); db = ndimage.distance_transform_edt(~ea)[eb].mean()
+    return float(100 * 0.5 * (da + db) / a.shape[0])
 
 def soft_iou(a, b):
     inter = (a * b).sum(); return inter / (a.sum() + b.sum() - inter)

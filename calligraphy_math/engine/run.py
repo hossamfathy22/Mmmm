@@ -56,14 +56,14 @@ def render_letter(strokes, dots, colors=None, ss=3):
     wm = max(float(w.max()) for _, w in strokes)
     pts = [P] + [np.array([p]) for p, _ in dots]
     allp = np.vstack(pts); ctr = (allp.min(0) + allp.max(0)) / 2
-    img = Image.new("RGB", (W * ss, H * ss), (255, 255, 255)); dr = ImageDraw.Draw(img)
-    tf = lambda q: np.column_stack([(q[:, 0] - ctr[0]) * PX * ss + W * ss / 2, -(q[:, 1] - ctr[1]) * PX * ss + H * ss / 2])
+    canvas = np.ones((H, W, 3))
     for i, (c, w) in enumerate(strokes):
-        X = tf(c.detach().numpy()); r = w.detach().numpy() * PX * ss / 2
-        n = GE.normals(X); L, R = X + r[:, None] * n, X - r[:, None] * n
-        col = colors[i] if colors else (15, 15, 15)
-        for j in range(len(X) - 1):
-            dr.polygon([tuple(L[j]), tuple(R[j]), tuple(R[j + 1]), tuple(L[j + 1])], fill=col)
+        cov = E.implicit_image([(c, w)], PX, ctr, W, H)[..., None]
+        col = np.array(colors[i] if colors else (15, 15, 15)) / 255.0
+        canvas = canvas * (1 - cov) + col * cov
+    img = Image.fromarray((canvas * 255).astype(np.uint8)).resize((W * ss, H * ss), Image.LANCZOS)
+    dr = ImageDraw.Draw(img)
+    tf = lambda q: np.column_stack([(q[:, 0] - ctr[0]) * PX * ss + W * ss / 2, -(q[:, 1] - ctr[1]) * PX * ss + H * ss / 2])
     for p, r in dots:
         x, y = tf(np.array([p]))[0]; rr = r * PX * ss
         dr.polygon([(x, y - rr), (x + rr, y), (x, y + rr), (x - rr, y)], fill=(15, 15, 15) if not colors else (120, 120, 120))
@@ -72,8 +72,12 @@ def render_letter(strokes, dots, colors=None, ss=3):
 def conf_color(a):
     return (46, 140, 87) if a >= 0.7 else (214, 162, 32) if a >= 0.2 else (140, 140, 140)
 
+with torch.no_grad():
+    e1 = E.edge_err(cv.hard(model.generate(g, zero), al1), cv.Tn); e2 = E.edge_err(cv.hard(model.generate(g, res), al2), cv.Tn)
+CRIT = dict(IoU_min=0.90, edge_err_max_pct=1.5)
 report = dict(letter=LETTER, target=os.path.basename(TARGET), stage1_general_IoU=round(h1, 3),
-              stage2_with_residual_IoU=round(h2, 3), general_style=dict(zip(E.GN, [round(float(x), 4) for x in g])),
+              stage2_with_residual_IoU=round(h2, 3), stage1_edge_err_pct=round(e1, 2), stage2_edge_err_pct=round(e2, 2),
+              criteria=CRIT, PASS=bool(h2 >= CRIT["IoU_min"] and e2 <= CRIT["edge_err_max_pct"]), general_style=dict(zip(E.GN, [round(float(x), 4) for x in g])),
               letters={})
 naskh_imgs, modern_imgs, conf_imgs = {}, {}, {}
 identity = E.GPRIOR[:, 0].clone()
@@ -104,8 +108,8 @@ fig, ax = plt.subplots(1, 5, figsize=(19, 4), facecolor="white")
 ax[0].imshow(naskh_imgs[LETTER]); ax[0].set_title(f"Sakkal {LETTER} (input)")
 with torch.no_grad():
     p1 = cv.hard(model.generate(g, zero), al1); p2 = cv.hard(model.generate(g, res), al2)
-ax[1].imshow(ov(p1, cv.Tn)); ax[1].set_title(f"stage 1: general style only\nIoU {h1:.2f}")
-ax[2].imshow(ov(p2, cv.Tn)); ax[2].set_title(f"stage 2: + letter residual\nIoU {h2:.2f}")
+ax[1].imshow(ov(p1, cv.Tn)); ax[1].set_title(f"stage 1: general style only\nIoU {h1:.2f} · edge {e1:.1f}% H")
+ax[2].imshow(ov(p2, cv.Tn)); ax[2].set_title(f"stage 2: + letter residual\nIoU {h2:.2f} · edge {e2:.1f}% H")
 ax[3].imshow(modern_imgs[LETTER]); ax[3].set_title("result")
 ax[4].imshow(Image.open(TARGET).convert("RGB")); ax[4].set_title("target")
 for x in ax: x.axis("off")
@@ -120,4 +124,4 @@ for key, imgs, ttl in (("2_alphabet_modern.png", modern_imgs, "transformed alpha
     fig.suptitle(ttl, fontsize=11)
     fig.savefig(os.path.join(OUT, key), dpi=90, bbox_inches="tight")
 json.dump(report, open(os.path.join(OUT, "report.json"), "w"), ensure_ascii=False, indent=1)
-log("done", json.dumps({k: report[k] for k in ("stage1_general_IoU", "stage2_with_residual_IoU")}))
+log("done", json.dumps({k: report[k] for k in ("stage1_general_IoU", "stage2_with_residual_IoU", "stage1_edge_err_pct", "stage2_edge_err_pct", "PASS")}))
