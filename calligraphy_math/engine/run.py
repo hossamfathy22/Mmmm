@@ -40,6 +40,7 @@ from scipy import ndimage
 lab, k = ndimage.label(ink); sz = ndimage.sum(ink, lab, range(1, k + 1))
 ink = np.isin(lab, 1 + np.where(sz > 0.01 * sz.max())[0])
 cv = E.Canvas(ink, size=150)
+cv_eval = E.Canvas(ink, size=300)        # التقييم بضعف الدقة حتى لا يُخفي التنعيم أي انقطاع
 src = glyphs[LETTER]
 model = E.Model(src)
 
@@ -75,7 +76,10 @@ def conf_color(a):
     return (46, 140, 87) if a >= 0.7 else (214, 162, 32) if a >= 0.2 else (140, 140, 140)
 
 with torch.no_grad():
-    e1 = E.edge_err(cv.hard(model.generate(g, zero), al1), cv.Tn); e2 = E.edge_err(cv.hard(model.generate(g, res), al2), cv.Tn)
+    p1e, p2e = cv_eval.hard(model.generate(g, zero), al1), cv_eval.hard(model.generate(g, res), al2)
+    h1, h2 = E.hard_iou(p1e, cv_eval.Tn), E.hard_iou(p2e, cv_eval.Tn)
+    e1, e2 = E.edge_err(p1e, cv_eval.Tn), E.edge_err(p2e, cv_eval.Tn)
+log(f"evaluation at 300 px: stage1 IoU {h1:.3f} edge {e1:.2f}% | stage2 IoU {h2:.3f} edge {e2:.2f}%")
 CRIT = dict(IoU_min=0.90, edge_err_max_pct=1.5)
 report = dict(letter=LETTER, target=os.path.basename(TARGET), stage1_general_IoU=round(h1, 3),
               stage2_with_residual_IoU=round(h2, 3), stage1_edge_err_pct=round(e1, 2), stage2_edge_err_pct=round(e2, 2),
@@ -109,9 +113,9 @@ def ov(p, t):
 fig, ax = plt.subplots(1, 5, figsize=(19, 4), facecolor="white")
 ax[0].imshow(naskh_imgs[LETTER]); ax[0].set_title(f"Sakkal {LETTER} (input)")
 with torch.no_grad():
-    p1 = cv.hard(model.generate(g, zero), al1); p2 = cv.hard(model.generate(g, res), al2)
-ax[1].imshow(ov(p1, cv.Tn)); ax[1].set_title(f"stage 1: general style only\nIoU {h1:.2f} · edge {e1:.1f}% H")
-ax[2].imshow(ov(p2, cv.Tn)); ax[2].set_title(f"stage 2: + letter residual\nIoU {h2:.2f} · edge {e2:.1f}% H")
+    p1, p2 = p1e, p2e
+ax[1].imshow(ov(p1, cv_eval.Tn)); ax[1].set_title(f"stage 1: general style only\nIoU {h1:.2f} · edge {e1:.1f}% H")
+ax[2].imshow(ov(p2, cv_eval.Tn)); ax[2].set_title(f"stage 2: + letter residual\nIoU {h2:.2f} · edge {e2:.1f}% H")
 ax[3].imshow(modern_imgs[LETTER]); ax[3].set_title("result")
 ax[4].imshow(Image.open(TARGET).convert("RGB")); ax[4].set_title("target")
 for x in ax: x.axis("off")

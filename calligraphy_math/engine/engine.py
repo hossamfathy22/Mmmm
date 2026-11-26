@@ -143,32 +143,45 @@ class Canvas:
         k, tx, ty = al[0], al[1], al[2]
         return torch.stack([c[:, 0] * k * self.H + self.W / 2 + tx * self.H, -c[:, 1] * k * self.H + self.H / 2 + ty * self.H], 1)
 
-    def soft(self, strokes, al, tau=0.6, eps=0.6):
-        X = torch.cat([self.to_pix(c, al) for c, _ in strokes]).float()
-        r = torch.cat([w for _, w in strokes]).float() * al[0].float() * self.H / 2
-        d = torch.cdist(self.pix, X)
-        s = tau * torch.logsumexp((r[None] - d) / tau, dim=1)
-        return torch.sigmoid(s / eps).reshape(self.H, self.W)
+    def soft(self, strokes, al, tau=0.3, eps=0.5):
+        segs = [(self.to_pix(c, al).float(), (w * al[0] * self.H / 2).float()) for c, w in strokes]
+        return capsule_cover(self.pix, segs, tau, eps).reshape(self.H, self.W)
 
     def hard(self, strokes, al):
         """الشكل نفسه الذي حسّنه النموذج (عتبة 0.5 على التغطية) — لا رسم بديل مختلف عنه."""
         with torch.no_grad():
             return self.soft([(c.detach(), w.detach()) for c, w in strokes], al.detach()).numpy() > 0.5
 
-def implicit_image(strokes, px_per_unit, ctr, W, H, ss=2, tau=0.6, eps=0.6, chunk=40000):
-    """رسم عالي الدقة بالتعريف الرياضي نفسه المستخدم في الملاءمة (اتحاد أقراص ناعم)."""
-    X = torch.cat([c.detach() for c, _ in strokes]).float()
-    r = torch.cat([w.detach() for _, w in strokes]).float() / 2
+def capsule_cover(P, segs, tau, eps, chunk=None):
+    """تغطية ناعمة لاتحاد «كبسولات» متصلة (قطع بين نقاط الهيكل بسُمك مُستوفى) — شكل متصل بأي دقة:
+         s(p) = max_seg [ r(t*) − |p − (A + t*(B−A))| ] ,  t* = clamp(((p−A)·(B−A))/|B−A|², 0, 1)
+         coverage = sigmoid( τ·LSE(s/τ) / ε )"""
+    A = torch.cat([X[:-1] for X, _ in segs]); B = torch.cat([X[1:] for X, _ in segs])
+    ra = torch.cat([r[:-1] for _, r in segs]); rb = torch.cat([r[1:] for _, r in segs])
+    AB = B - A; L2 = (AB ** 2).sum(1).clamp_min(1e-9)
+    out = []
+    chunk = chunk or len(P)
+    for i in range(0, len(P), chunk):
+        p = P[i:i + chunk]
+        AP = p[:, None, :] - A[None]
+        t = ((AP * AB[None]).sum(2) / L2[None]).clamp(0, 1)
+        d = (AP - t[..., None] * AB[None]).norm(dim=2)
+        sd = ra[None] + t * (rb - ra)[None] - d
+        out.append(torch.sigmoid(tau * torch.logsumexp(sd / tau, 1) / eps))
+    return torch.cat(out)
+
+def implicit_image(strokes, px_per_unit, ctr, W, H, ss=2, tau=0.3, eps=0.5, chunk=6000):
+    """رسم عالي الدقة بالتعريف الرياضي نفسه المستخدم في الملاءمة (اتحاد كبسولات)."""
     k = px_per_unit * ss
-    Xp = torch.stack([(X[:, 0] - ctr[0]) * k + W * ss / 2, -(X[:, 1] - ctr[1]) * k + H * ss / 2], 1)
-    rp = r * k; t = tau * ss; e = eps * ss
+    segs = []
+    for c, w in strokes:
+        c = c.detach().float()
+        segs.append((torch.stack([(c[:, 0] - ctr[0]) * k + W * ss / 2, -(c[:, 1] - ctr[1]) * k + H * ss / 2], 1),
+                     w.detach().float() * k / 2))
     yy, xx = torch.meshgrid(torch.arange(H * ss) + 0.5, torch.arange(W * ss) + 0.5, indexing="ij")
     P = torch.stack([xx.flatten(), yy.flatten()], 1).float()
-    out = torch.empty(len(P))
-    for i in range(0, len(P), chunk):
-        d = torch.cdist(P[i:i + chunk], Xp)
-        out[i:i + chunk] = torch.sigmoid(t * torch.logsumexp((rp[None] - d) / t, 1) / e)
-    img = out.reshape(H * ss, W * ss).numpy()
+    with torch.no_grad():
+        img = capsule_cover(P, segs, tau * ss, eps * ss, chunk).reshape(H * ss, W * ss).numpy()
     return np.asarray(Image.fromarray((img * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS)) / 255.0
 
 def edge_err(a, b):
