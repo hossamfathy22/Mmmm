@@ -1,0 +1,57 @@
+{
+ "loop": [
+  0,
+  74
+ ],
+ "rows": {
+  "Naskh (identity)": {
+   "openness": 0.705,
+   "loop_dist": 0.0,
+   "turn_loop": -177.6,
+   "loop_width_ratio": 1.0,
+   "tail_dir": 177.3
+  },
+  "affine only": {
+   "openness": 0.439,
+   "loop_dist": 0.198,
+   "turn_loop": -177.1,
+   "loop_width_ratio": 1.0,
+   "tail_dir": 176.3
+  },
+  "curvature c only": {
+   "openness": 0.314,
+   "loop_dist": 0.349,
+   "turn_loop": -225.2,
+   "loop_width_ratio": 1.0,
+   "tail_dir": 92.3
+  },
+  "swash only": {
+   "openness": 0.705,
+   "loop_dist": 0.0,
+   "turn_loop": -177.6,
+   "loop_width_ratio": 1.0,
+   "tail_dir": -46.0
+  },
+  "width law only": {
+   "openness": 0.333,
+   "loop_dist": 0.0,
+   "turn_loop": -177.6,
+   "loop_width_ratio": 1.35,
+   "tail_dir": 177.3
+  },
+  "v1 full": {
+   "openness": 0.101,
+   "loop_dist": 0.395,
+   "turn_loop": -247.0,
+   "loop_width_ratio": 1.5,
+   "tail_dir": -149.8
+  },
+  "affine + width (tool only)": {
+   "openness": 0.158,
+   "loop_dist": 0.198,
+   "turn_loop": -177.1,
+   "loop_width_ratio": 1.8,
+   "tail_dir": 176.3
+  }
+ }
+}

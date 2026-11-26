@@ -1,0 +1,30 @@
+{
+ "Naskh": {
+  "openness": 0.705,
+  "loop_shape_change_rad": 0.0,
+  "tail_direction_deg": 177.3
+ },
+ "v1": {
+  "openness": 0.101,
+  "loop_shape_change_rad": 0.395,
+  "tail_direction_deg": -149.8
+ },
+ "fixed": {
+  "openness": 0.705,
+  "loop_shape_change_rad": 0.198,
+  "tail_direction_deg": -94.1
+ },
+ "counter_rule": [
+  {
+   "stroke": 0,
+   "loop": [
+    0,
+    74
+   ],
+   "naskh_openness": 0.705,
+   "before": 0.148,
+   "factor": 0.375,
+   "after": 0.705
+  }
+ ]
+}
