@@ -1,8 +1,9 @@
 """
 تشغيل المحرّك:
-    python run.py <pdf سكّال> <صورة الحرف الهدف> <اسم الحرف بالإنجليزية> <مجلد المخرجات>
-مثال:
+    python run.py <pdf سكّال> <صورة الحرف الهدف> <اسم الحرف بالإنجليزية> <مجلد المخرجات> [--transfer]
+مثال (الحرف الهدف فقط):
     python run.py sakkal.pdf modern_jeem.jpg jeem out/
+النقل إلى بقية الحروف لا يحدث إلا بالخيار --transfer.
 """
 import sys, os, json, math, pickle
 import numpy as np
@@ -15,6 +16,7 @@ import geometry as GE
 from glyph import Glyph
 
 PDF, TARGET, LETTER, OUT = sys.argv[1:5]
+TRANSFER = "--transfer" in sys.argv[5:]
 os.makedirs(OUT, exist_ok=True)
 log = lambda *x: print(*x, flush=True)
 
@@ -81,7 +83,7 @@ report = dict(letter=LETTER, target=os.path.basename(TARGET), stage1_general_IoU
               letters={})
 naskh_imgs, modern_imgs, conf_imgs = {}, {}, {}
 identity = E.GPRIOR[:, 0].clone()
-for n in A.NAMES:
+for n in (A.NAMES if TRANSFER else [LETTER]):
     m = E.Model(glyphs[n], wbar=src.wbar)
     if n == LETTER:
         r_n, rep = res, [dict(stroke=k, nearest_target_stroke=k, distance=0.0, alpha=1.0) for k in range(m.n)]
@@ -115,9 +117,9 @@ ax[4].imshow(Image.open(TARGET).convert("RGB")); ax[4].set_title("target")
 for x in ax: x.axis("off")
 fig.savefig(os.path.join(OUT, "1_fit.png"), dpi=110, bbox_inches="tight")
 
-for key, imgs, ttl in (("2_alphabet_modern.png", modern_imgs, "transformed alphabet"),
+for key, imgs, ttl in (() if not TRANSFER else ("2_alphabet_modern.png", modern_imgs, "transformed alphabet"),
                        ("3_alphabet_confidence.png", conf_imgs, "confidence: green = residual transferred (similar stroke) · yellow = partial · grey = general style only"),
-                       ("0_alphabet_naskh.png", naskh_imgs, "Sakkal Naskh input")):
+                       ("0_alphabet_naskh.png", naskh_imgs, "Sakkal Naskh input"))):
     fig, axes = plt.subplots(4, 7, figsize=(17, 9), facecolor="white")
     for x, n in zip(axes.flat[::-1], A.NAMES):
         x.imshow(imgs[n]); x.set_title(f"{n}  {A.ARABIC[n]}" if False else n, fontsize=9); x.axis("off")
