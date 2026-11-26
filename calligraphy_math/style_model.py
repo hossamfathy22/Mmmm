@@ -108,22 +108,45 @@ def refine(mask, c, iters=4, maxlen=140, max_shift=8.0):
     w = ndimage.median_filter(np.minimum(a + b, 2 * np.minimum(a, b) + 4), 5)
     return c, ndimage.gaussian_filter1d(w, 4)
 
-def extract(name):
+def junction_zones(raw, pad=4):
+    """نقاط كل ضربة التي تقع داخل ضربة أخرى (أو داخل جزء بعيد من الضربة نفسها، كالعقدة):
+       |γ_i(u) − γ_j(v)| < (w̃_i + w̃_j)/2 + 2px ,  w̃ = السُمك الوسيط (لا المقاس المتضخم)."""
+    from scipy.spatial.distance import cdist
+    zones = []
+    for i, (ci, wi) in enumerate(raw):
+        z = np.zeros(len(ci), bool)
+        si = np.r_[0, np.cumsum(np.linalg.norm(np.diff(ci, axis=0), axis=1))]
+        for j, (cj, wj) in enumerate(raw):
+            thr = 0.5 * (np.median(wi) + np.median(wj)) + 2
+            D = cdist(ci, cj)
+            if i == j:                                            # الضربة نفسها: نتجاهل الجوار القريب على طول القوس
+                D[np.abs(si[:, None] - si[None]) < 3 * np.median(wi)] = np.inf
+            z |= D.min(1) < thr
+        z = ndimage.binary_dilation(z, iterations=pad)
+        zones.append(z)
+    return zones
+
+def fill_zones(w, z):
+    """استبدال السُمك في مناطق الالتقاء باستيفاء خطي من الجانبين (أو تمديد ثابت عند طرف الضربة)."""
+    if z.all() or not z.any():
+        return w
+    idx = np.arange(len(w))
+    return np.where(z, np.interp(idx, idx[~z], w[~z]), w)
+
+def extract(name, return_zones=False):
     mask = body_mask(IMG[name])
     ys, xs = np.nonzero(mask)
     H = float(ys.max() - ys.min())
     ctr = np.array([(xs.max() + xs.min()) / 2, (ys.max() + ys.min()) / 2])
+    raw = [refine(mask, spline(g, N)) for g in GUIDE[name]]
+    zones = junction_zones(raw)
     strokes = []
-    for g in GUIDE[name]:
-        c, w = refine(mask, spline(g, N))
-        # أطراف الضربة تقع غالباً داخل ضربة أخرى (تقاطع) أو على قَطّ مائل، فيُقاس السُمك أكبر من حقيقته:
-        # نقيّد أول وآخر 12% بقيمة السُمك الداخلية عند حدّها
-        e = int(0.12 * len(w))
-        w[:e] = np.minimum(w[:e], w[e]); w[-e:] = np.minimum(w[-e:], w[-e - 1])
+    for (c, w), z in zip(raw, zones):
+        w = fill_zones(w, z)                                      # إصلاح قياس السُمك عند الالتقاء
         c = (c - ctr) / H
         c[:, 1] *= -1                                             # y للأعلى (رياضياً)
         strokes.append((c, np.maximum(w, 1.0) / H))
-    return mask, strokes
+    return (mask, strokes, zones) if return_zones else (mask, strokes)
 
 # ---------------- نموذج الأسلوب ----------------
 NAMES = ["shear s", "rotation ρ°", "aspect a", "curvature gain c", "swash β°", "swash span f",

@@ -1,0 +1,26 @@
+{
+ "params_mode_A_mean": {
+  "shear s": 0.274,
+  "rotation ρ°": 1.1,
+  "aspect a": 0.421,
+  "curvature gain c": 1.245,
+  "swash β°": -139.181,
+  "swash span f": 0.326,
+  "weight S": 0.084,
+  "contrast γ": 2.692,
+  "pen floor m": 0.539,
+  "pen angle θ°": 57.395
+ },
+ "W_max": 0.2728,
+ "jeem_IoU_before_fixes": 0.721,
+ "jeem_IoU_after_fixes": 0.726,
+ "sad": {
+  "loop_strokes": [
+   0
+  ],
+  "naskh_openness": 1.171,
+  "loop_width_factor": 0.948,
+  "openness_before": 1.171,
+  "openness_after": 1.171
+ }
+}

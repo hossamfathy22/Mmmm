@@ -2,7 +2,7 @@
 إصلاح معادلات الحل A (الذي اختاره المستخدم) دون تغيير معاملات الأسلوب المتعلَّمة من الجيم.
 
 الإصلاحات (كلها قواعد عامة، تُطبَّق على كل الحروف بما فيها الجيم):
- E1  أطراف الضربات عند التقاطع: يُقيَّد السُمك في أول/آخر 12% بقيمته الداخلية   (في style_model.extract)
+ E1  مناطق التقاء الضربات تُستبعد من قياس السُمك وتُملأ بالاستيفاء من الجانبين   (في style_model.extract)
  E2  سقف ناعم للسُمك متعلَّم من الجيم:   w ← W_max · tanh(w / W_max) ,  W_max = أقصى سُمك في الجيم المطابقة
  E3  حفظ الفراغ الداخلي (counter) للعُقَد المغلقة:
          أكبر f ∈ [0.35, 1] بحيث  r_hole/r_loop (f·w_loop)  ≥  κ · (النسبة نفسها في النسخ) ,  κ = 1
@@ -17,13 +17,15 @@ from PIL import Image, ImageDraw, ImageFilter
 from scipy import ndimage
 
 UP = sys.argv[1]; OUT = sys.argv[2] if len(sys.argv) > 2 else "results_refined"
+FITS = sys.argv[3] if len(sys.argv) > 3 else "results/style_fits.json"
 sys.argv = [sys.argv[0], UP]
 import style_model as SM
 
+USE_CAP = False                   # E2 كان ترقيعاً لكتلة سببها خطأ القياس؛ بعد إصلاح القياس يضرّ الجيم (0.72→0.67)
 KAPPA = 1.0                      # قاعدة تصميم: العقدة تبقى مفتوحة كما في النسخ
 
 def mode_A():
-    fits = json.load(open("results/style_fits.json"))["fits"]
+    fits = json.load(open(FITS))["fits"]
     A = [f for f in fits if abs(f["params"]["rotation ρ°"]) < 10]
     return np.mean([list(f["params"].values()) for f in A], axis=0), A
 
@@ -100,7 +102,8 @@ def keep_junctions(strokes, st, p, thr=0.06):
 def refine(strokes, p, wmax, naskh_mask=None):
     st = SM.apply_style(strokes, p)
     st = keep_junctions(strokes, st, p)                              # E5
-    st = soft_cap(st, wmax)                                         # E2
+    if USE_CAP:
+        st = soft_cap(st, wmax)                                     # E2 (أُلغي بعد إصلاح E1 من جذره)
     st = smooth(st)                                                 # E4
     loops = closed_strokes(strokes)
     info = {}
@@ -163,8 +166,8 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(1, 3, figsize=(17, 4.8), facecolor="white")
     ax[0].imshow(Image.open(SM.IMG["sad_naskh"]).convert("RGB").crop((0, 250, 736, 850))); ax[0].set_title("input: Naskh sad")
-    ax[1].imshow(1 - render(stS_raw), cmap="gray", vmin=0, vmax=1); ax[1].set_title("mode A before fixes (the one you circled)")
-    ax[2].imshow(1 - render(stS_fix), cmap="gray", vmin=0, vmax=1); ax[2].set_title("mode A after equation fixes E1–E5")
+    ax[1].imshow(1 - render(stS_raw), cmap="gray", vmin=0, vmax=1); ax[1].set_title("style before fixes")
+    ax[2].imshow(1 - render(stS_fix), cmap="gray", vmin=0, vmax=1); ax[2].set_title("after fixes E3–E5")
     for a in ax: a.axis("off")
     fig.savefig(f"{OUT}/sad_before_after.png", dpi=120, bbox_inches="tight")
 
