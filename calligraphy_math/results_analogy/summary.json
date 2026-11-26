@@ -1,0 +1,180 @@
+{
+ "hand": {
+  "rotation_deg": -5.3,
+  "shear": -0.136,
+  "width_scale": 1.304,
+  "height_scale": 0.655,
+  "width_to_height": 1.99
+ },
+ "pen_law_R2_on_jeem": 0.951,
+ "pen_params": {
+  "log S": -2.524,
+  "γ": 0.606,
+  "θ(rad)": 1.738,
+  "log m": -1.062,
+  "a1": 0.702,
+  "b1": -0.109,
+  "a2": -0.087,
+  "b2": 0.326
+ },
+ "dot_ratio": 0.608,
+ "T1_tool_consistency": {
+  "theta_from_head_deg": 101.1,
+  "theta_from_bowl_deg": 162.2,
+  "delta_theta_deg": 61.1,
+  "R2_head_to_bowl": 0.1,
+  "R2_bowl_to_head": -1.822,
+  "R2_self_head": 0.978,
+  "R2_self_bowl": 0.798,
+  "PASS": false
+ },
+ "evaluation": {
+  "jeem (training, capacity)": {
+   "IoU": 0.849,
+   "edge_err_pct": 0.85
+  },
+  "user_jeem (unseen source)": {
+   "IoU": 0.64,
+   "edge_err_pct": 2.87
+  },
+  "baseline: user Naskh jeem as-is": {
+   "IoU": 0.357,
+   "edge_err_pct": 8.17
+  }
+ },
+ "T2_unseen_source_PASS": false,
+ "element_analogies": [
+  {
+   "letter": "ha",
+   "element": "head",
+   "nearest_jeem_element": "head",
+   "distance_rad": 0.087,
+   "alpha": 0.941,
+   "all_distances": {
+    "head": 0.087,
+    "neck": 1.986,
+    "bowl": 1.024
+   }
+  },
+  {
+   "letter": "ha",
+   "element": "neck",
+   "nearest_jeem_element": "neck",
+   "distance_rad": 0.432,
+   "alpha": 0.225,
+   "all_distances": {
+    "head": 2.103,
+    "neck": 0.432,
+    "bowl": 1.306
+   }
+  },
+  {
+   "letter": "ha",
+   "element": "bowl",
+   "nearest_jeem_element": "bowl",
+   "distance_rad": 0.118,
+   "alpha": 0.895,
+   "all_distances": {
+    "head": 1.05,
+    "neck": 1.093,
+    "bowl": 0.118
+   }
+  },
+  {
+   "letter": "nun",
+   "element": "stem",
+   "nearest_jeem_element": "bowl",
+   "distance_rad": 0.93,
+   "alpha": 0.001,
+   "all_distances": {
+    "head": 1.393,
+    "neck": 0.983,
+    "bowl": 0.93
+   }
+  },
+  {
+   "letter": "nun",
+   "element": "nun-bowl",
+   "nearest_jeem_element": "neck",
+   "distance_rad": 1.039,
+   "alpha": 0.0,
+   "all_distances": {
+    "head": 1.528,
+    "neck": 1.039,
+    "bowl": 1.41
+   }
+  },
+  {
+   "letter": "sad",
+   "element": "loop",
+   "nearest_jeem_element": "head",
+   "distance_rad": 1.085,
+   "alpha": 0.0,
+   "all_distances": {
+    "head": 1.085,
+    "neck": 1.135,
+    "bowl": 1.462
+   }
+  },
+  {
+   "letter": "sad",
+   "element": "stem",
+   "nearest_jeem_element": "neck",
+   "distance_rad": 0.838,
+   "alpha": 0.004,
+   "all_distances": {
+    "head": 1.443,
+    "neck": 0.838,
+    "bowl": 1.074
+   }
+  },
+  {
+   "letter": "sad",
+   "element": "nun-bowl",
+   "nearest_jeem_element": "neck",
+   "distance_rad": 1.038,
+   "alpha": 0.0,
+   "all_distances": {
+    "head": 1.529,
+    "neck": 1.038,
+    "bowl": 1.403
+   }
+  },
+  {
+   "letter": "user_jeem",
+   "element": "head",
+   "nearest_jeem_element": "head",
+   "distance_rad": 0.256,
+   "alpha": 0.591,
+   "all_distances": {
+    "head": 0.256,
+    "neck": 1.893,
+    "bowl": 1.043
+   }
+  },
+  {
+   "letter": "user_jeem",
+   "element": "neck",
+   "nearest_jeem_element": "neck",
+   "distance_rad": 0.546,
+   "alpha": 0.092,
+   "all_distances": {
+    "head": 2.157,
+    "neck": 0.546,
+    "bowl": 1.41
+   }
+  },
+  {
+   "letter": "user_jeem",
+   "element": "bowl",
+   "nearest_jeem_element": "bowl",
+   "distance_rad": 0.176,
+   "alpha": 0.781,
+   "all_distances": {
+    "head": 1.075,
+    "neck": 1.073,
+    "bowl": 0.176
+   }
+  }
+ ]
+}
