@@ -127,4 +127,13 @@ for key, imgs, ttl in (SHEETS if TRANSFER else ()):
     fig.suptitle(ttl, fontsize=11)
     fig.savefig(os.path.join(OUT, key), dpi=90, bbox_inches="tight")
 json.dump(report, open(os.path.join(OUT, "report.json"), "w"), ensure_ascii=False, indent=1)
+torch.save(dict(letter=LETTER, g=g, residual=res, align_stage1=al1, align_stage2=al2), os.path.join(OUT, "params.pt"))
+# صورة كبيرة للنتيجة بجانب الهدف
+with torch.no_grad():
+    st = model.generate(g, res)
+    P = torch.cat([c for c, _ in st]).numpy(); ctr = (P.min(0) + P.max(0)) / 2
+    span = P.max(0) - P.min(0) + 0.3
+    W_, H_ = 700, int(700 * span[1] / span[0])
+    big = E.implicit_image(st, (W_ - 80) / span[0], ctr, W_, H_, ss=2)
+Image.fromarray((255 * (1 - big)).astype(np.uint8)).save(os.path.join(OUT, "result_large.png"))
 log("done", json.dumps({k: report[k] for k in ("stage1_general_IoU", "stage2_with_residual_IoU", "stage1_edge_err_pct", "stage2_edge_err_pct", "PASS")}))
