@@ -1,0 +1,43 @@
+{
+ "model_IoU": 0.7314350797266514,
+ "ceiling_IoU": 0.9292687419414257,
+ "model_skeleton_plus_target_widths_IoU": 0.64715971103373,
+ "target_skeleton_plus_model_widths_IoU": 0.7393303064699206,
+ "error_share_by_part_pct": {
+  "hairline": 31.8,
+  "head": 27.9,
+  "left curve": 23.4,
+  "hook": 9.3,
+  "tail swash": 7.5
+ },
+ "error_by_part_px": {
+  "head": {
+   "missed": 228,
+   "extra": 1088
+  },
+  "hairline": {
+   "missed": 1027,
+   "extra": 474
+  },
+  "hook": {
+   "missed": 257,
+   "extra": 182
+  },
+  "left curve": {
+   "missed": 996,
+   "extra": 108
+  },
+  "tail swash": {
+   "missed": 158,
+   "extra": 198
+  }
+ },
+ "mean_skeleton_offset_pct_H": [
+  17.57,
+  10.19
+ ],
+ "mean_abs_width_error_pct_H": [
+  7.33,
+  1.25
+ ]
+}
