@@ -446,11 +446,6 @@ if __name__ == "__main__":
     json.dump(summary, open(f"{OUT}/summary.json", "w"), ensure_ascii=False, indent=1)
     print(json.dumps(summary, ensure_ascii=False, indent=1))
 
-    import pickle
-    pickle.dump(dict(res={k: {kk: vv for kk, vv in v.items() if kk != "eval"} for k, v in res.items()},
-                     glyphs=dict(jeem=jeem, user_jeem=user_jeem, modern=modern, **glyphs)),
-                open(f"{OUT}/state.pkl", "wb"))
-
     # ---------------- الأشكال ----------------
     import matplotlib
     matplotlib.use("Agg")
