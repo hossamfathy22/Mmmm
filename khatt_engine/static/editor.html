@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>محرك خط · المحرر</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@500;700&family=Vazirmatn:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: the logo is read once at the top; below, the word on a board beside the handles that shape it. */
+:root{
+  --bg:#eef1f4;--surface:#fff;--line:#d5dce4;--fg:#16202c;--muted:#5b6878;--accent:#0b8a96;--chip:#e3e9ef;--board:#fff;
+  --ok:#23895f;--warn:#b7791f;--bad:#cf3f53;--ink:#1e2d5a;
+  --f-display:"Readex Pro","Vazirmatn",system-ui,sans-serif;--f-body:"Vazirmatn",Tahoma,system-ui,sans-serif;--f-data:"IBM Plex Mono",ui-monospace,monospace;--r:10px}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141a;--surface:#171e26;--line:#2a3440;--fg:#e4eaf0;--muted:#97a3b1;--accent:#3cc3cf;--chip:#222c37;--board:#f4f6f8;--ok:#4cc48f;--warn:#e2a64a;--bad:#ff7084;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.7}
+.wrap{max-width:1320px;margin:0 auto;padding:24px 16px 64px;display:flex;flex-direction:column;gap:16px}
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+h1{font-family:var(--f-display);font-size:clamp(24px,3.4vw,32px);margin:0}
+h1 b{color:var(--accent)}
+.lede{margin:0;color:var(--muted);flex:1 1 320px}
+a{color:var(--accent)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+h2{font-family:var(--f-display);font-size:17px;margin:0 0 8px}
+.read{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:12px 16px;align-items:end}
+@media (max-width:820px){.read{grid-template-columns:1fr}}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:12px;display:flex;gap:14px;align-items:center;cursor:pointer;min-height:84px}
+.drop.over{border-color:var(--accent)}
+.drop img{max-height:60px;max-width:180px;border-radius:4px;background:#fff}
+.drop span{color:var(--muted)}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input[type=text]{font:inherit;font-size:19px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+.btn{font:inherit;font-weight:700;border:0;border-radius:8px;padding:10px 20px;cursor:pointer;background:var(--accent);color:#fff;white-space:nowrap}
+.btn.ghost{background:var(--chip);color:var(--fg);padding:6px 12px;font-size:13px;font-weight:500}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.err{color:var(--bad);font-weight:700;margin:0}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:980px){.facts{grid-template-columns:1fr}}
+.pill{display:inline-block;font-size:12.5px;padding:1px 10px;border-radius:999px;font-weight:700}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+ul.notes{margin:6px 0 0;padding-inline-start:20px;display:grid;gap:3px;font-size:14px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td{padding:3px 0;border-bottom:1px solid var(--line)}
+td.n{font-family:var(--f-data);font-variant-numeric:tabular-nums;direction:ltr;text-align:left}
+.overlay{display:block;width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{border:1px solid var(--line);border-radius:8px;padding:2px 9px;font-size:13.5px;display:flex;gap:6px;align-items:baseline}
+.chip b{font-size:18px}
+.work{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr);gap:16px;align-items:start}
+@media (max-width:980px){.work{grid-template-columns:1fr}}
+.board{background:var(--board);border:1px solid var(--line);border-radius:8px;min-height:240px;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}
+.board svg{display:block;max-width:100%;height:auto;max-height:46vh}
+.board svg g{fill:#16202c}
+.bar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-top:10px}
+.bar .grow{flex:1}
+.crit{margin:10px 0 0;font-size:14px}
+.crit li{color:var(--warn)}
+.sticky{position:sticky;top:12px;z-index:2}
+@media (max-width:980px){.sticky{position:static}}
+.handles{max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:980px){.handles{max-height:none}}
+.group{border-top:1px solid var(--line);padding:8px 0}
+.group>summary{cursor:pointer;font-weight:700;list-style:none;display:flex;gap:8px;align-items:baseline}
+.group>summary::-webkit-details-marker{display:none}
+.group>summary::before{content:"▸";color:var(--muted);font-size:12px}
+.group[open]>summary::before{content:"▾"}
+.group small{color:var(--muted);font-weight:400}
+.h{padding:8px 0 4px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px}
+.h .rule{font-size:13.5px}
+.h .val{font-family:var(--f-data);font-size:13px;direction:ltr;text-align:left;white-space:nowrap}
+.h .val.moved{color:var(--accent);font-weight:700}
+.h input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent);direction:ltr}
+.h .meta{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--muted)}
+.src{border:1px solid var(--line);border-radius:999px;padding:0 8px}
+.scope{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.scope button{font:inherit;font-size:12.5px;border:0;background:transparent;color:var(--muted);padding:0 9px;cursor:pointer}
+.scope button.on{background:var(--accent);color:#fff}
+.link{background:none;border:0;color:var(--accent);font:inherit;font-size:12.5px;cursor:pointer;padding:0}
+select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 8px}
+.var{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:4px 0}
+.var b{font-size:20px}
+.muted{color:var(--muted)}
+.hidden{display:none !important}
+/* the parts kit: one card per part; the drawing board opens under the cards */
+.kit-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.kit-head p{margin:0;color:var(--muted);font-size:13.5px;flex:1 1 320px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin-top:10px}
+.card{border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;cursor:pointer;background:var(--surface)}
+.card.on{outline:2px solid var(--accent)}
+.card .pv{background:var(--board);border-radius:6px;height:92px;display:flex;align-items:center;justify-content:center}
+.card .pv svg{max-height:84px;max-width:100%}
+.pv svg .rest,.cand svg .rest{fill:#c3ccd6}
+.pv svg .part,.cand svg .part{fill:#16202c}
+.card b{font-size:13.5px}
+.badge{font-size:12px;border-radius:999px;padding:0 8px;align-self:flex-start;font-weight:700}
+.badge.logo{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.badge.designer,.badge.reference{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.badge.engine{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.uses{font-size:12.5px;color:var(--muted);line-height:1.5}
+.studio{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:14px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+@media (max-width:980px){.studio{grid-template-columns:1fr}}
+.canvas{background:var(--board);border:1px solid var(--line);border-radius:8px;touch-action:none;user-select:none}
+.canvas svg{display:block;width:100%;height:auto;max-height:58vh}
+.canvas .guide{stroke:#9fb0c2;stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:4 4}
+.canvas .guide-t{fill:#7b8a9c;font-family:var(--f-body)}
+.canvas .rest{fill:#d4dbe3}
+.canvas .ghost{fill:none;stroke:#7b8a9c;stroke-width:1.2;vector-effect:non-scaling-stroke;stroke-dasharray:3 3}
+.canvas .drawn{fill:#16202c}
+.canvas .spine{fill:none;stroke:var(--accent);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.canvas .pt{fill:#fff;stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke;cursor:grab}
+.canvas .pt.first{fill:var(--accent)}
+.tools{display:flex;flex-direction:column;gap:10px}
+.tools .row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:13.5px}
+.tools input[type=range]{flex:1;accent-color:var(--accent);direction:ltr}
+.cands{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cand{border:1px solid var(--line);border-radius:6px;background:var(--board);padding:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:#5b6878}
+.cand svg{height:52px;max-width:100%}
+.cand:hover{outline:2px solid var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>محرك <b>خط</b> · المحرر</h1>
+    <p class="lede">يقرأ الشعار مرة واحدة، ثم ترسم به أي كلمة وتحرّك المقابض حتى ترضى. كل تعديل يُحفظ ليتعلم منه المحرك. <a href="/report">التقرير الكامل للمراحل</a></p>
+  </header>
+
+  <form class="panel read" id="readForm">
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/*" hidden>
+      <img id="thumb" alt="" class="hidden">
+      <span id="dropText">اسحب صورة الشعار إلى هنا أو اضغط لاختيارها</span>
+    </label>
+    <label class="f">الكلمة المكتوبة في الشعار (اختياري، تجعل القراءة والفحص أدق)
+      <input type="text" id="logoText" placeholder="مثال: سیرنگ" autocomplete="off">
+    </label>
+    <button class="btn" id="readBtn" disabled>اقرأ الشعار</button>
+    <p class="err hidden" id="readErr" style="grid-column:1/-1"></p>
+  </form>
+
+  <section class="facts hidden" id="facts">
+    <div class="panel"><h2>فحص الصورة</h2><div id="health"></div></div>
+    <div class="panel"><h2>ما قيس من الشعار</h2><table id="measures"></table></div>
+    <div class="panel"><h2>الفحص الذاتي</h2><div id="selfcheck"></div></div>
+  </section>
+
+  <section class="work hidden" id="work">
+    <div class="panel sticky">
+      <label class="f">الكلمة المطلوب رسمها
+        <input type="text" id="word" value="" placeholder="اكتب كلمة عربية" autocomplete="off">
+      </label>
+      <div class="board" id="board" aria-live="polite"></div>
+      <ul class="crit" id="critic"></ul>
+      <div class="bar">
+        <button class="btn" id="saveBtn" disabled>احفظ التعديلات</button>
+        <button class="btn ghost" id="resetBtn">أعد كل شيء إلى القواعد</button>
+        <button class="btn ghost" id="svgBtn">نزّل SVG</button>
+        <span class="grow"></span>
+        <span class="muted" id="status"></span>
+      </div>
+    </div>
+    <aside class="panel handles">
+      <h2>المقابض</h2>
+      <p class="muted" style="margin:0 0 6px;font-size:13.5px">كل مقبض قاعدة مشتقة من قياسات الشعار. حرّكه، وإن أردت التعديل لكل الشعارات اختر «دائمًا».</p>
+      <div id="variants"></div>
+      <div id="handles"></div>
+      <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13.5px"><input type="checkbox" id="showAll"> أظهر مقابض الحروف التي ليست في الكلمة</label>
+    </aside>
+  </section>
+
+  <section class="panel hidden" id="kitPanel">
+    <div class="kit-head">
+      <h2>طقم القطع</h2>
+      <span class="pill ok" id="kitCount"></span>
+      <p>كل حرف عربي يُبنى من هذه القطع. ما قُصّ من الشعار جاهز؛ وما ينقص يبنيه المحرك بقياسات الشعار حتى تكمله أنت: اختر اقتراحًا من الخطوط أو ارسمه بخط يُرسم بقلم الشعار. كل قطعة تكملها تدخل في كل حرف يحتاجها.</p>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div class="studio hidden" id="studio">
+      <div>
+        <div class="canvas" id="canvas"></div>
+        <p class="muted" style="margin:6px 0 0;font-size:13px">اضغط لتضع نقطة على الخط المركزي، واسحب النقاط لتعدّلها، وانقر نقطة مرتين لحذفها. الرمادي بقية الحرف، والمتقطّع قطعة المحرك. القلم قلم الشعار: يسمك في العمودي ويرقّ في الأفقي.</p>
+      </div>
+      <div class="tools">
+        <div class="row"><b id="studioName"></b><span class="badge" id="studioSrc"></span></div>
+        <div class="row">
+          <button class="btn ghost" id="fromLogo" type="button">ابدأ من خط القطعة الحالية</button>
+          <button class="btn ghost" id="undoPt" type="button">تراجع عن نقطة</button>
+          <button class="btn ghost" id="clearPts" type="button">امسح</button>
+        </div>
+        <div class="row"><label><input type="checkbox" id="closedRing"> حلقة مغلقة</label>
+          <label><input type="checkbox" id="snap" checked> التصاق بخطوط الشبكة</label></div>
+        <div class="row">الأطراف
+          <select id="ends"><option value="round">مستديرة</option><option value="flat">مقطوعة</option><option value="diamond">معيّن</option></select></div>
+        <div class="row">السمك <input type="range" id="thick" min="0.4" max="1.8" step="0.02" value="1"><span class="val" id="thickVal">1.00</span></div>
+        <div class="row">
+          <button class="btn" id="useDrawn" type="button">استعمل ما رسمته</button>
+          <button class="btn ghost" id="toEngine" type="button">أعدها إلى المحرك</button>
+          <button class="btn ghost" id="toLogo" type="button">أعدها كما في الشعار</button>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom:6px"><b>اقتراحات من الخطوط</b><span class="muted" style="font-size:12.5px">مرسومة بقلم الشعار</span></div>
+          <div class="cands" id="cands"><span class="muted" style="font-size:13px">…</span></div>
+        </div>
+        <p class="muted" id="studioMsg" style="margin:0;font-size:13px"></p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = v => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+let logo = null;            // what /api/read returned
+let fileName = '';
+let params = {}, variants = {}, scopes = {};
+let kitParts = {};          // the designer's parts: name -> part (drawn or chosen), or null for the engine's
+let lastSvg = '';
+let seq = 0, timer = null;
+
+// ---- reading the logo
+const drop = $('drop'), file = $('file');
+function picked(f){
+  if(!f) return;
+  fileName = f.name;
+  $('thumb').src = URL.createObjectURL(f); $('thumb').classList.remove('hidden');
+  $('dropText').textContent = f.name; $('readBtn').disabled = false;
+}
+file.addEventListener('change', () => picked(file.files[0]));
+['dragover','dragenter'].forEach(e => drop.addEventListener(e, ev => {ev.preventDefault(); drop.classList.add('over');}));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, ev => {ev.preventDefault(); drop.classList.remove('over');}));
+drop.addEventListener('drop', ev => {const f = ev.dataTransfer.files[0]; if(f){const dt = new DataTransfer(); dt.items.add(f); file.files = dt.files; picked(f);}});
+
+$('readForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if(!file.files[0]) return;
+  $('readErr').classList.add('hidden'); $('readBtn').disabled = true; $('readBtn').textContent = 'يقرأ…';
+  const fd = new FormData(); fd.append('image', file.files[0]); fd.append('text', $('logoText').value);
+  try{
+    const r = await fetch('/api/read', {method:'POST', body: fd});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || 'تعذّرت قراءة الشعار.');
+    logo = j; params = {}; variants = {}; scopes = {}; kitParts = {}; current = null;
+    showFacts();
+    if(!$('word').value) $('word').value = logo.read_sure ? logo.read : 'بيدوناق';
+    $('work').classList.remove('hidden');
+    redraw(true);
+    loadKit();
+  }catch(e){ $('readErr').textContent = e.message; $('readErr').classList.remove('hidden'); }
+  $('readBtn').disabled = false; $('readBtn').textContent = 'اقرأ الشعار';
+});
+
+function showFacts(){
+  const h = logo.health, c = Math.round(h.confidence * 100);
+  const cls = c >= 80 ? 'ok' : c >= 55 ? 'warn' : 'bad';
+  let html = `<span class="pill ${cls}">الثقة في القراءة ${c}%</span>`;
+  const notes = h.corrections.map(n => 'صُحّح: ' + n.text).concat(h.warnings.map(n => 'تنبيه: ' + n.text));
+  html += notes.length ? '<ul class="notes">' + notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>'
+                       : '<p class="muted" style="margin:6px 0 0">الصورة نظيفة: لا تصحيح ولا تنبيه.</p>';
+  const how = {given: 'كما كتبتها', stems: 'من الجذوع', drawn: `بالرسم، تغطية ${Math.round((logo.read_match || 0) * 100)}%`}[logo.read_how] || '';
+  if(logo.read) html += `<p style="margin:8px 0 0">قرأ المحرك: <b>${esc(logo.read)}</b> <span class="muted">(${how})</span></p>`;
+  if(!logo.read_sure) html += `<p class="err" style="margin:8px 0 0">لم يقرأ المحرك كلمة الشعار قراءة مؤكدة، فلم يأخذ منه حروفه ولا قطعه، والكلمات بحروف المحرك. اكتب كلمة الشعار في الخانة أعلاه ثم اقرأه من جديد.</p>`;
+  $('health').innerHTML = html;
+  $('measures').innerHTML = Object.entries(logo.measures).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${fmt(v)}</td></tr>`).join('');
+  const s = logo.self_check;
+  if(!s){ $('selfcheck').innerHTML = '<p class="muted" style="margin:0">لم يُجرَ: اكتب الكلمة المكتوبة في الشعار ليعيد المحرك كتابتها ويطابقها عليه.</p>'; }
+  else{
+    const o = Math.round(s.overall * 100), oc = s.overall >= .75 ? 'ok' : s.overall >= .55 ? 'warn' : 'bad';
+    $('selfcheck').innerHTML = `<img class="overlay" alt="كلمة الشعار كما أعاد المحرك كتابتها فوق الشعار" src="data:image/png;base64,${logo.self_check_png}">
+      <p style="margin:6px 0 0"><span class="pill ${oc}">التطابق ${o}%</span> <span class="muted">الأزرق الشعار وحده، الأحمر المحرك وحده</span></p>
+      <div class="chips">${s.letters.map(x => `<span class="chip"><b>${esc(x.letter)}</b>${Math.round(x.match*100)}%</span>`).join('')}</div>
+      ${s.overall_after ? `<p style="margin:8px 0 0">بعد أخذ ما يرسمه الشعار بطريقته منه: <span class="pill ${s.overall_after >= .75 ? 'ok' : 'warn'}">${Math.round(s.overall_after * 100)}%</span></p>
+        <img class="overlay" style="margin-top:6px" alt="كلمة الشعار بعد أخذ الحروف المختلفة منه" src="data:image/png;base64,${s.overlay_after_png}">` : ''}
+      ${s.notes.length ? '<ul class="notes">' + s.notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul>' : ''}`;
+  }
+  $('facts').classList.remove('hidden');
+}
+
+// ---- drawing
+function schedule(check){ clearTimeout(timer); timer = setTimeout(() => redraw(check), check ? 0 : 50); }
+async function redraw(check){
+  if(!logo) return;
+  const word = $('word').value.trim();
+  if(!word){ $('board').innerHTML = '<span class="muted">اكتب كلمة</span>'; return; }
+  const mine = ++seq;
+  try{
+    const r = await fetch('/api/draw', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, word, params, variants, check, parts: kitParts})});
+    const j = await r.json();
+    if(mine !== seq) return;                       // a newer drawing is on its way
+    if(!r.ok) throw new Error(j.detail || 'تعذّر الرسم.');
+    lastSvg = j.svg; $('board').innerHTML = j.svg;
+    if(check){
+      $('critic').innerHTML = (j.critic || []).map(t => `<li>${esc(t)}</li>`).join('')
+        + ((j.engine_only || []).length ? `<li>بناها المحرك وحده، فالشعار لا يعطيها حرفًا ولا قطعة: <b>${esc(j.engine_only.join(' '))}</b>. ارسم قطعها في طقم القطع إن أردتها من يدك.</li>` : '');
+      buildControls(j);
+    }
+    const n = Object.keys(params).length + Object.keys(variants).length + Object.keys(kitParts).length;
+    $('saveBtn').disabled = n === 0;
+    $('status').textContent = n ? `${n} تعديل غير محفوظ` : '';
+  }catch(e){ if(mine === seq) $('board').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+$('word').addEventListener('input', () => schedule(true));
+
+function buildControls(j){
+  const showAll = $('showAll').checked;
+  $('variants').innerHTML = j.choices.map(c => {
+    const key = `${c.letter}.${c.form}`;
+    return `<div class="var"><b>${esc(c.letter)}</b><span class="muted">${esc(c.form_ar)}</span>
+      <select data-key="${key}">${c.options.map(o => `<option value="${esc(o.name)}" title="${esc(o.note)}" ${o.name === c.chosen ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>
+      ${variants[key] ? scopeHtml(key) + `<button class="link" data-unvar="${key}">أعد</button>` : ''}</div>`;
+  }).join('');
+  const groups = {};
+  j.handles.forEach(h => { if(showAll || h.used || params[h.name] !== undefined) (groups[h.shape] = groups[h.shape] || []).push(h); });
+  const open = new Set([...document.querySelectorAll('#handles details[open]')].map(d => d.dataset.shape));
+  const first = !document.querySelector('#handles details');
+  $('handles').innerHTML = Object.entries(groups).map(([shape, hs]) => {
+    const moved = hs.filter(h => params[h.name] !== undefined).length;
+    return `<details class="group" data-shape="${esc(shape)}" ${(open.has(shape) || (first && hs.some(h => h.used)) || moved) ? 'open' : ''}>
+      <summary>${esc(shape)} <small>${hs.length} مقبض${moved ? ' · ' + moved + ' معدَّل' : ''}</small></summary>
+      ${hs.map(handleHtml).join('')}</details>`;
+  }).join('') || '<p class="muted">لا مقابض لحروف هذه الكلمة.</p>';
+}
+function scopeHtml(key){
+  const s = scopes[key] || 'logo';
+  return `<span class="scope" data-scope="${key}"><button type="button" class="${s === 'logo' ? 'on' : ''}" data-v="logo">لهذا الشعار</button><button type="button" class="${s === 'always' ? 'on' : ''}" data-v="always">دائمًا</button></span>`;
+}
+function handleHtml(h){
+  const moved = params[h.name] !== undefined;
+  const step = (h.range[1] - h.range[0]) / 200 || 0.01;
+  return `<div class="h" data-name="${h.name}">
+    <span class="rule">${esc(h.rule)}</span><span class="val ${moved ? 'moved' : ''}">${fmt(h.value)}</span>
+    <input type="range" min="${h.range[0]}" max="${h.range[1]}" step="${step}" value="${h.value}" aria-label="${esc(h.rule)}">
+    <span class="meta"><span class="src">${esc(h.source)}</span>
+      ${moved ? `القاعدة ${fmt(h.rule_value)} ${scopeHtml(h.name)} <button class="link" data-reset="${h.name}">أعد</button>` : ''}</span></div>`;
+}
+$('handles').addEventListener('input', ev => {
+  if(ev.target.type !== 'range') return;
+  const box = ev.target.closest('.h'); const name = box.dataset.name;
+  params[name] = parseFloat(ev.target.value);
+  const v = box.querySelector('.val'); v.textContent = fmt(params[name]); v.classList.add('moved');
+  schedule(false);
+});
+$('handles').addEventListener('change', ev => { if(ev.target.type === 'range') schedule(true); });
+document.addEventListener('click', ev => {
+  const t = ev.target;
+  if(t.dataset.reset){ delete params[t.dataset.reset]; delete scopes[t.dataset.reset]; schedule(true); }
+  else if(t.dataset.unvar){ delete variants[t.dataset.unvar]; delete scopes[t.dataset.unvar]; schedule(true); }
+  else if(t.dataset.v && t.parentElement.dataset.scope){
+    scopes[t.parentElement.dataset.scope] = t.dataset.v;
+    t.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === t));
+  }
+});
+$('variants').addEventListener('change', ev => { if(ev.target.tagName === 'SELECT'){ variants[ev.target.dataset.key] = ev.target.value; schedule(true); } });
+$('showAll').addEventListener('change', () => schedule(true));
+$('resetBtn').addEventListener('click', () => { params = {}; variants = {}; scopes = {}; kitParts = {}; schedule(true); loadKit(); });
+
+
+// ---- the parts kit
+let kit = null, current = null;                 // the kit as /api/kit returned it; the part on the board
+let pts = [], drawnOutline = null, strokeSeq = 0;
+const SRC = {logo: 'من الشعار', designer: 'رسمها المصمم', reference: 'من خط مرجعي', engine: 'ناقصة: بناء المحرك'};
+async function loadKit(){
+  if(!logo) return;
+  try{
+    const r = await fetch('/api/kit', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, params, variants, parts: kitParts})});
+    const j = await r.json(); if(!r.ok) throw new Error(j.detail || 'تعذّر الطقم.');
+    kit = j; renderKit();
+    if(current) openStudio(current, true);
+  }catch(e){ $('cards').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+function srcText(p){
+  if(p.source === 'logo') return `${SRC.logo} «${(p.from || '').split('.')[0]}»`;
+  return SRC[p.source] || p.source;
+}
+function renderKit(){
+  $('kitPanel').classList.remove('hidden');
+  $('kitCount').textContent = `${kit.complete} من ${kit.total} مكتملة`
+    + ((kit.basics || []).length ? ` · قطع الأساس من الشعار: ${kit.basics.map(b => b.label).join('، ')}` : '');
+  $('cards').innerHTML = kit.parts.map(p => `<div class="card ${current === p.name ? 'on' : ''}" data-part="${esc(p.name)}" tabindex="0" role="button" aria-label="${esc(p.label)}">
+      <div class="pv">${p.preview}</div><b>${esc(p.label)}</b>
+      <span class="badge ${p.source}">${esc(srcText(p))}</span>
+      <span class="uses">${p.letters.length} صيغة: ${esc([...new Set(p.letters.map(k => k.split('.')[0]))].join(' '))}</span></div>`).join('');
+}
+$('cards').addEventListener('click', ev => { const c = ev.target.closest('.card'); if(c) openStudio(c.dataset.part); });
+$('cards').addEventListener('keydown', ev => { const c = ev.target.closest('.card'); if(c && (ev.key === 'Enter' || ev.key === ' ')){ ev.preventDefault(); openStudio(c.dataset.part); } });
+
+function part(name){ return kit.parts.find(p => p.name === name); }
+function openStudio(name, keep){
+  const p = part(name); if(!p) return;
+  const fresh = current !== name || !keep;
+  current = name; renderKit();
+  $('studio').classList.remove('hidden');
+  $('studioName').textContent = p.label;
+  $('studioSrc').className = 'badge ' + p.source; $('studioSrc').textContent = srcText(p);
+  if(fresh){
+    pts = []; drawnOutline = null;
+    $('closedRing').checked = p.board.closed; $('thick').value = p.board.thickness; $('thickVal').textContent = (+p.board.thickness).toFixed(2);
+    $('ends').value = p.board.ends || 'round';
+    if(p.source === 'designer') pts = p.board.line.map(q => q.slice());
+    $('studioMsg').textContent = p.source === 'engine' ? 'الشعار لا يحوي هذه القطعة: ارسمها أو اختر اقتراحًا.' : '';
+    loadCands(name);
+  }
+  drawBoard();
+}
+
+// the board: the letter's frame, y up, in the logo's units
+let view = null;
+function drawBoard(){
+  const p = part(current); if(!p) return;
+  const b = p.board, [x0, y0, x1, y1] = b.box, pad = 14;
+  view = {x: x0 - pad, y: -(y1 + pad), w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad};
+  const path = rings => rings.map(r => 'M' + r.map(([x, y]) => `${x.toFixed(1)},${(-y).toFixed(1)}`).join('L') + 'Z').join('');
+  const lines = Object.entries({ascender: 'الطالع', x_height: 'ارتفاع الحروف', baseline: 'السطر', descender: 'النازل'})
+    .map(([k, t]) => `<line class="guide" x1="${view.x}" x2="${view.x + view.w}" y1="${-b.lines[k]}" y2="${-b.lines[k]}"/>
+      <text class="guide-t" x="${view.x + view.w - 4}" y="${-b.lines[k] - 3}" text-anchor="start" font-size="${(view.h / 70).toFixed(1)}">${t}</text>`).join('');
+  const shown = drawnOutline || b.part;          // what is drawn now, else the part in use
+  const spine = pts.length ? `<path class="spine" d="M${pts.map(([x, y]) => `${x},${-y}`).join('L')}${$('closedRing').checked ? 'Z' : ''}"/>` : '';
+  const r = Math.max(view.w, view.h) / 75;
+  const handles = pts.map(([x, y], i) => `<circle class="pt ${i === 0 ? 'first' : ''}" data-i="${i}" cx="${x}" cy="${-y}" r="${r}"/>`).join('');
+  $('canvas').innerHTML = `<svg viewBox="${view.x} ${view.y} ${view.w} ${view.h}" role="img" aria-label="لوحة رسم القطعة">${lines}
+    <path class="rest" fill-rule="evenodd" d="${path(b.letter)}"/>
+    ${shown ? `<path class="drawn" fill-rule="evenodd" d="${path(shown)}"/>` : ''}
+    <path class="ghost" d="${path(b.engine_part)}"/>${spine}${handles}</svg>`;
+}
+function toUnits(ev){
+  const svg = $('canvas').querySelector('svg'); const pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY; const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+  let x = q.x, y = -q.y;
+  if($('snap').checked){                       // close to a line of the grid: on it
+    const L = part(current).board.lines, tol = (L.x_height - L.baseline) * 0.05;
+    for(const v of Object.values(L)) if(Math.abs(y - v) < tol) y = v;
+  }
+  return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+}
+let dragging = -1, moved = false;
+$('canvas').addEventListener('pointerdown', ev => {
+  if(!current) return;
+  const t = ev.target;
+  if(t.classList && t.classList.contains('pt')){ dragging = +t.dataset.i; moved = false; t.setPointerCapture(ev.pointerId); return; }
+  pts.push(toUnits(ev)); drawBoard(); stroke();
+});
+$('canvas').addEventListener('pointermove', ev => {
+  if(dragging < 0) return;
+  pts[dragging] = toUnits(ev); moved = true; drawBoard(); stroke(true);
+});
+$('canvas').addEventListener('pointerup', () => { if(dragging >= 0 && moved) stroke(); dragging = -1; });
+$('canvas').addEventListener('dblclick', ev => {
+  const t = ev.target; if(t.classList && t.classList.contains('pt')){ pts.splice(+t.dataset.i, 1); drawBoard(); stroke(); }
+});
+let strokeTimer = null;
+function stroke(quick){
+  clearTimeout(strokeTimer);
+  strokeTimer = setTimeout(async () => {
+    if(pts.length < 2){ drawnOutline = null; drawBoard(); return; }
+    const mine = ++strokeSeq;
+    const r = await fetch('/api/kit/stroke', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, name: current, points: pts, closed: $('closedRing').checked,
+                            thickness: +$('thick').value, ends: $('ends').value})});
+    const j = await r.json(); if(mine !== strokeSeq || !r.ok) return;
+    const xr = part(current).board.xr;
+    drawnOutline = j.part.polys.map(rg => rg.map(([x, y]) => [x + xr, y]));
+    lastDrawn = j.part; drawBoard();
+  }, quick ? 60 : 0);
+}
+let lastDrawn = null;
+['closedRing', 'ends'].forEach(id => $(id).addEventListener('change', () => { drawBoard(); stroke(); }));
+$('thick').addEventListener('input', () => { $('thickVal').textContent = (+$('thick').value).toFixed(2); stroke(true); });
+$('undoPt').addEventListener('click', () => { pts.pop(); drawBoard(); stroke(); });
+$('clearPts').addEventListener('click', () => { pts = []; drawnOutline = null; lastDrawn = null; drawBoard(); });
+$('fromLogo').addEventListener('click', () => { pts = part(current).board.line.map(q => q.slice()); drawBoard(); stroke(); });
+function applyPart(p){ kitParts[current] = p; $('studioMsg').textContent = 'استُعملت في كل حرف يحتاجها.'; schedule(true); loadKit(); }
+$('useDrawn').addEventListener('click', () => { if(lastDrawn) applyPart(lastDrawn); else $('studioMsg').textContent = 'ارسم نقطتين على الأقل.'; });
+$('toEngine').addEventListener('click', () => { kitParts[current] = null; pts = []; drawnOutline = null; lastDrawn = null; schedule(true); loadKit(); });
+$('toLogo').addEventListener('click', () => { delete kitParts[current]; pts = []; drawnOutline = null; lastDrawn = null; schedule(true); loadKit(); });
+let cands = [];
+async function loadCands(name){
+  $('cands').innerHTML = '<span class="muted" style="font-size:13px">…</span>';
+  try{
+    const r = await fetch('/api/kit/candidates', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, name})});
+    const j = await r.json(); if(!r.ok || name !== current) return;
+    cands = j.candidates;
+    $('cands').innerHTML = cands.length ? cands.map((c, i) => `<button type="button" class="cand" data-c="${i}" title="${esc(c.font)}">${c.preview}<span>${esc(c.font)}</span></button>`).join('')
+                                        : '<span class="muted" style="font-size:13px">لا اقتراح لهذه القطعة.</span>';
+  }catch(e){ $('cands').innerHTML = ''; }
+}
+$('cands').addEventListener('click', ev => {
+  const c = ev.target.closest('.cand'); if(!c) return;
+  const cand = cands[+c.dataset.c]; applyPart(cand.part);
+  pts = (cand.part.line || []).map(q => q.slice());                 // its centre line, to go on from
+  drawnOutline = null;
+});
+
+// ---- saving and exporting
+$('saveBtn').addEventListener('click', async () => {
+  $('saveBtn').disabled = true;
+  try{
+    const r = await fetch('/api/save', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({style: logo.style, word: $('word').value.trim(), params, variants, scopes, logo: fileName, parts: kitParts})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || 'تعذّر الحفظ.');
+    $('status').textContent = j.saved ? `حُفظ ${j.saved} تعديل في السجلّ` : 'لا تعديل يختلف عن القواعد';
+  }catch(e){ $('status').textContent = e.message; $('saveBtn').disabled = false; }
+});
+$('svgBtn').addEventListener('click', () => {
+  if(!lastSvg) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lastSvg], {type:'image/svg+xml'}));
+  a.download = ($('word').value.trim() || 'word') + '.svg'; a.click();
+});
+</script>
+</body>
+</html>

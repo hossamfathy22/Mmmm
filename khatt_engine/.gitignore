@@ -1,0 +1,5 @@
+__pycache__/
+.pytest_cache/
+khatt_out/
+*.pyc
+bench_out/

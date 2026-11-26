@@ -1,0 +1,54 @@
+"""Command line:  python -m khatt logo.png "بيدوناق" -o out/ [--text "سیرنگ|Sirang"] [--line 1]"""
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from .pipeline import run
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(prog="khatt", description="قِس شعارًا وافهمه وقطّعه، ثم ابنِ كلمة جديدة من قطعه")
+    p.add_argument("image", help="صورة الشعار (PNG أو JPG)")
+    p.add_argument("word", help="الكلمة العربية المطلوب بناؤها")
+    p.add_argument("-o", "--out", default="khatt_out", help="مجلد النتائج")
+    p.add_argument("--text", default="", help="النص المكتوب في الشعار، سطر لكل سطر مفصولة بـ | (اختياري، يحسّن الفهم)")
+    p.add_argument("--line", type=int, default=None, help="رقم السطر الذي تؤخذ منه القطع (يبدأ من 1)")
+    p.add_argument("--cut-parts", action="store_true", help="تجريبي: قصّ قطع الشعار من بكسلاته بدل رسمها رسمًا مثاليًا بأرقامه")
+    a = p.parse_args()
+    try:
+        r = run(Path(a.image).read_bytes(), a.word, texts=[t for t in a.text.split("|")] if a.text else None,
+                line=(a.line - 1) if a.line else None, use_parts=a.cut_parts, out_dir=a.out, name=Path(a.image).name)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    h = r["input"]
+    print(f"فحص الصورة: الثقة {h['confidence'] * 100:.0f}%")
+    for n in h["corrections"]:
+        print("  صُحّح:", n["text"])
+    for n in h["warnings"]:
+        print("  تنبيه:", n["text"])
+    c = r.get("self_check")
+    if c:
+        print(f"الفحص الذاتي: «{c['text']}» تطابق الشعار {c['overall'] * 100:.0f}% — "
+              + "، ".join(f"{x['letter']} {x['match'] * 100:.0f}%" for x in c["letters"]))
+        if c.get("overall_after"):
+            print(f"  بعد أخذ ما يرسمه الشعار بطريقته منه: {c['overall_after'] * 100:.0f}% — "
+                  + "، ".join(f"{x['letter']} {x['match'] * 100:.0f}%" for x in c["letters_after"]))
+        for n in c["notes"]:
+            print("  تنبيه:", n)
+    else:
+        print("الفحص الذاتي: لم يُجرَ (اكتب نص الشعار بـ --text)")
+    for l in r["lines"]:
+        print(f"السطر {l['line']} ({l['script']}): جذع {l['stem']} · شعري {l['hairline']} · ميل {l['slant_deg']}° · ارتفاع {l['x_height']}"
+              + (f" · قرأ: {l['text_guess']}" if l["text_guess"] else ""))
+    print("القطع:", "، ".join(p["name"] for p in r["parts"]))
+    for c in r["verification"]:
+        print(f"  تحقق {c['name']}: الشعار {c['rule']} · الكلمة {c['word']} → {c['verdict']}")
+    print(f"النتائج في: {Path(a.out).resolve()}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,1156 @@
+"""Letter forms built from six parts: stem, baseline join, head (ring), tail/bowl, dot, dash.
+
+Each builder draws one letter in local coordinates: the right edge of the letter body is x = 0,
+the letter grows to the left (negative x), baseline is y = 0.
+`form` is one of: "i" isolated, "I" initial, "M" medial, "F" final.
+"""
+from __future__ import annotations
+
+import math
+from contextvars import ContextVar
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Tuple
+
+from . import geometry as g
+from .library import ACTIVE, Compound, Tagged
+from .recipes import BY_EYE, DERIVED, FITTED, MEASURED, NUMBERS, N, angular, choose, curved, declare, param, pick, variant
+from .recipes import P as val
+from .style import Style
+
+
+def _lib():
+    return ACTIVE.get()
+
+
+def _named(shape, name: str):
+    """Tag an engine-drawn shape with the name of the part it plays."""
+    if isinstance(shape, (Tagged, Compound)):
+        return shape
+    return Tagged(shape, "engine", name)
+
+
+def _draw(letter: str, st: Style, form: str, mark: Optional[str]) -> "Glyph":
+    """Draw a letter form in the variant in force for this logo (see recipes.py)."""
+    return choose(st, letter, form).build(st, form, mark)
+
+
+def _ring(st, xl, xr, yb, yt):
+    return _named(g.ring(st, xl, xr, yb, yt), "رأس")
+
+
+@dataclass
+class Glyph:
+    shapes: List[g.Shape]
+    left: float                      # leftmost x of the body (tails excluded), used for spacing
+    entry_x: float = 0.0             # where a join coming from the right must reach
+    entry_edge: float = 0.0          # visible right edge at the baseline
+    exit_x: Optional[float] = None   # where a join leaving to the left starts
+    exit_edge: Optional[float] = None
+    stems: List[Tuple[float, float, float]] = field(default_factory=list)  # (x centre, top, bottom) for drawings
+    tail: Optional[float] = None     # leftmost x of a tail that runs under the next letter
+    below: Optional[Tuple[float, float]] = None  # x range of marks under the baseline
+
+
+def _e(form: str) -> bool:
+    return form in ("M", "F")
+
+
+def _x(form: str) -> bool:
+    return form in ("I", "M") and "no_exit" not in JOIN.get()
+
+
+# How a letter joins, when the logo joins some letters differently from the baseline join:
+# "no_exit"   the letter keeps its joining shape but leaves nothing at the baseline for the next one
+# "top_entry" the letter is reached by a bar at the top of the previous tooth (ر ز ژ in a logo whose
+#             tails rest on the baseline, as in a geometric kufi)
+JOIN: ContextVar = ContextVar("khatt_join", default=frozenset())
+
+
+def top_joins(st: Style) -> bool:
+    """ر is joined from the top when the logo itself does so (measured: `top_join`), or when it draws
+    with corners and its ر tails rest on the baseline."""
+    return st.top_join >= 0.5 or (st.angular >= 0.5 and st.tail_drop < 0.3)
+
+
+# ---------------------------------------------------------------- marks (dots, dashes, hamza)
+def marks(st: Style, spec: Optional[str], cx: float, above_ref: Optional[float] = None,
+          below_ref: float = 0.0, at: Optional[float] = None) -> List[g.Shape]:
+    """spec: a1/a2/a3 dots above, b1/b2/b3 below, ha/hb hamza, md madda.
+    `at` forces the centre height (used for dots inside a bowl)."""
+    if not spec:
+        return []
+    d, h = st.dot, st.hair
+    gap = val(st, "mark.gap")
+    dash_len = val(st, "mark.dash")
+    above = spec[0] in "ah" and spec != "hb"
+    ref = st.x_height if above_ref is None else above_ref
+    cy = at if at is not None else (ref + gap + d / 2 if above else below_ref - gap - d / 2)
+    out: List[g.Shape] = []
+    kind = spec[1:] if spec[0] in "ab" else spec
+    lib = _lib()
+
+    def dot(x, y):
+        got = lib.dot(x, y) if lib is not None else None
+        return got if got is not None else _named(g.circle(x, y, d / 2, st.tan, shape_n=st.dot_n, rot=st.dot_rot), "نقطة")
+
+    def dash(x, y, length):
+        got = lib.dash(x, y, length) if lib is not None else None
+        return got if got is not None else _named(g.rect(x - length / 2, x + length / 2, y - h / 2, y + h / 2), "شرطة")
+    if kind == "1":
+        out.append(dot(cx, cy))
+    elif kind == "2":
+        if st.dash_marks:
+            out.append(dash(cx, cy, dash_len))
+        else:
+            out += [dot(cx - N("marks.0", 0.6) * d, cy), dot(cx + N("marks.1", 0.6) * d, cy)]
+    elif kind == "3":
+        step = N("marks.2", 0.95) * d if above else -N("marks.3", 0.95) * d
+        if st.dash_marks:
+            out.append(dash(cx, cy, dash_len))
+            out.append(dot(cx, cy + step * N("marks.4", 0.75) + (d / 2 - h / 2) * (1 if above else -1) * N("marks.5", 0.2)))
+        else:
+            out += [dot(cx - N("marks.6", 0.6) * d, cy), dot(cx + N("marks.7", 0.6) * d, cy), dot(cx, cy + step)]
+    elif spec in ("ha", "hb"):
+        hz = g.open_arc(st, cx, cy, N("marks.8", 0.42) * d, N("marks.9", 0.5) * d, 40, 320, scale=N("marks.10", 0.55))
+        if at is None:
+            # measured, not guessed: the drawn hamza keeps a white of 0.3 stem from its letter
+            ys = [y for poly in hz for _, y in poly]
+            dy = (ref + N("marks.11", 0.3) * st.stem - min(ys)) if above else (below_ref - N("marks.12", 0.3) * st.stem - max(ys))
+            if (above and dy > 0) or (not above and dy < 0):
+                hz = [[(x, y + dy) for x, y in poly] for poly in hz]
+        out.append(_named(hz, "همزة"))
+    elif spec == "md":
+        out.append(dash(cx, cy, N("marks.13", 1.8) * d))
+    return out
+
+
+def clear_marks(st: Style, body: List[g.Shape], spec: Optional[str], spots: List[Tuple[float, float]]) -> List[g.Shape]:
+    """Put the marks at the first spot where they keep their own white (a fifth of the stem)
+    from the letter: the critic's 'touch' test, applied while drawing."""
+    if not spec:
+        return []
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from .typeset import flat
+    polys = [Polygon(p).buffer(0) for s in flat(body) for p in s if len(p) >= 3]
+    ink = unary_union(polys).buffer(0.2 * st.stem) if polys else None
+    best = None
+    for x, y in spots:
+        m = marks(st, spec, x, at=y)
+        mp = unary_union([Polygon(p).buffer(0) for s in m for p in s if len(p) >= 3])
+        if ink is None or not mp.intersects(ink):
+            return m
+        if best is None:
+            best = m
+    return best or []
+
+
+# ---------------------------------------------------------------- shared parts
+# The cup under ن ل ق س ص ي was 3.4 stems wide, a figure taken from one bold logo. In a light face
+# the stems are thin and the cup came out half as wide as a letter. It is a share of the x-height;
+# 1.18 gives the same cup as before on that logo.
+param("cup.width", lambda st: max(3.4 * st.stem, 1.18 * st.x_height), "عرض الكأس السفلي = الأكبر من 3.4 جذع و1.18 × ارتفاع الحروف", DERIVED, "الكأس")
+param("cup.arm", lambda st: 0.4 * st.x_height, "حيث ينزل ذراع الكأس الأيمن من جذعه = 0.4 × ارتفاع الحروف", BY_EYE, "الكأس")
+param("cup.left", lambda st: 0.45 * st.x_height, "ارتفاع طرف الكأس الأيسر = 0.45 × ارتفاع الحروف", BY_EYE, "الكأس")
+param("bowl.reach", lambda st: 2.0 * st.pitch, "امتداد الكأس الراجع إلى اليمين تحت ح ع = خطوتان", BY_EYE, "الكأس الراجع")
+param("mark.gap", lambda st: 0.44 * st.dot, "البياض بين النقطة وحرفها = 0.44 من قطرها", BY_EYE, "النقاط")
+param("mark.dash", lambda st: st.dash if st.dash > 0 else 1.5 * st.dot,
+      "طول شرطة النقطتين = طول شرطة الشعار إن وُجدت، وإلا 1.5 من قطر النقطة", MEASURED, "النقاط")
+def teeth(st: Style, n: int, entry: bool, exit: bool, top: Optional[float] = None,
+          x0: float = 0.0, drop_inner: bool = False) -> Tuple[List[g.Shape], List[float]]:
+    """n teeth joined at the baseline, right to left, starting at right edge x0."""
+    u, P = st.stem / 2, st.pitch
+    top = st.x_height if top is None else top
+    xs = [x0 - u - i * P for i in range(n)]
+    shapes: List[g.Shape] = []
+    for i, xc in enumerate(xs):
+        ent = entry if i == 0 else True
+        ex = exit if i == n - 1 else True
+        t = top - st.seen_drop if (drop_inner and i > 0) else top
+        shapes.append(g.stem(st, xc, t, entry=ent, exit=ex,
+                             round_br=(i == 0 and not entry), round_bl=(i == n - 1 and not exit)))
+        if i > 0:
+            shapes.append(g.connector(st, xc + u, xs[i - 1] - u))
+    return shapes, xs
+
+
+def bowl_down(st: Style, r: float, top: float, width: float, left_top: float) -> g.Shape:
+    """Arm at x = r goes down below the baseline, across, and up on the left (ن ل ق س ص ي)."""
+    D, h, X = st.descender, st.hair, st.x_height
+    Lx, yb, k = r - width, -D + h / 2, N("bowl_down.0", 0.08) * X
+    if st.angular >= 0.5:      # a logo that turns with corners: a square cup
+        return _named(g.angular_stroke(st, [(r, top), (r, yb), (Lx, yb), (Lx, left_top)], st.corner_r), "كأس سفلي")
+    return _named(g.stroke(st, g.path(
+        g.line((r, top), (r, k)),
+        g.cubic((r, k), (r, -N("bowl_down.1", 0.72) * D), (r - N("bowl_down.2", 0.2) * width, yb), (r - N("bowl_down.3", 0.5) * width, yb)),
+        g.cubic((r - N("bowl_down.4", 0.5) * width, yb), (Lx + N("bowl_down.5", 0.2) * width, yb), (Lx, -N("bowl_down.6", 0.72) * D), (Lx, k)),
+        g.line((Lx, k), (Lx, left_top)))), "كأس سفلي")
+
+
+def tail(st: Style, r: float, top: float) -> g.Shape:
+    """Stem that drops below the baseline and sweeps left as a hairline (ر و).
+    With a logo library: the logo's own shaft and tail."""
+    lib = _lib()
+    if lib is not None and lib.has("tail"):
+        parts = Compound([lib.tail(r)])
+        sh = lib.shaft(r, top)
+        if sh is not None:
+            parts.insert(0, sh)
+        return parts
+    D, h = st.descender * st.tail_drop, st.hair
+    if st.angular >= 0.5:      # down, a corner, and a flat foot to the left (as far as the logo's)
+        yb = -D + h / 2 if D > h else h / 2
+        foot = r - st.tail_reach * st.stem
+        return _named(g.angular_stroke(st, [(r, top), (r, yb), (foot, yb)], st.corner_r), "ذيل")
+    U = st.stem * st.tail_reach / N("tail.0", 3.05)           # horizontal scale of the sweep, from the logo
+    yb = -D + h / 2
+    return _named(g.stroke(st, g.path(
+        g.line((r, top), (r, 0)),
+        g.cubic((r, 0), (r, -N("tail.1", 0.6) * D), (r - N("tail.2", 0.52) * U, yb), (r - N("tail.3", 1.48) * U, yb)),
+        g.cubic((r - N("tail.4", 1.48) * U, yb), (r - N("tail.5", 2.17) * U, yb), (r - N("tail.6", 2.6) * U, -N("tail.7", 0.9) * D), (r - N("tail.8", 3.05) * U, -N("tail.9", 0.8) * D)))), "ذيل")
+
+
+def sweep_right(st: Style, x: float, top: float, reach: float) -> g.Shape:
+    """Down on the left, then a bowl that swings back to the right (ح ع isolated/final)."""
+    D, h, X = st.descender, st.hair, st.x_height
+    yb = -D + h / 2
+    if st.angular >= 0.5:
+        return _named(g.angular_stroke(st, [(x, top), (x, yb), (x + reach, yb)], st.corner_r), "كأس أيمن")
+    return _named(g.stroke(st, g.path(
+        g.line((x, top), (x, N("sweep_right.0", 0.05) * X)),
+        g.cubic((x, N("sweep_right.1", 0.05) * X), (x, -N("sweep_right.2", 0.75) * D), (x + N("sweep_right.3", 0.3) * reach, yb), (x + N("sweep_right.4", 0.6) * reach, yb)),
+        g.cubic((x + N("sweep_right.5", 0.6) * reach, yb), (x + N("sweep_right.6", 0.85) * reach, yb), (x + N("sweep_right.7", 0.95) * reach, -N("sweep_right.8", 0.85) * D), (x + reach, -N("sweep_right.9", 0.6) * D)))), "كأس أيمن")
+
+
+def head_box(st: Style, counter: Optional[float] = None) -> Tuple[float, float]:
+    """Left edge and width of a full head (و ف ق ه): two stems around one counter."""
+    c = st.white if counter is None else counter
+    w = 2 * st.stem + c
+    return -w, w
+
+
+# ---------------------------------------------------------------- letter families
+def alef(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    u, X, A = st.stem / 2, st.x_height, st.ascender
+    shapes = [g.stem(st, -u, X + A, entry=_e(form))]
+    if mark == "ha":
+        shapes += marks(st, "ha", -u, above_ref=X + A)
+    elif mark == "hb":
+        shapes += marks(st, "hb", -u)
+    elif mark == "md":
+        shapes += marks(st, "md", -u, above_ref=X + A)
+    return Glyph(shapes, left=-st.stem, stems=[(-u, X + A, 0)])
+
+
+# chosen by eye, then tried narrower, wider, lower and taller against the typefaces: these read best
+param("beh.post", lambda st: 0.5 * st.x_height, "ارتفاع طرفي الباء المنفصلة = نصف ارتفاع الحروف", FITTED, "الباء")
+param("beh.width", lambda st: 2.2 * st.pitch, "المسافة بين طرفي الباء المنفصلة = 2.2 خطوة", FITTED, "الباء")
+
+
+def beh(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    u, P, X = st.stem / 2, st.pitch, st.x_height
+    if form in ("I", "M"):
+        shapes, xs = teeth(st, 1, _e(form), _x(form))
+        shapes += marks(st, mark, xs[0])
+        return Glyph(shapes, left=-st.stem, exit_x=-st.stem, exit_edge=-st.stem, stems=[(xs[0], X, 0)])
+    post = val(st, "beh.post")
+    xr, xl = -u, -u - val(st, "beh.width")
+    shapes = [g.stem(st, xr, post, entry=_e(form), exit=True, round_br=not _e(form)),
+              g.connector(st, xl + u, xr - u),
+              g.stem(st, xl, post, entry=True, round_bl=True)]
+    shapes += marks(st, mark, (xr + xl) / 2, above_ref=post)
+    return Glyph(shapes, left=xl - u, stems=[(xr, post, 0), (xl, post, 0)])
+
+
+param("noon.stem", lambda st: 0.62 * st.x_height, "ارتفاع جذع النون المنفصلة = 0.62 × ارتفاع الحروف", FITTED, "النون")
+# joined to the letter before it, ن starts as a tooth of full height (final ن read right 57% at 0.62, 72% so)
+param("noon.stem_final", lambda st: 0.95 * st.x_height, "ارتفاع جذع النون الأخيرة = 0.95 × ارتفاع الحروف (سنّ كامل)", FITTED, "النون")
+
+
+def noon(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    if form in ("I", "M"):
+        return beh(st, form, mark)
+    U, u, X = st.stem, st.stem / 2, st.x_height
+    r, w = -u, val(st, "cup.width")
+    top = val(st, "noon.stem_final" if form == "F" and st.angular < 0.5 else "noon.stem")
+    shapes = [g.stem(st, r, top, entry=_e(form)), bowl_down(st, r, val(st, "cup.arm"), w, val(st, "cup.left"))]
+    shapes += marks(st, mark, r - w / 2, at=N("noon.0", 0.3) * X + val(st, "mark.gap") + st.dot / 2)
+    return Glyph(shapes, left=r - w - u, stems=[(r, top, 0)])
+
+
+param("yeh.stem", lambda st: 0.45 * st.x_height, "ارتفاع جذع الياء الأخيرة = 0.45 × ارتفاع الحروف", BY_EYE, "الياء")
+param("yeh.arm", lambda st: 0.3 * st.x_height, "حيث ينزل كأس الياء الأخيرة وحيث ينتهي = 0.3 × ارتفاع الحروف", BY_EYE, "الياء")
+param("yeh.head", lambda st: 0.98 * st.x_height, "قمة رأس الياء المنفصلة = 0.98 × ارتفاع الحروف", FITTED, "الياء")
+param("yeh.reach", lambda st: 2.3 * st.pitch, "امتداد كأس الياء المنفصلة = 2.3 خطوة", BY_EYE, "الياء")
+
+
+def _yeh_isolated(st: Style, final_mark: Optional[str]) -> Glyph:
+    """ي ى alone, as the typefaces draw it: the pen starts at the top right, comes round to the left
+    and back along the baseline (a head open to the right), then drops into a wide bowl to the left."""
+    U, u, P, X, D, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.descender, st.hair
+    yt, reach = val(st, "yeh.head") - h / 2, val(st, "yeh.reach")
+    yb = -D + h / 2
+    T, L, B = (-N("_yeh_isolated.0", 0.15) * P, yt), (-N("_yeh_isolated.1", 1.05) * P, N("_yeh_isolated.2", 0.52) * yt), (-N("_yeh_isolated.3", 0.45) * P, N("_yeh_isolated.4", 0.1) * X)
+    R, O, E = (-N("_yeh_isolated.5", 0.02) * P, -N("_yeh_isolated.6", 0.3) * D), (-N("_yeh_isolated.7", 0.48) * reach, yb), (-reach, -N("_yeh_isolated.8", 0.2) * D)
+    path = g.path(g.cubic(T, (-N("_yeh_isolated.9", 0.65) * P, yt + N("_yeh_isolated.10", 0.02) * X), (-N("_yeh_isolated.11", 1.05) * P, N("_yeh_isolated.12", 0.9) * yt), L),
+                  g.cubic(L, (-N("_yeh_isolated.13", 1.05) * P, N("_yeh_isolated.14", 0.24) * X), (-N("_yeh_isolated.15", 0.85) * P, N("_yeh_isolated.16", 0.1) * X), B),
+                  g.cubic(B, (-N("_yeh_isolated.17", 0.12) * P, N("_yeh_isolated.18", 0.1) * X), (-N("_yeh_isolated.19", 0.02) * P, 0.0), R),
+                  g.cubic(R, (-N("_yeh_isolated.20", 0.02) * P, -N("_yeh_isolated.21", 0.8) * D), (-N("_yeh_isolated.22", 0.22) * reach, yb), O),
+                  g.cubic(O, (-N("_yeh_isolated.23", 0.78) * reach, yb), (-reach, -N("_yeh_isolated.24", 0.75) * D), E))
+    shapes = [_named(g.solid_stroke(st, path), "الياء")]
+    if final_mark == "ha":
+        d = st.dot
+        shapes += clear_marks(st, shapes, "ha", [(-f * reach, yy) for yy in (N("_yeh_isolated.25", 0.25) * X, N("_yeh_isolated.26", 0.4) * X, N("_yeh_isolated.27", 0.55) * X, X + N("_yeh_isolated.28", 0.5) * d) for f in (N("_yeh_isolated.29", 0.72), N("_yeh_isolated.30", 0.8), N("_yeh_isolated.31", 0.64))])
+    elif final_mark:
+        d = st.dot
+        spots = [(-f * reach, yb + h / 2 + N("_yeh_isolated.32", 0.45) * d + d / 2 + k * N("_yeh_isolated.33", 0.25) * d) for k in (0, 1, 2) for f in (N("_yeh_isolated.34", 0.5), N("_yeh_isolated.35", 0.58), N("_yeh_isolated.36", 0.42))]
+        spots += [(-N("_yeh_isolated.37", 0.5) * reach, yb - h / 2 - N("_yeh_isolated.38", 0.45) * d - d / 2)]
+        shapes += clear_marks(st, shapes, final_mark, spots)
+    return Glyph(shapes, left=-reach - u)
+
+
+def yeh(st: Style, form: str, mark: Optional[str], final_mark: Optional[str]) -> Glyph:
+    if form in ("I", "M"):
+        return beh(st, form, mark)
+    if form == "i" and st.angular < 0.5 and pick(st, "ي.i") != "كأس":
+        return _yeh_isolated(st, final_mark)
+    U, u, X, D = st.stem, st.stem / 2, st.x_height, st.descender
+    r, w = -u, val(st, "cup.width") * N("yeh.0", 4.0) / N("yeh.1", 3.4)
+    top, arm = val(st, "yeh.stem"), val(st, "yeh.arm")
+    shapes = [g.stem(st, r, top, entry=_e(form)), bowl_down(st, r, arm, w, arm)]
+    if final_mark == "ha":
+        shapes += marks(st, "ha", r - w / 2, above_ref=N("yeh.2", 0.2) * X)
+    else:
+        d = st.dot
+        shapes += marks(st, final_mark, r - w / 2, at=-D + st.hair + N("yeh.3", 0.4) * d + d / 2)
+    return Glyph(shapes, left=r - w - u, stems=[(r, top, 0)])
+
+
+def _pen(st: Style, curved, corners) -> g.Shape:
+    """One continuous pen stroke: the curved path for a curved logo, straight strokes meeting at
+    corners for an angular one (see skeleton.py)."""
+    if st.angular >= 0.5:
+        return g.angular_stroke(st, corners, st.corner_r)
+    return g.stroke(st, curved)
+
+
+def _jeem_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    """ح ج خ چ in a logo that draws with corners (square kufi): a hairline bar at the x-height and, from its right end, one stroke that turns back
+    and runs down to the left: to the baseline join (حـ ـحـ) or into a deep bowl that swings back
+    to the right under the letter (ح ـح). Bar and spine are one path, so they cannot part."""
+    U, u, P, X, h, D = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair, st.descender
+    d0 = -u if not _e(form) else -N("_jeem_square.0", 0.55) * P - u      # the apex: right end of the bar
+    xa = d0 - N("_jeem_square.1", 1.25) * P                              # left end of the bar
+    yt = X - h / 2                                  # centre line of the bar
+    shapes: List[g.Shape] = []
+    if _e(form):      # the join from the right climbs to the apex
+        shapes.append(_named(_pen(st, g.cubic((0, h / 2), (d0 * N("_jeem_square.2", 0.4), h / 2), (d0, N("_jeem_square.3", 0.35) * X), (d0, yt)),
+                                  [(0.0, h / 2), (d0 - u, yt)]), "صعود الوصل"))
+    turn = g.path(g.line((xa, yt), (d0 - N("_jeem_square.4", 0.25) * U, yt)),
+                  g.cubic((d0 - N("_jeem_square.5", 0.25) * U, yt), (d0 + N("_jeem_square.6", 0.4) * U, yt), (d0 + N("_jeem_square.7", 0.15) * U, N("_jeem_square.8", 0.6) * X), (d0 - N("_jeem_square.9", 0.45) * P, N("_jeem_square.10", 0.4) * X)))
+    if form in ("I", "M"):
+        foot = xa - N("_jeem_square.11", 0.05) * P
+        ex = foot - N("_jeem_square.12", 0.35) * P
+        curved = g.path(turn, g.cubic((d0 - N("_jeem_square.13", 0.45) * P, N("_jeem_square.14", 0.4) * X), (d0 - N("_jeem_square.15", 0.85) * P, N("_jeem_square.16", 0.18) * X), (foot + N("_jeem_square.17", 0.15) * P, h / 2), (ex, h / 2)))
+        # square kufi: from the apex the bar runs left, turns down the left side, and leaves on the baseline
+        shapes.append(_named(_pen(st, curved, [(d0, yt), (xa + u, yt), (xa + u, h / 2), (ex, h / 2)]), "رأس الحاء"))
+        if mark and mark[0] == "b":
+            shapes += marks(st, mark, (xa + d0) / 2 + N("_jeem_square.18", 0.15) * P)
+        else:
+            shapes += marks(st, mark, (xa + d0) / 2)
+        return Glyph(shapes, left=min(xa, ex), exit_x=ex + 1, exit_edge=ex)
+    xl, reach = xa + N("_jeem_square.19", 0.05) * P, N("_jeem_square.20", 2.1) * P
+    yb = -D + h / 2
+    curved = g.path(turn,
+                    g.cubic((d0 - N("_jeem_square.21", 0.45) * P, N("_jeem_square.22", 0.4) * X), (xl - N("_jeem_square.23", 0.05) * P, N("_jeem_square.24", 0.25) * X), (xl - N("_jeem_square.25", 0.1) * P, -N("_jeem_square.26", 0.5) * D), (xl + N("_jeem_square.27", 0.45) * reach, yb)),
+                    g.cubic((xl + N("_jeem_square.28", 0.45) * reach, yb), (xl + N("_jeem_square.29", 0.8) * reach, yb), (xl + N("_jeem_square.30", 0.95) * reach, -N("_jeem_square.31", 0.85) * D), (xl + reach, -N("_jeem_square.32", 0.6) * D)))
+    corners = [(d0, yt), (xl + u, yt), (xl + u, yb), (xl + reach, yb)]
+    shapes.append(_named(_pen(st, curved, corners), "الحاء"))
+    if mark and mark[0] == "b":
+        d = st.dot
+        base_y = yb + h / 2 + N("_jeem_square.33", 0.45) * d + d / 2
+        spots = [(xl + f * reach, base_y + k * N("_jeem_square.34", 0.25) * d) for k in (0, 1, 2) for f in (N("_jeem_square.35", 0.62), N("_jeem_square.36", 0.55), N("_jeem_square.37", 0.48), N("_jeem_square.38", 0.7), N("_jeem_square.39", 0.4))]
+        # a shallow bowl (short descender) has no room inside: then under it
+        spots += [(xl + f * reach, yb - h / 2 - N("_jeem_square.40", 0.45) * d - d / 2) for f in (N("_jeem_square.41", 0.55), N("_jeem_square.42", 0.45))]
+        shapes += clear_marks(st, shapes, mark, spots)
+    else:
+        shapes += marks(st, mark, (xa + d0) / 2)
+    return Glyph(shapes, left=xa)
+
+
+param("hah.span", lambda st: 1.78 * st.pitch, "عرض رأس الحاء = 1.78 خطوة", BY_EYE, "الحاء")
+param("hah.reach", lambda st: 2.2 * st.pitch, "امتداد كأس الحاء الأخيرة والمنفصلة إلى اليمين = 2.2 خطوة", BY_EYE, "الحاء")
+param("hah.bowl_left", lambda st: 0.5 * st.pitch, "كم يتجاوز كأس الحاء طرفها الأيسر = نصف خطوة", BY_EYE, "الحاء")
+param("hah.turn", lambda st: 0.62, "نصف قطر انعطاف أنف الحاء = 0.62 من سمك الذراع (أكثر من النصف، فلا ينسدّ داخله)", DERIVED, "الحاء")
+param("hah.nose_y", lambda st: 0.65 * st.x_height, "ارتفاع طرف أنف الحاء في صيغة الذراع المائل = 0.65 × ارتفاع الحروف", FITTED, "الحاء")
+
+
+def _hah_default(st: Style) -> str:
+    """The upright nose needs a contrast pen: it is the one thick part of the letter. A pen of one
+    weight draws the arm leaning down to a pointed nose, as most typefaces do."""
+    return "أنف" if st.hair < 0.5 * st.stem else "ذراع مائل"
+
+
+def _hah_path(st: Style, span: float, yn: float, wa: float):
+    """Centre line of the leaning-arm ح: the arm from the top left, a round turn at the nose whose
+    inside never closes (its radius is more than half the pen), and the way down to the baseline.
+    Returns the samples and the landing point on the baseline."""
+    X, h = st.x_height, st.hair
+    r = max(val(st, "hah.turn") * wa, N("_hah_path.0", 0.08) * X)                             # radius of the turn
+    cx, cy = -r - wa / 2, yn
+    xa, xj = -span, -N("_hah_path.1", 0.78) * span
+    a = (xa, X - wa / 2)
+    f1 = math.atan2(a[1] - (cy + r), cx - a[0])                             # lean of the upper arm
+    f2 = math.radians(N("_hah_path.2", 42.0))                                                 # lean of the lower arm
+    t1, t2 = math.pi / 2 - f1, f2 - math.pi / 2
+    pts = g.line(a, (cx + r * math.cos(t1), cy + r * math.sin(t1)))
+    n = 14
+    for i in range(1, n + 1):
+        t = t1 + (t2 - t1) * i / n
+        pts.append((cx + r * math.cos(t), cy + r * math.sin(t), math.sin(t), -math.cos(t)))
+    p2 = (pts[-1][0], pts[-1][1])
+    d2 = (-math.cos(f2), -math.sin(f2))
+    b = (xj, h / 2)
+    k = N("_hah_path.3", 0.4) * math.hypot(p2[0] - b[0], p2[1] - b[1])
+    low = g.cubic(p2, (p2[0] + d2[0] * k, p2[1] + d2[1] * k), (b[0] + k, b[1]), b)
+    return g.path(pts, low), b, low
+
+
+def _hah_slanted(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    """حـ ـحـ with a leaning upper arm: from the top left the pen comes down to the right, turns round
+    at the nose at mid height, and runs down to the baseline and on to the next letter."""
+    U, u, P, X, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair
+    span, yn = val(st, "hah.span"), val(st, "hah.nose_y")
+    xa = -span
+    wa = st.width_at(math.sin(math.atan2(X - yn, span)))             # the arm's own width, for its lean
+    path, b, low = _hah_path(st, span, yn, wa)
+    xj = b[0]
+    if form in ("i", "F"):
+        # ح ـح: after landing on the baseline the same stroke turns down into the bowl and swings back
+        # to the right under the letter; a join from the right meets it where it lands, lying flat
+        D = st.descender
+        xl, reach, yb = xj - val(st, "hah.bowl_left"), val(st, "hah.reach"), -D + h / 2
+        bowl = g.path(g.cubic(b, (xj - N("_hah_slanted.0", 0.28) * P, h / 2), (xl, N("_hah_slanted.1", 0.1) * D), (xl, -N("_hah_slanted.2", 0.3) * D)),
+                      g.cubic((xl, -N("_hah_slanted.3", 0.3) * D), (xl, -N("_hah_slanted.4", 0.8) * D), (xl + N("_hah_slanted.5", 0.2) * reach, yb), (xl + N("_hah_slanted.6", 0.5) * reach, yb)),
+                      g.cubic((xl + N("_hah_slanted.7", 0.5) * reach, yb), (xl + N("_hah_slanted.8", 0.8) * reach, yb), (xl + N("_hah_slanted.9", 0.95) * reach, -N("_hah_slanted.10", 0.85) * D), (xl + reach, -N("_hah_slanted.11", 0.6) * D)))
+        parts = [g.solid_stroke(st, g.path(path, bowl))]
+        if _e(form):
+            rise = [q[0] for q in low if q[1] - st.width_at(q[3]) / 2 <= 2.6 * h]
+            parts.append(g.rect(xj, min(max(rise) if rise else xj + N("_hah_slanted.12", 0.4) * span, -N("_hah_slanted.13", 0.05) * span), 0, h))
+            parts.append(g.rect(xj, 0.0, 0, h))
+        shapes = [_named(g.fuse(parts, N("_hah_slanted.14", 0.6) * min(h, N("_hah_slanted.15", 0.3) * U) if _e(form) else 0.0), "الحاء")]
+        if mark and mark[0] == "b":
+            d = st.dot
+            base_y = yb + h / 2 + N("_hah_slanted.16", 0.45) * d + d / 2
+            spots = [(xl + f * reach, base_y + k * N("_hah_slanted.17", 0.25) * d) for k in (0, 1, 2) for f in (N("_hah_slanted.18", 0.62), N("_hah_slanted.19", 0.55), N("_hah_slanted.20", 0.48), N("_hah_slanted.21", 0.7), N("_hah_slanted.22", 0.4))]
+            spots += [(xl + f * reach, yb - h / 2 - N("_hah_slanted.23", 0.45) * d - d / 2) for f in (N("_hah_slanted.24", 0.55), N("_hah_slanted.25", 0.45))]
+            shapes += clear_marks(st, shapes, mark, spots)
+        else:
+            shapes += marks(st, mark, -N("_hah_slanted.26", 0.5) * span, above_ref=X)
+        return Glyph(shapes, left=min(xa, xl - u), entry_x=0.0, entry_edge=0)
+    ex = xj - N("_hah_slanted.27", 0.45) * P
+    parts = [g.solid_stroke(st, g.path(path, g.line(b, (ex, h / 2))))]
+    if _e(form):
+        rise = [q[0] for q in low if q[1] - st.width_at(q[3]) / 2 <= 2.6 * h]
+        entry = min(max(rise) if rise else xj + N("_hah_slanted.28", 0.4) * span, -N("_hah_slanted.29", 0.05) * span)
+        parts.append(g.rect(xj, entry, 0, h))
+    else:
+        entry = 0.0
+    shapes = [_named(g.fuse(parts, N("_hah_slanted.30", 0.6) * min(h, N("_hah_slanted.31", 0.3) * U) if _e(form) else 0.0), "الحاء")]
+    shapes += marks(st, mark, -N("_hah_slanted.32", 0.5) * span - (N("_hah_slanted.33", 0.1) * P if mark and mark[0] == "b" else 0),
+                    above_ref=X if not (mark and mark[0] == "b") else None)
+    return Glyph(shapes, left=xa, entry_x=entry, entry_edge=0, exit_x=ex + 1, exit_edge=xa)
+
+
+def jeem(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    """ح ج خ چ. The skeleton of the reference typefaces: an upper arm, a nose at the far right above the
+    middle of the letter, and a lower arm that sweeps back to the left: to the baseline join (حـ ـحـ)
+    or on down into a deep bowl that swings back to the right under the letter (ح ـح).
+    The upper arm is a hairline bar, the nose is where the pen is upright (a full stem), the lower arm
+    thins as it leans. A join from the right arrives on the baseline, under the nose."""
+    U, u, P, X, h, D = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair, st.descender
+    d0 = 0.0                                        # the nose: right end of the letter
+    xa = d0 - N("jeem.0", 1.78) * P                              # left end of the bar
+    xj = d0 - N("jeem.1", 1.38) * P                              # where the lower arm reaches the baseline
+    yt = X - h / 2
+    if st.angular >= 0.5:
+        return _jeem_square(st, form, mark)
+    if (pick(st, f"ح.{form}", "ح") or _hah_default(st)) == "ذراع مائل":
+        return _hah_slanted(st, form, mark)
+    top = [g.nose_top(st, d0, xa)]
+    if form in ("I", "M"):
+        ex = xj - N("jeem.2", 0.45) * P
+        run = d0 - xj
+        arm = [g.nose_arm(st, d0, xj, ex)]
+        if _e(form):
+            # the join from the right runs on the baseline under the nose and into the arm; the wedge
+            # between the two is filled
+            # the stub runs right until the arm has risen well clear of it (2.6 hairlines)
+            rise = [q[0] for q in g.cubic((d0, N("jeem.3", 0.636) * X), (d0, N("jeem.4", 0.303) * X), (d0 - N("jeem.5", 0.387) * run, 0), (xj, 0)) if q[1] <= 2.6 * h]
+            entry = min(max(rise) if rise else xj + N("jeem.6", 0.55) * run, d0 - N("jeem.7", 0.05) * run)
+            shapes = [_named(g.fuse([top, arm, g.rect(xj, entry, 0, h)], N("jeem.8", 0.6) * h), "أنف الحاء")]
+        else:
+            entry = 0.0
+            shapes = [_named(g.fuse([top, arm], 0.0), "أنف الحاء")]
+        if mark and mark[0] == "b":
+            shapes += marks(st, mark, (xa + d0) / 2 - N("jeem.9", 0.1) * P)
+        else:
+            shapes += marks(st, mark, (xa + d0) / 2)
+        # the next letter keeps its white from the bar's left end; the baseline join passes under it
+        return Glyph(shapes, left=xa, entry_x=entry, entry_edge=0, exit_x=ex + 1, exit_edge=xa)
+    # ح ـح: from the nose the stroke runs down to the left, through the baseline, into the bowl
+    xl, reach = xa + N("jeem.10", 0.45) * P - val(st, "hah.bowl_left"), val(st, "hah.reach")
+    yb = -D + h / 2
+    run = d0 - xl
+    beta = N("jeem.11", 32.0)
+    m = (d0 - N("jeem.12", 0.5) * run, N("jeem.13", 0.2) * X)
+    t = (-math.cos(math.radians(beta)), -math.sin(math.radians(beta)))
+    bowl = g.path(g.line((m[0] - t[0] * N("jeem.14", 0.05) * run, m[1] - t[1] * N("jeem.15", 0.05) * run), m),
+                  g.cubic(m, (m[0] + t[0] * N("jeem.16", 0.33) * run, m[1] + t[1] * N("jeem.17", 0.33) * run), (xl + N("jeem.18", 0.03) * P, -N("jeem.19", 0.02) * D), (xl, -N("jeem.20", 0.3) * D)),
+                  g.cubic((xl, -N("jeem.21", 0.3) * D), (xl - N("jeem.22", 0.03) * P, -N("jeem.23", 0.8) * D), (xl + N("jeem.24", 0.2) * reach, yb), (xl + N("jeem.25", 0.5) * reach, yb)),
+                  g.cubic((xl + N("jeem.26", 0.5) * reach, yb), (xl + N("jeem.27", 0.8) * reach, yb), (xl + N("jeem.28", 0.95) * reach, -N("jeem.29", 0.85) * D), (xl + reach, -N("jeem.30", 0.6) * D)))
+    parts = [top, [g.nose_turn(st, d0, m, beta)], g.solid_stroke(st, bowl)]
+    if _e(form):
+        parts.append(g.rect(d0 - N("jeem.31", 0.78) * run, 0.0, 0, h))      # the join from the right meets the arm on the baseline
+    shapes = [_named(g.fuse(parts, N("jeem.32", 0.6) * h), "الحاء")]
+    if mark and mark[0] == "b":
+        d = st.dot
+        base_y = yb + h / 2 + N("jeem.33", 0.45) * d + d / 2
+        spots = [(xl + f * reach, base_y + k * N("jeem.34", 0.25) * d) for k in (0, 1, 2) for f in (N("jeem.35", 0.62), N("jeem.36", 0.55), N("jeem.37", 0.48), N("jeem.38", 0.7), N("jeem.39", 0.4))]
+        spots += [(xl + f * reach, yb - h / 2 - N("jeem.40", 0.45) * d - d / 2) for f in (N("jeem.41", 0.55), N("jeem.42", 0.45))]   # a shallow bowl: under it
+        shapes += clear_marks(st, shapes, mark, spots)
+    else:
+        shapes += marks(st, mark, (xa + d0) / 2)
+    return Glyph(shapes, left=xa, entry_x=0.0, entry_edge=0)
+
+
+# As drawn by hand in بيدوناق, which was judged by eye and kept. The typefaces would have the flag twice
+# as long and the base 1.4 times (د read right 73% so, 66% as it is): a choice left to the designer.
+param("dal.flag", lambda st: 0.57 * st.stem, "طول راية الدال = 0.57 جذع", BY_EYE, "الدال")
+param("dal.base", lambda st: 1.75 * st.stem, "طول قاعدة الدال = 1.75 جذع", BY_EYE, "الدال")
+
+
+def dal(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, X, h = st.stem, st.stem / 2, st.x_height, st.hair
+    flag, base = val(st, "dal.flag"), val(st, "dal.base")
+    shapes = [g.stem(st, -u, X, entry=_e(form), exit=True),
+              _named(g.rect(-U - flag, -U, X - h, X), "راية الدال"),
+              _named(g.connector(st, -U - base, -U), "قاعدة الدال")]
+    shapes += marks(st, mark, -u)
+    return Glyph(shapes, left=-U - base, stems=[(-u, X, 0)])
+
+
+param("reh.top", lambda st: 0.62 * st.x_height, "ارتفاع جذع الراء = 0.62 × ارتفاع الحروف", BY_EYE, "الراء")
+param("reh.corner", lambda st: st.reh_corner if st.reh_corner > 0 else 0.48 * st.stem,
+      "استدارة ركن الراء الموصولة من أعلى = كما يقيسها الشعار، وإلا 0.48 جذع (قيست 11 على جذع 23 في «سیرنگ»)", MEASURED, "الراء")
+
+
+def reh(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    u, X = st.stem / 2, st.x_height
+    if "top_entry" in JOIN.get() and st.angular < 0.5:
+        # as the logo joins its own ر: a hairline bar from the top of the previous tooth, a rounded
+        # corner, a full stem, and the tail under the line
+        h, U = st.hair, st.stem
+        r = val(st, "reh.corner")
+        bar = st.white + N("reh.0", 0.5) * U
+        body = [(bar, X), (bar, X - h), (0.0, X - h), (0.0, 0.0), (-U, 0.0), (-U, X - r)] \
+            + [(q[0], q[1]) for q in g.cubic((-U, X - r), (-U, X - N("reh.1", 0.45) * r), (-U + N("reh.2", 0.45) * r, X), (-U + r, X), 10)]
+        shapes = [_named([body], "راء موصولة من أعلى"), tail(st, -u, N("reh.3", 0.3) * X)]
+        shapes += marks(st, mark, -u, above_ref=X)
+        return Glyph(shapes, left=-U, stems=[(-u, X, 0)], tail=-u - N("reh.4", 3.05) * st.stem - st.hair)
+    if "top_entry" in JOIN.get():
+        # a bar from the top of the previous tooth, down the stem, and a flat foot on the baseline
+        h, U = st.hair, st.stem
+        foot = -u - st.tail_reach * U + u
+        yb = h / 2
+        path = [(st.white + N("reh.5", 0.5) * U, X - h / 2), (-u, X - h / 2), (-u, yb), (foot, yb)]
+        shapes = [_named(g.angular_stroke(st, path, st.corner_r), "راء موصولة من أعلى")]
+        shapes += marks(st, mark, -u, above_ref=X)
+        return Glyph(shapes, left=-U, stems=[(-u, X, 0)], tail=foot - h)
+    lib = _lib()
+    top = lib.parts["tail"].info.get("top", N("reh.6", 0.62) * X) if lib is not None and lib.has("tail") else val(st, "reh.top")
+    shapes = [tail(st, -u, top)]
+    if _e(form):
+        half = lib.half("r", True, -u, lib.white) if lib is not None else None
+        shapes.append(half if half is not None else g.stem(st, -u, top, entry=True))
+    shapes += marks(st, mark, -u, above_ref=top)
+    return Glyph(shapes, left=-st.stem, stems=[(-u, top, 0)], tail=-u - N("reh.7", 3.05) * st.stem - st.hair)
+
+
+def seen(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, P, X = st.stem, st.stem / 2, st.pitch, st.x_height
+    if form in ("I", "M"):
+        shapes, xs = teeth(st, 3, _e(form), _x(form), drop_inner=True)
+        shapes += marks(st, mark, xs[1])
+        return Glyph(shapes, left=xs[-1] - u, exit_x=xs[-1] - u, exit_edge=xs[-1] - u, stems=[(x, X, 0) for x in xs])
+    shapes, xs = teeth(st, 2, _e(form), True, drop_inner=True)
+    r = xs[-1] - P
+    w = val(st, "cup.width")
+    shapes += [g.connector(st, r + u, xs[-1] - u), g.stem(st, r, X, entry=True),
+               bowl_down(st, r, val(st, "cup.arm"), w, val(st, "cup.left"))]
+    shapes += marks(st, mark, xs[1])
+    return Glyph(shapes, left=r - w - u, stems=[(x, X, 0) for x in xs] + [(r, X, 0)])
+
+
+def _loop_square(st: Style) -> Tuple[float, float]:
+    """The long loop of ص ط. Like every head it fills the x-height (all letters lie between the
+    baseline and the x-height line); it is longer than a head: its counter is 1.6 whites wide."""
+    w = 2 * st.stem + N("_loop_square.0", 1.6) * st.white
+    return -w, st.x_height
+
+
+def _sad_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, X = st.stem, st.stem / 2, st.x_height
+    xl, ht = _loop_square(st)
+    shapes = [_ring(st, xl, 0, 0, ht)]
+    xt = xl + u
+    if form in ("I", "M"):
+        # the tooth of ص stands one pitch after the loop, joined by the same u-bowl as two teeth:
+        # the loop's left side gives the right half of the bowl, the tooth the left half
+        xs = xt - st.pitch
+        shapes.append(g.stem(st, xt, N("_sad_square.0", 0.5) * X, exit=True))
+        shapes.append(g.stem(st, xs, X, entry=True, exit=_x(form), round_bl=not _x(form)))
+        shapes += marks(st, mark, xl / 2, above_ref=ht)
+        return Glyph(shapes, left=xs - u, entry_x=-U, entry_edge=0, exit_x=xs - u, exit_edge=xs - u,
+                     stems=[(xs, X, 0)])
+    w = val(st, "cup.width")
+    shapes.append(bowl_down(st, xt, N("_sad_square.1", 0.4) * ht, w, N("_sad_square.2", 0.45) * X))
+    shapes += marks(st, mark, xl / 2, above_ref=ht)
+    return Glyph(shapes, left=xt - w - u, entry_x=-U, entry_edge=0)
+
+
+def _tah_square(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, X, A = st.stem, st.stem / 2, st.x_height, st.ascender
+    xl, ht = _loop_square(st)
+    xt = xl + u
+    # the stem stands on the loop; a join to the next letter leaves from the loop's own bottom
+    shapes = [_ring(st, xl, 0, 0, ht), g.stem(st, xt, X + A)]
+    shapes += marks(st, mark, xl * N("_tah_square.0", 0.38), above_ref=ht)
+    return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl if _x(form) else None,
+                 exit_edge=xl if _x(form) else None, stems=[(xt, X + A, 0)])
+
+
+# chosen by eye on one logo, then tried shorter and longer against the typefaces: this length reads best
+param("loop.length", lambda st: 0.8 * st.x_height + 1.35 * st.stem,
+      "طول عروة الصاد والطاء = 0.8 × ارتفاع الحروف (منحدر بميل 45°) + 1.35 جذع (الطرف المستدير)", FITTED, "العروة")
+param("sad.tooth", lambda st: st.x_height, "ارتفاع سنّ الصاد = ارتفاع الحروف", BY_EYE, "الصاد")
+# On the typefaces (nearly all with heavy hairlines) the ring reads right 61% of the time against 57%
+# for the teardrop. They hardly hold a contrast pen, so for those the teardrop, approved by eye on the
+# reference logo, stays.
+param("loop.ring_length", lambda st: 1.25 * (2 * st.stem + 1.9 * st.white), "طول عروة الصاد الحلقية = 1.25 × (جذعان + 1.9 بياض)", FITTED, "العروة")
+param("loop.ring_below", lambda st: 0.5, "تُرسم العروة حلقةً حين يبلغ الخط الشعري نصف الجذع فأكثر", BY_EYE, "العروة")
+
+
+def _loop_kind(st: Style) -> str:
+    # the loop is one construction for ص ض ط ظ in every form: a choice made for any of them holds
+    want = pick(st, "ص", "ط", "عروة", *[f"{c}.{f}" for c in "صط" for f in "iIMF"])
+    if want in ("قطرة", "حلقة"):
+        return want
+    return "قطرة" if st.hair < val(st, "loop.ring_below") * st.stem else "حلقة"
+
+
+def _loop(st: Style) -> Tuple[List[g.Shape], float, float]:
+    """The loop of ص ط with its right end at x = 0, the centre of the stem that stands at its left
+    point, and its length. Two constructions:
+      قطرة  a teardrop: flat on the baseline, a round thick end, a slope down to the stem's foot
+            (a contrast pen, as in the reference logo);
+      حلقة  a rounded ring whose left side is the stem itself, flat on top at the x-height
+            (a pen with heavy hairlines, as most sans typefaces draw it)."""
+    U = st.stem
+    L = g.loop_length(st)
+    if _loop_kind(st) == "حلقة":
+        Lr = val(st, "loop.ring_length")
+        xs = -Lr + U / 2                       # the stem is the ring's left side
+        return [_named(g.ring(st, -Lr, 0.0, 0.0, st.x_height), "عروة")], xs, Lr - U
+    return [_named(g.teardrop(st, -L, 0.0), "عروة")], -L - U / 2, L
+
+
+def sad(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    """ص ض: the loop, and a tooth standing at its left point (the reference typefaces put it there,
+    not a pitch away). The tooth carries the join, or goes down into the cup (ص ـص)."""
+    if st.angular >= 0.5:
+        return _sad_square(st, form, mark)
+    U, u, X = st.stem, st.stem / 2, st.x_height
+    shapes, xs, L = _loop(st)
+    common = dict(entry_x=-N("sad.0", 1.3) * U, entry_edge=0)
+    if form in ("I", "M"):
+        shapes.append(g.stem(st, xs, val(st, "sad.tooth"), exit=_x(form), round_bl=not _x(form)))
+        shapes += marks(st, mark, -N("sad.1", 0.43) * L, above_ref=X)
+        return Glyph(shapes, left=xs - u, exit_x=xs - u, exit_edge=xs - u, stems=[(xs, val(st, "sad.tooth"), 0)], **common)
+    w = val(st, "cup.width")
+    shapes += [g.stem(st, xs, val(st, "sad.tooth")), bowl_down(st, xs, val(st, "cup.arm"), w, val(st, "cup.left"))]
+    shapes += marks(st, mark, -N("sad.2", 0.43) * L, above_ref=X)
+    return Glyph(shapes, left=xs - w - u, stems=[(xs, X, 0)], **common)
+
+
+def tah(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    """ط ظ: the same loop, and a stem to the ascender standing at its left point."""
+    if st.angular >= 0.5:
+        return _tah_square(st, form, mark)
+    U, u, X, A = st.stem, st.stem / 2, st.x_height, st.ascender
+    shapes, xs, L = _loop(st)
+    shapes.append(g.stem(st, xs, X + A, exit=_x(form), round_bl=not _x(form)))
+    shapes += marks(st, mark, -N("tah.0", 0.4) * L, above_ref=X)
+    return Glyph(shapes, left=xs - u, entry_x=-N("tah.1", 1.3) * U, entry_edge=0, exit_x=(xs - u) if _x(form) else None,
+                 exit_edge=(xs - u) if _x(form) else None, stems=[(xs, X + A, 0)])
+
+
+def _ain_eye(st: Style, xl: float, top: float) -> List[g.Shape]:
+    """The eye of ـعـ ـع: a head on the baseline whose top dips in a V. The counter stays closed
+    (an open top would read as two teeth of ـسـ). The V is the band between the cut and the same
+    cut moved down by the pen, so it shares its edges with the head and cannot leave a seam."""
+    from shapely.affinity import translate
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    U, u, h = st.stem, st.stem / 2, st.hair
+    inner = top - 2 * h                             # height of the counter
+    depth = h + N("_ain_eye.0", 0.35) * inner                        # the V reaches a third of the way into it
+    ring = g.ring(st, xl, 0, 0, top)
+    shp, outer = None, None
+    for poly in ring:
+        P_ = Polygon(poly).buffer(0)
+        outer = P_ if outer is None else outer.union(P_)
+        shp = P_ if shp is None else shp.symmetric_difference(P_)
+    xm = xl / 2
+    notch = Polygon([(xl + u, top + 2), (-u, top + 2), (-u, top - h / 2), (xm, top - depth), (xl + u, top - h / 2)])
+    t = N("_ain_eye.1", 1.2) * h                                     # a diagonal is a little heavier than the hairline
+    band = notch.difference(translate(notch, 0, -t)).intersection(outer)
+    shp = unary_union([shp.difference(notch), band])
+    out: g.Shape = []
+    for poly in getattr(shp, "geoms", [shp]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            out.append(list(poly.exterior.coords)[:-1])
+            out += [list(i.coords)[:-1] for i in poly.interiors]
+    return [_named(out, "عين")]
+
+
+param("ain.eye_w", lambda st: 2 * st.stem + 0.7 * st.white, "عرض عين العين الوسطى = جذعان + 0.7 بياض", BY_EYE, "العين")
+param("ain.eye_h", lambda st: 0.85 * st.x_height, "ارتفاع عين العين الوسطى = 0.85 × ارتفاع الحروف", BY_EYE, "العين")
+param("ain.side", lambda st: 0.62 * st.stem, "سمك جانب عين العين الوسطى = 0.62 جذع (الجانبان معًا أخف من حدّ التكدّس)", DERIVED, "العين")
+# more rounding and the funnel reads as a round head (28% -> 19%)
+param("ain.round", lambda st: 0.1 * st.stem, "استدارة أركان عين العين الوسطى = 0.1 جذع", FITTED, "العين")
+param("ain.head_w", lambda st: 1.1 * st.pitch, "عرض رأس العين الأولى = 1.1 خطوة", BY_EYE, "العين")
+# the open head was 0.6 of the x-height (by eye); the typefaces fill the x-height with it: عـ read right
+# 15% of the time before, 69% so
+param("ain.head_h", lambda st: 0.96 * st.x_height, "ارتفاع رأس العين الأولى = 0.96 × ارتفاع الحروف", FITTED, "العين")
+
+
+def _ain_funnel(st: Style, w: float, top: float) -> g.Shape:
+    """The eye of ـعـ as the typefaces draw it: wide and flat at the top, narrowing to its foot on the
+    baseline. Top and bottom are hairlines, the leaning sides take the pen's width for their lean."""
+    U, h = st.stem, st.hair
+    foot = max(N("_ain_funnel.0", 1.0) * U, N("_ain_funnel.1", 0.4) * w)                    # width at the baseline: about one stem, or ink piles up
+    dx = (w - foot) / 2
+    ang = math.atan2(top, max(dx, 1e-6))            # lean of a side
+    # its horizontal thickness: the pen's width for that lean, but the two sides meet at the foot, so
+    # together they must not be heavier than the pen allows where strokes pile up
+    side = min(st.width_at(math.sin(ang)) / max(math.sin(ang), 0.3), val(st, "ain.side"))
+    outer = [(-w, top), (0.0, top), (-dx, 0.0), (-w + dx, 0.0)]
+    yt, yb = top - h, h
+    il = -w + dx * (1 - yt / top) + side; ir = -dx * (1 - yt / top) - side
+    bl = -w + dx * (1 - yb / top) + side; br = -dx * (1 - yb / top) - side
+    if ir - il < 0.25 * U or yt - yb < 0.25 * U:
+        return [outer]
+    if br <= bl:                                    # the counter comes to a point above the foot
+        k = (ir - il) / max((ir - il) - (br - bl), 1e-6)
+        return [outer, [(il, yt), (ir, yt), ((il + ir) / 2 + (bl + br - il - ir) / 2 * k, yt - (yt - yb) * k)]]
+    return [outer, [(il, yt), (ir, yt), (br, yb), (bl, yb)]]
+
+
+def ain(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    return _draw("ع", st, form, mark)
+
+
+@variant("ع", "M", "قمع", "عين عريضة مسطحة من أعلى تضيق إلى قدمها على السطر، كما في أغلب الخطوط", when=curved)
+@variant("ع", "F", "قمع", "عين قمعية فوق الكأس", when=lambda st: False)        # offered, not the default: the ring reads better there
+def _ain_joined(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, P, X, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair
+    w, top = val(st, "ain.eye_w"), val(st, "ain.eye_h")
+    xl = -w
+    shapes = [_named(g.soften(_ain_funnel(st, w, top), val(st, "ain.round")), "عين"), g.connector(st, xl, 0)]
+    shapes += marks(st, mark, xl / 2, above_ref=top)
+    if form == "M":
+        return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
+    shapes.append(sweep_right(st, xl + u + (w - max(N("_ain_joined.0", 1.0) * U, N("_ain_joined.1", 0.4) * w)) / 2, N("_ain_joined.2", 0.3) * top, N("_ain_joined.3", 0.9) * val(st, "bowl.reach")))
+    return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0)
+
+
+@variant("ع", "MF", "حلقة بشقّ", "حلقة مغلقة ينخفض أعلاها في شقّ")
+def _ain_ring(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, P, X, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair
+    xl = -(2 * U + N("_ain_ring.0", 0.7) * st.white)
+    top = N("_ain_ring.1", 0.85) * X
+    shapes = _ain_eye(st, xl, top) + [g.connector(st, xl, 0)]
+    shapes += marks(st, mark, xl / 2, above_ref=top)
+    if form == "M":
+        return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
+    shapes.append(sweep_right(st, xl + u, N("_ain_ring.2", 0.3) * top, N("_ain_ring.3", 0.9) * val(st, "bowl.reach")))
+    return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0)
+
+
+@variant("ع", "iI", "رأس مفتوح", "رأس كحرف c مفتوح إلى اليمين، ثم جذع إلى السطر أو كأس تحته")
+def _ain_open(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, P, X, h, D = st.stem, st.stem / 2, st.pitch, st.x_height, st.hair, st.descender
+    a, b = val(st, "ain.head_w") / 2, val(st, "ain.head_h") / 2
+    cx, cy = -a * N("_ain_open.0", 0.95), X - b
+    xs = cx - a
+    if st.angular >= 0.5:      # a square c: top bar, the left side, the lower arm
+        shapes = [_named(g.angular_stroke(st, [(cx + a, X - h / 2), (xs, X - h / 2), (xs, cy - b + h / 2), (cx + N("_ain_open.1", 0.6) * a, cy - b + h / 2)],
+                                          st.corner_r), "رأس العين")]
+    else:
+        shapes = [g.open_arc(st, cx, cy, a, b, 35, 325)]
+    shapes += marks(st, mark, cx, above_ref=X + st.hair / 2)      # the head's top stroke stands half a pen over the line
+    if form == "I":
+        shapes.append(g.stem(st, xs, cy, exit=True))
+        return Glyph(shapes, left=xs - u, exit_x=xs - u, exit_edge=xs - u, stems=[(xs, cy, 0)])
+    shapes.append(sweep_right(st, xs, cy, val(st, "bowl.reach")))
+    return Glyph(shapes, left=xs - u)
+
+
+param("fa.top", lambda st: st.x_height, "قمة رأس الفاء والقاف الموصولتين = ارتفاع الحروف", DERIVED, "الفاء والقاف")
+param("fa.counter", lambda st: st.white, "فراغ رأس الفاء والقاف الموصولتين = البياض", DERIVED, "الفاء والقاف")
+# Typefaces stand the joined head on a short neck. A neck needs room: with a heavy hairline the white
+# under the head would be a crack, so there the head stays down. (A taller neck with a real white under
+# it was tried on all the typefaces: initial ف reads a little better, medial ف worse; no gain.)
+param("fa.lift", lambda st: 0.15 * st.x_height if 0.15 * st.x_height >= 2.2 * st.hair else 0.0,
+      "ارتفاع رأس الفاء والقاف عن السطر = 0.15 × ارتفاع الحروف (وصفر إن لم يبقَ تحته بياض بسمك خط شعري)", FITTED, "الفاء والقاف")
+
+
+# two pitches by eye; the typefaces keep it shorter: isolated ف read right 38% so, 49% at 1.4 pitches
+param("qaf.left", lambda st: 0.6 * st.x_height, "ارتفاع طرف كأس القاف الأيسر = 0.6 × ارتفاع الحروف", BY_EYE, "الفاء والقاف")
+param("fa.tail", lambda st: 1.4 * st.pitch, "طول ذيل الفاء على السطر = 1.4 خطوة", FITTED, "الفاء والقاف")
+param("fa.end", lambda st: 0.5 * st.x_height, "ارتفاع طرف ذيل الفاء = نصف ارتفاع الحروف", BY_EYE, "الفاء والقاف")
+
+
+def feh(st: Style, form: str, mark: Optional[str], qaf: bool = False) -> Glyph:
+    U, u, P, X = st.stem, st.stem / 2, st.pitch, st.x_height
+    common = dict(entry_x=-U, entry_edge=0)
+    if form in ("I", "M") and st.angular < 0.5:
+        # joined: the head may be smaller than a free head and stand on a neck above the baseline
+        xl = -(2 * U + val(st, "fa.counter"))
+        top, lift = val(st, "fa.top"), val(st, "fa.lift")
+        shapes = [_ring(st, xl, 0, lift, top)]
+        if lift > 0.5:
+            shapes += [_named(g.rect(xl / 2 - u, xl / 2 + u, 0, lift + st.hair), "عنق"), g.connector(st, xl, 0)]
+        shapes += marks(st, mark, xl / 2, above_ref=top)
+        return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
+    xl, w = head_box(st)
+    if form in ("i", "F") and st.angular < 0.5:
+        # free at the left: the same head, on its neck where there is room, then the tail or the cup
+        lift = val(st, "fa.lift") if not qaf else 0.0
+        shapes = [_ring(st, xl, 0, lift, X)]
+        if lift > 0.5:
+            shapes += [_named(g.rect(xl / 2 - u, xl / 2 + u, 0, lift + st.hair), "عنق"), g.connector(st, xl, 0)]
+    else:
+        shapes = [_ring(st, xl, 0, 0, X)]
+    shapes += marks(st, mark, xl / 2)
+    if form in ("I", "M"):
+        return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
+    if qaf:
+        # the cup's left arm keeps half a white from the head (12 against a white of 22 in the
+        # hand-made بيدوناق), never against it
+        bw = max(val(st, "cup.width") * N("feh.0", 3.5) / N("feh.1", 3.4), -xl + N("feh.2", 0.5) * st.white)
+        shapes.append(bowl_down(st, -u, X / 2, bw, val(st, "qaf.left")))
+        return Glyph(shapes, left=xl, **common)
+    post = xl - val(st, "fa.tail")
+    end = val(st, "fa.end")
+    shapes += [g.connector(st, post + u, xl + U), g.stem(st, post, end, entry=True, round_bl=True)]
+    return Glyph(shapes, left=post - u, stems=[(post, end, 0)], **common)
+
+
+# by eye the arm was 1.3 pitches and the end post 0.45 of the x-height; a shorter arm and a taller post
+# read better against the typefaces (final ك 55% -> 66%, isolated 53% -> 64%)
+param("kaf.arm", lambda st: 0.9 * st.pitch, "طول ذراع الكاف = 0.9 خطوة", FITTED, "الكاف")
+param("kaf.width", lambda st: 2.2 * st.pitch, "طول قاعدة الكاف الأخيرة = 2.2 خطوة", BY_EYE, "الكاف")
+param("kaf.post", lambda st: 0.7 * st.x_height, "ارتفاع طرف الكاف الأخيرة = 0.7 × ارتفاع الحروف", FITTED, "الكاف")
+
+
+def kaf(st: Style, form: str, mark: Optional[str], variant: str) -> Glyph:
+    """ك ک گ: a stem to the ascender with a hairline arm to the left at its top (the gaf has a
+    second, floating bar above the arm; both stay under the ascender line). Final and isolated
+    forms add the baseline and a short post on the left, like ب; Arabic ك carries a small dash."""
+    U, u, P, X, A, h = st.stem, st.stem / 2, st.pitch, st.x_height, st.ascender, st.hair
+    top = X + A
+    arm_top = top - N("kaf.0", 2.6) * h if variant == "gaf" else top
+    arm_left = -U - val(st, "kaf.arm")
+    shapes: List[g.Shape] = []
+    if form in ("I", "M"):
+        shapes.append(g.stem(st, -u, arm_top, entry=_e(form), exit=_x(form), round_br=not _e(form)))
+    else:
+        shapes.append(g.stem(st, -u, arm_top, entry=_e(form), exit=True, round_br=not _e(form)))
+    shapes.append(_named(g.rect(arm_left, -u, arm_top - h, arm_top), "ذراع الكاف"))
+    if variant == "gaf":
+        shapes.append(_named(g.rect(arm_left + N("kaf.1", 0.15) * P, -U - N("kaf.2", 0.1) * P, top - h, top), "شرطة الگاف"))
+    if form in ("I", "M"):
+        return Glyph(shapes, left=min(arm_left, -U), exit_x=-U, exit_edge=-U, stems=[(-u, arm_top, 0)])
+    post = -U - val(st, "kaf.width")
+    ph = val(st, "kaf.post")
+    shapes += [g.connector(st, post + u, -U), g.stem(st, post, ph, entry=True, round_bl=True)]
+    if variant == "arabic":
+        cx = (post + u - U) / 2
+        cy = max(N("kaf.3", 0.42) * X, N("kaf.4", 1.5) * h + N("kaf.5", 0.3) * U)             # clear of the baseline stroke, whatever its weight
+        shapes.append(_named(g.rect(cx - N("kaf.6", 0.35) * P, cx + N("kaf.7", 0.35) * P, cy - h / 2, cy + h / 2), "شرطة"))
+    return Glyph(shapes, left=min(arm_left, post - u), stems=[(-u, arm_top, 0), (post, ph, 0)])
+
+
+def lam(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, X, A = st.stem, st.stem / 2, st.x_height, st.ascender
+    if form in ("I", "M"):
+        shapes = [g.stem(st, -u, X + A, entry=_e(form), exit=True, round_br=not _e(form))]
+        return Glyph(shapes, left=-U, exit_x=-U, exit_edge=-U, stems=[(-u, X + A, 0)])
+    w = val(st, "cup.width")
+    shapes = [g.stem(st, -u, X + A, entry=_e(form)), bowl_down(st, -u, val(st, "cup.arm"), w, val(st, "cup.left"))]
+    return Glyph(shapes, left=-u - w - u, stems=[(-u, X + A, 0)])
+
+
+# the ring of م was 0.6 of the x-height with half a white inside (by eye, on one logo); against the
+# typefaces that read right 26% of the time, and 71% at this size
+param("meem.height", lambda st: 0.88 * st.x_height, "ارتفاع حلقة الميم = 0.88 × ارتفاع الحروف", FITTED, "الميم")
+param("meem.counter", lambda st: 1.25 * st.white, "فراغ حلقة الميم = 1.25 × البياض", FITTED, "الميم")
+param("meem.tail", lambda st: st.descender, "نزول ذيل الميم = النازل", DERIVED, "الميم")
+
+
+def meem(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    return _draw("م", st, form, mark)
+
+
+@variant("م", "iIMF", "حلقة وذيل", "حلقة على السطر، وذيل ينزل من يسارها في آخر الكلمة")
+def _meem(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, X, h = st.stem, st.stem / 2, st.x_height, st.hair
+    D = val(st, "meem.tail")
+    xl = -(2 * U + val(st, "meem.counter"))
+    top = val(st, "meem.height")
+    shapes = [_ring(st, xl, 0, 0, top)]
+    common = dict(entry_x=-U, entry_edge=0)
+    if form in ("I", "M"):
+        return Glyph(shapes, left=xl, exit_x=xl + U, exit_edge=xl, **common)
+    x = xl + u
+    # the tail drops from the left side of the head; in a curved logo it hooks to the left and thins
+    curved_ = g.path(g.line((x, top / 2), (x, -N("_meem.0", 0.4) * D)),
+                     g.cubic((x, -N("_meem.1", 0.4) * D), (x, -N("_meem.2", 0.85) * D), (x - N("_meem.3", 0.3) * U, -D + h / 2), (x - N("_meem.4", 1.0) * U, -D + h / 2)))
+    shapes.append(_named(_pen(st, curved_, [(x, top / 2), (x, -D)]), "ذيل الميم"))
+    return Glyph(shapes, left=xl - (N("_meem.5", 1.0) * U if st.angular < 0.5 else 0), stems=[(x, top / 2, -D)], **common)
+
+
+param("heh.counter", lambda st: 1.3 * st.white + 0.8 * st.stem + 0.6 * st.hair,
+      "فراغ رأس الهاء الأولى = 1.3 بياض + 0.8 جذع + 0.6 خط شعري (عينان كلٌّ منهما أوسع من نصف البياض، وبينهما القاطع بسمك قلمه)", DERIVED, "الهاء")
+param("heh.lower_w", lambda st: 0.62, "عرض العين السفلى للهاء الوسطى = 0.62 من عرض رأسها", BY_EYE, "الهاء")
+param("heh.lower_side", lambda st: 0.63 * st.stem, "سمك جانب العين السفلى = 0.63 جذع", BY_EYE, "الهاء")
+param("heh.cut_top", lambda st: 0.3, "رأس قاطع الهاء الأولى على 0.3 من عرضها من اليمين", BY_EYE, "الهاء")
+param("heh.cut_foot", lambda st: 0.62, "قدم قاطع الهاء الأولى على 0.62 من عرضها من اليمين", BY_EYE, "الهاء")
+param("heh.width", lambda st: 2 * st.stem + st.white, "عرض رأس الهاء المنفصلة والأخيرة = جذعان + بياض", DERIVED, "الهاء")
+param("heh.height", lambda st: st.x_height, "ارتفاع رأس الهاء المنفصلة والأخيرة = ارتفاع الحروف", DERIVED, "الهاء")
+
+
+def heh(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, X, A, h = st.stem, st.stem / 2, st.x_height, st.ascender, st.hair
+    xl, w = head_box(st)
+    if form == "I" and pick(st, "ه.I") != "حلقة وجذع" and st.angular < 0.5:
+        # هـ in the typefaces: a wide head with a stroke across it that makes two eyes
+        wide = 2 * U + val(st, "heh.counter")
+        xl = -wide
+        cut = g.solid_stroke(st, g.line((-val(st, "heh.cut_top") * wide, X - h / 2), (-val(st, "heh.cut_foot") * wide, h / 2)))
+        shapes = [_ring(st, xl, 0, 0, X), _named(cut, "قاطع الهاء")]
+        shapes += marks(st, mark, xl / 2, above_ref=X)
+        return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl)
+    if form == "I":
+        # هـ: a lower head whose right side rises as a stem to the x-height (like a mirrored ط)
+        ht = N("heh.0", 0.68) * X
+        shapes = [_ring(st, xl, 0, 0, ht), g.stem(st, -u, X, round_br=True)]
+        shapes += marks(st, mark, xl / 2, above_ref=X)
+        return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, exit_x=xl + U, exit_edge=xl, stems=[(-u, X, 0)])
+    if form == "M":
+        # ـهـ in the reference typefaces: an eye above the baseline and a smaller one hanging under it.
+        # The upper eye is the head; the lower one is the same ring, 0.62 as wide, down to the descender
+        side = val(st, "heh.lower_side")
+        wl = max(val(st, "heh.lower_w") * w, 2 * side + N("heh.1", 0.45) * st.white)
+        cx = xl / 2
+        shapes = [_ring(st, xl, 0, 0, X),
+                  _named(g.ring(st, cx - wl / 2, cx + wl / 2, -st.descender, h, side=side), "عين سفلى")]
+    else:
+        w = val(st, "heh.width")
+        xl = -w
+        shapes = [_ring(st, xl, 0, 0, val(st, "heh.height"))]
+    shapes += marks(st, mark, xl / 2)
+    return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0,
+                 exit_x=(xl + U) if _x(form) else None, exit_edge=xl if _x(form) else None)
+
+
+param("waw.width", lambda st: 2 * st.stem + st.white, "عرض رأس الواو = جذعان + بياض", DERIVED, "الواو")
+param("waw.height", lambda st: st.x_height, "ارتفاع رأس الواو = ارتفاع الحروف", DERIVED, "الواو")
+
+
+def waw(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    U, u, X = st.stem, st.stem / 2, st.x_height
+    xl, top = -val(st, "waw.width"), val(st, "waw.height")
+    if st.tail_drop < 0.3:
+        # the tail rests on the baseline: the head rises above it, or it would read as ه with a foot
+        hb = N("waw.0", 0.4) * X
+        shapes = [_ring(st, xl, 0, hb, top), tail(st, -u, hb + st.hair)]
+    else:
+        shapes = [_ring(st, xl, 0, 0, top), tail(st, -u, top / 2)]
+    shapes += marks(st, mark, xl / 2)
+    return Glyph(shapes, left=xl, entry_x=-U, entry_edge=0, tail=-u - N("waw.1", 3.05) * U - st.hair)
+
+
+def hamza(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    X, U = st.x_height, st.stem
+    shapes = [g.open_arc(st, -N("hamza.0", 0.7) * U, N("hamza.1", 0.42) * X, N("hamza.2", 0.55) * U, N("hamza.3", 0.3) * X, 40, 320, scale=N("hamza.4", 0.8))]
+    return Glyph(shapes, left=-N("hamza.5", 1.5) * U)
+
+
+def tatweel(st: Style, form: str, mark: Optional[str]) -> Glyph:
+    P = st.pitch
+    return Glyph([g.connector(st, -P, 0)], left=-P, entry_x=0, exit_x=-P, exit_edge=-P)
+
+
+# variants chosen inside the builders above, declared so that they can be listed and picked
+declare("ص", "iIMF", [("قطرة", "عروة كالقطرة بمنحدر إلى قدم السنّ: لقلم التباين"),
+                      ("حلقة", "حلقة مستديرة جانبها الأيسر هو السنّ: للأقلام ثقيلة الخطوط الأفقية")],
+        lambda st: "مربّع" if st.angular >= 0.5 else _loop_kind(st))
+declare("ط", "iIMF", [("قطرة", "عروة كالقطرة"), ("حلقة", "حلقة مستديرة")],
+        lambda st: "مربّع" if st.angular >= 0.5 else _loop_kind(st))
+declare("ح", "iIMF", [("أنف", "شرطة شعرية وأنف قائم بسمك الجذع: لقلم التباين"),
+                      ("ذراع مائل", "ذراع ينحدر إلى أنف مستدير: لقلم السمك الواحد")],
+        lambda st: "مربّع" if st.angular >= 0.5 else _hah_default(st))
+declare("ه", "I", [("عينان", "رأس عريض بقاطع يصنع عينين"), ("حلقة وجذع", "حلقة منخفضة وجذع قائم على يمينها")],
+        lambda st: "حلقة وجذع" if st.angular >= 0.5 else "عينان")
+declare("ي", "i", [("رأس وكأس", "رأس مفتوح إلى اليمين ثم كأس واسع"), ("كأس", "كأس فقط")],
+        lambda st: "كأس" if st.angular >= 0.5 else "رأس وكأس")
+
+
+# ---------------------------------------------------------------- the table
+# join: "D" joins both sides, "R" joins only the letter before it, "U" never joins.
+Builder = Callable[[Style, str], Glyph]
+LETTERS: Dict[str, Tuple[str, Builder]] = {
+    "ا": ("R", lambda s, f: alef(s, f, None)),
+    "أ": ("R", lambda s, f: alef(s, f, "ha")),
+    "إ": ("R", lambda s, f: alef(s, f, "hb")),
+    "آ": ("R", lambda s, f: alef(s, f, "md")),
+    "ٱ": ("R", lambda s, f: alef(s, f, None)),
+    "ب": ("D", lambda s, f: beh(s, f, "b1")),
+    "ت": ("D", lambda s, f: beh(s, f, "a2")),
+    "ث": ("D", lambda s, f: beh(s, f, "a3")),
+    "پ": ("D", lambda s, f: beh(s, f, "b3")),
+    "ن": ("D", lambda s, f: noon(s, f, "a1")),
+    "ي": ("D", lambda s, f: yeh(s, f, "b2", "b2")),
+    "ی": ("D", lambda s, f: yeh(s, f, "b2", None)),
+    "ى": ("D", lambda s, f: yeh(s, f, None, None)),
+    "ئ": ("D", lambda s, f: yeh(s, f, "ha", "ha")),
+    "ج": ("D", lambda s, f: jeem(s, f, "b1")),
+    "ح": ("D", lambda s, f: jeem(s, f, None)),
+    "خ": ("D", lambda s, f: jeem(s, f, "a1")),
+    "چ": ("D", lambda s, f: jeem(s, f, "b3")),
+    "د": ("R", lambda s, f: dal(s, f, None)),
+    "ذ": ("R", lambda s, f: dal(s, f, "a1")),
+    "ر": ("R", lambda s, f: reh(s, f, None)),
+    "ز": ("R", lambda s, f: reh(s, f, "a1")),
+    "ژ": ("R", lambda s, f: reh(s, f, "a3")),
+    "س": ("D", lambda s, f: seen(s, f, None)),
+    "ش": ("D", lambda s, f: seen(s, f, "a3")),
+    "ص": ("D", lambda s, f: sad(s, f, None)),
+    "ض": ("D", lambda s, f: sad(s, f, "a1")),
+    "ط": ("D", lambda s, f: tah(s, f, None)),
+    "ظ": ("D", lambda s, f: tah(s, f, "a1")),
+    "ع": ("D", lambda s, f: ain(s, f, None)),
+    "غ": ("D", lambda s, f: ain(s, f, "a1")),
+    "ف": ("D", lambda s, f: feh(s, f, "a1")),
+    "ڤ": ("D", lambda s, f: feh(s, f, "a3")),
+    "ق": ("D", lambda s, f: feh(s, f, "a2", qaf=True)),
+    "ك": ("D", lambda s, f: kaf(s, f, None, "arabic")),
+    "ک": ("D", lambda s, f: kaf(s, f, None, "keheh")),
+    "گ": ("D", lambda s, f: kaf(s, f, None, "gaf")),
+    "ل": ("D", lambda s, f: lam(s, f, None)),
+    "م": ("D", lambda s, f: meem(s, f, None)),
+    "ه": ("D", lambda s, f: heh(s, f, None)),
+    "ة": ("R", lambda s, f: heh(s, f, "a2")),
+    "و": ("R", lambda s, f: waw(s, f, None)),
+    "ؤ": ("R", lambda s, f: waw(s, f, "ha")),
+    "ء": ("U", lambda s, f: hamza(s, f, None)),
+    "ـ": ("D", lambda s, f: tatweel(s, f, None)),
+}
+
+
+# ---- the parts a letter shares with its family -----------------------------------------------
+# A part is carried from letter to letter by its name (typeset.with_parts): a letter whose part has no
+# name, or a name its family's other letters do not use, takes nothing from them. The arc family
+# (ح ج خ ع غ): the isolated and final ح were one shape ("الحاء"), sharing no name with the nose of
+# the initial and medial ones; the head of the isolated and initial ع had none.
+def _rings(geom) -> List[List[Tuple[float, float]]]:
+    out = []
+    for poly in getattr(geom, "geoms", [geom]):
+        if poly.geom_type == "Polygon" and not poly.is_empty:
+            out.append(list(poly.exterior.coords)[:-1])
+            out += [list(h.coords)[:-1] for h in poly.interiors]
+    return out
+
+
+def _split_at_baseline(shape, above: str, below: str) -> List[g.Shape]:
+    """A shape that runs above and below the baseline, as two named parts: what stands on the line
+    (the nose of ح) and what hangs under it (its bowl)."""
+    from shapely.geometry import Polygon, box
+    acc = None
+    for ring in shape:
+        if len(ring) >= 3:
+            q = Polygon(ring).buffer(0)
+            acc = q if acc is None else acc.symmetric_difference(q)
+    if acc is None or acc.is_empty:
+        return [shape]
+    x0, y0, x1, y1 = acc.bounds
+    up = acc.intersection(box(x0 - 1, 0.0, x1 + 1, y1 + 1))
+    down = acc.intersection(box(x0 - 1, y0 - 1, x1 + 1, 0.0))
+    if up.area < 0.05 * acc.area or down.area < 0.05 * acc.area:
+        return [shape]
+    return [Tagged(_rings(up), "engine", above), Tagged(_rings(down), "engine", below)]
+
+
+def family_names(letter: str, form: str, glyph: Glyph) -> Glyph:
+    from .recipes import SKELETON
+    base = SKELETON.get(letter, letter)
+    if base == "ح":
+        # every construction of ح (square, slanted arm, ...) names its parts alike: the nose standing
+        # on the line, and the bowl hanging under it in the isolated and final forms
+        out = []
+        for sh in glyph.shapes:
+            if not isinstance(sh, Compound) and getattr(sh, "name", "") == "الحاء":
+                if min(y for poly in sh for _, y in poly) < -0.05 * max(1.0, max(y for poly in sh for _, y in poly)):
+                    out += _split_at_baseline(sh, "أنف الحاء", "كأس أيمن")
+                else:
+                    out.append(Tagged(sh, sh.source if hasattr(sh, "source") else "engine", "أنف الحاء"))
+            else:
+                out.append(sh)
+        glyph.shapes = out
+    elif base == "ع" and form in ("i", "I"):
+        plain = [i for i, sh in enumerate(glyph.shapes) if not isinstance(sh, Compound) and not getattr(sh, "name", "")]
+        if plain:
+            i = max(plain, key=lambda j: max(y for poly in glyph.shapes[j] for _, y in poly))
+            glyph.shapes[i] = Tagged(glyph.shapes[i], "engine", "رأس العين")
+    return glyph
+
+
+def numbers_of(s: Style) -> Optional[Dict[str, float]]:
+    """The logo's measure of the constructions' numbers: what the self-check fitted on its word
+    (style.fitted, "n:" keys, kept with the named rules it was fitted with) and what was set by hand."""
+    d = {k[2:]: v for k, v in s.fitted.items() if k.startswith("n:")} if s.fitted else {}
+    if s.numbers:
+        d.update(s.numbers)
+    return d or None
+
+
+def _with_numbers(build: Builder) -> Builder:
+    """The letter built with the logo's own measure of every number in its construction (recipes.N)."""
+    def built(s, f):
+        tok = NUMBERS.set(numbers_of(s))
+        try:
+            return build(s, f)
+        finally:
+            NUMBERS.reset(tok)
+    return built
+
+
+def _with_family_names(letter: str, build: Builder) -> Builder:
+    build = _with_numbers(build)
+    return lambda s, f: family_names(letter, f, build(s, f))
+
+
+LETTERS = {c: (j, _with_family_names(c, b)) for c, (j, b) in LETTERS.items()}

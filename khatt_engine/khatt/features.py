@@ -1,0 +1,372 @@
+"""The judgements a designer makes by eye, turned into measurements.
+
+For every logo the engine measures *how* its parts are shaped, not only how big they are:
+  top_angle, top_round   how stems are cut at the top (flat, angled, rounded)
+  join_in, join_out      how deep the curves of a join between two teeth go (fraction of x-height)
+  ring_n, ring_ratio     how square the closed counters are (superellipse exponent), and their proportion
+  dot_n, dot_rot         dot shape: circle (n=2), square (n large), diamond (rotated 45°)
+  tail_reach             how far a tail sweeps, in stems
+  overshoot              how far round bottoms dip below the flat ones
+  seen_drop              how much lower the inner teeth of a run are
+  group_gap              white between letters that do not join
+  join_white             white between two joined letters (the teeth of one letter keep `white`)
+  angular, corner_r      from the skeleton: share of the turning done at corners, and their outer radius
+  tail_drop, tail_reach  for letters of the ر family in the logo's own text: how far the tail goes
+                         below the baseline (0 = it rests on the baseline) and how far it reaches
+Each value comes with its evidence (how many samples) so the report can say where it came from.
+"""
+from __future__ import annotations
+
+import math
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
+from .measure import Line, _cross, _runs
+from .understand import Reading
+
+
+def _median(v: List[float]) -> Optional[float]:
+    v = [x for x in v if x == x]
+    return float(np.median(v)) if v else None
+
+
+def superellipse_area_ratio(n: float) -> float:
+    """Area of |x|^n + |y|^n = 1 divided by its bounding box."""
+    return math.gamma(1 + 1 / n) ** 2 / math.gamma(1 + 2 / n)
+
+
+def superellipse_n(ratio: float) -> float:
+    lo, hi = 1.05, 12.0
+    ratio = min(max(ratio, superellipse_area_ratio(lo) + 1e-6), superellipse_area_ratio(hi) - 1e-6)
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if superellipse_area_ratio(mid) < ratio:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
+def _poly_area(p: List[Tuple[float, float]]) -> float:
+    a = np.asarray(p)
+    x, y = a[:, 0], a[:, 1]
+    return 0.5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
+
+
+# ------------------------------------------------------------------ stem terminals
+def _terminal(L: Line, s) -> Optional[Tuple[float, float]]:
+    """Fit the top edge of one stem: a straight line (its angle) plus how much the corners drop."""
+    r_mid = int(round(L.row_of_y((s.top + max(s.bottom, 0)) / 2)))
+    xs, ys = [], []
+    for c in np.arange(L.col_of_x(s.x - 0.49 * s.w), L.col_of_x(s.x + 0.49 * s.w) + 1e-6, 0.5):
+        ci = int(round(c))
+        col = L.G[:, ci]
+        if not (0 <= r_mid < len(col)) or col[r_mid] < L.level:
+            continue
+        e = _cross(col, L.level, r_mid, -1)
+        if e is None:
+            continue
+        xs.append((L.x_of_col(ci) - s.x) / (s.w / 2))
+        ys.append(L.y_of_row(e))
+    if len(xs) < 6:
+        return None
+    xs, ys = np.asarray(xs), np.asarray(ys)
+    mid = np.abs(xs) < 0.5
+    if mid.sum() < 3:
+        return None
+    b, a = np.polyfit(xs[mid] * s.w / 2, ys[mid], 1)
+    drop = (a + b * xs * s.w / 2) - ys                     # how far below the straight cut each column ends
+    # fit the radius of rounded corners: a corner of radius rho (fraction of the half width)
+    # drops by R(1 - sqrt(1 - ((|u| - (1 - rho)) / rho)^2)) with R = rho * w / 2
+    best, best_err = 0.0, float("inf")
+    hw = s.w / 2
+    for rho in np.linspace(0, 1, 51):
+        if rho == 0:
+            pred = np.zeros_like(xs)
+        else:
+            t = np.clip((np.abs(xs) - (1 - rho)) / rho, 0, 1)
+            pred = rho * hw * (1 - np.sqrt(1 - t ** 2))
+        err = float(np.sum((pred - drop) ** 2))
+        if err < best_err:
+            best, best_err = float(rho), err
+    return math.degrees(math.atan(b)), best
+
+
+# ------------------------------------------------------------------ joins
+def _join_profile(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
+    """For each join: where the inner curve of the counter starts (height above the counter bottom),
+    and where the outer edge of a free stem starts to round off."""
+    ins, outs = [], []
+    X = L.x_height
+    for j in R.joins:
+        if j.kind != "join":
+            continue
+        a, b = L.stems[j.right], L.stems[j.left]
+        c0, c1 = L.col_of_x(b.x + b.w / 2), L.col_of_x(a.x - a.w / 2)
+        if c1 - c0 < 3:
+            continue
+        full = (c1 - c0)
+        mc = int(round((c0 + c1) / 2))
+        prof = L.G[:, mc - 1:mc + 2].mean(axis=1)
+        r0 = min(len(prof) - 1, max(0, int(round(L.row_of_y(0.0)))))
+        # the bottom of the counter: walk up the middle column from the baseline until the ink ends
+        r = r0
+        while r > 0 and prof[r] < L.level and r > r0 - 0.3 * L.stem:
+            r -= 1                                    # skip white just under a slightly raised join
+        while r > 0 and prof[r] >= L.level:
+            r -= 1
+        y_bottom = L.y_of_row(r)
+        for rr in range(min(r, L.G.shape[0] - 1), max(0, int(L.row_of_y(0.9 * X))), -1):
+            w = float((L.G[rr, int(c0) - 1:int(c1) + 2] < L.level).sum())
+            if w >= 0.92 * full:
+                ins.append(L.y_of_row(rr) / X)
+                break
+    for i, s in enumerate(L.stems):
+        free_r = (i == 0 or L.stems[i - 1].comp != s.comp) and not s.joined_right
+        free_l = (i == len(L.stems) - 1 or L.stems[i + 1].comp != s.comp) and not s.joined_left
+        for side, free in ((+1, free_r), (-1, free_l)):
+            if not free or s.role not in ("tooth", "lowered", "tall") or abs(s.bottom) > 0.5 * L.stem:
+                continue
+            edge = s.x + side * s.w / 2
+            start = None
+            for y in np.linspace(0.7 * X, 0.0, 60):
+                r = min(L.G.shape[0] - 1, max(0, int(round(L.row_of_y(y)))))
+                row = L.G[r]
+                ci = int(round(L.col_of_x(s.x)))
+                e = _cross(row, L.level, ci, side)
+                if e is None:
+                    break
+                if abs(L.x_of_col(e) - edge) > 0.06 * s.w:
+                    start = y
+                    break
+            outs.append((start if start is not None else 0.0) / X)
+    return ins, outs
+
+
+# ------------------------------------------------------------------ rings and dots
+def _ring_shape(lines: List[Line]) -> Tuple[Optional[float], Optional[float], int]:
+    ns, ratios = [], []
+    for L in lines:
+        for c in L.counters:
+            w, h = c.x1 - c.x0, c.y1 - c.y0
+            if not (0.4 * L.stem <= w <= 3.5 * L.stem and h >= 0.3 * L.x_height):
+                continue
+            # the counter is measured upright (deskewed), so its fill ratio is not disturbed by the slant
+            ns.append(superellipse_n(c.area / max(1.0, w * h)))
+            ratios.append(h / max(1e-6, L.x_height))
+    return _median(ns), _median(ratios), len(ns)
+
+
+def _dot_shape(lines: List[Line]) -> Tuple[Optional[float], float, int, Optional[float]]:
+    n_vals, rots, sizes = [], [], []
+    for L in lines:
+        for p in L.dots:
+            for poly in p.contours[:1]:
+                # back to the image's own orientation (re-apply the slant)
+                q = [(x + y * L.t, y) for x, y in poly]
+                A = _poly_area(q)
+                xs, ys = [a for a, _ in q], [b for _, b in q]
+                r0 = A / max(1e-6, (max(xs) - min(xs)) * (max(ys) - min(ys)))
+                rq = [((x - y) / math.sqrt(2), (x + y) / math.sqrt(2)) for x, y in q]
+                xs2, ys2 = [a for a, _ in rq], [b for _, b in rq]
+                r45 = A / max(1e-6, (max(xs2) - min(xs2)) * (max(ys2) - min(ys2)))
+                ratio = max(r0, r45)
+                n_vals.append(superellipse_n(ratio)); rots.append(45.0 if r45 > r0 + 0.04 else 0.0)
+                sizes.append(math.sqrt(A / superellipse_area_ratio(n_vals[-1])))   # side of its box
+    if not n_vals:
+        return None, 0.0, 0, None
+    return _median(n_vals), (45.0 if rots.count(45.0) > len(rots) / 2 else 0.0), len(n_vals), _median(sizes)
+
+
+# ------------------------------------------------------------------ overshoot, gaps
+def _overshoot(lines: List[Line]) -> Tuple[Optional[float], int]:
+    vals = []
+    for L in lines:
+        flat = [s.bottom for s in L.stems if s.role in ("tooth", "tall") and not s.joined_left and not s.joined_right
+                and abs(s.bottom) < 0.08 * L.stem]
+        rounds = []
+        for c in L.counters:
+            col = int(round(L.col_of_x((c.x0 + c.x1) / 2)))
+            r = int(round(L.row_of_y(c.y0))) + 1
+            prof = L.G[:, col]
+            if 0 <= r < len(prof) and prof[r] >= L.level:
+                e = _cross(prof, L.level, r, +1)
+                if e is not None:
+                    rounds.append(L.y_of_row(e))
+        if len(flat) >= 2 and rounds:          # two flat feet on the baseline at least, or no evidence
+            vals.append(float(np.median(flat)) - float(np.median(rounds)))
+    v = _median(vals)
+    return (max(0.0, v) if v is not None else None), len(vals)
+
+
+def _group_gap(L: Line, R: Reading) -> Optional[float]:
+    """White between neighbouring letter groups that do not touch, at mid x-height."""
+    X = L.x_height
+    gaps = []
+    comps = sorted({s.comp for s in L.stems}, key=lambda c: -max(s.x for s in L.stems if s.comp == c))
+    r = int(round(L.row_of_y(0.5 * X)))
+    for ca, cb in zip(comps, comps[1:]):
+        left_edge_a = min((s.x - s.w / 2) for s in L.stems if s.comp == ca)
+        right_edge_b = max((s.x + s.w / 2) for s in L.stems if s.comp == cb)
+        g = left_edge_a - right_edge_b
+        if 0 < g < 4 * L.stem:
+            gaps.append(g)
+    return _median(gaps)
+
+
+def _letter_gap(L: Line, R: Reading) -> Tuple[Optional[float], int]:
+    """White between two joined letters, apart from the white between the teeth of one letter (the
+    three teeth of س). Only where the reading knows which stems belong to which letter."""
+    of = {i: n for n, u in enumerate(R.units) if u.letter not in ("?", "ٮ") for i in u.stems}
+    between = [j.white for j in R.joins if j.kind == "join" and j.right in of and j.left in of and of[j.right] != of[j.left]]
+    return _median(between), len(between)
+
+
+# ------------------------------------------------------------------ all together
+def measure_features(lines: List[Line], readings: List[Reading], src: int, k: float) -> Dict[str, Dict]:
+    """Returns {name: {"value": v, "samples": n, "unit": ..., "note": Arabic text}} (lengths in original px)."""
+    L, R = lines[src], readings[src]
+    out: Dict[str, Dict] = {}
+
+    def put(name, value, samples, note, unit=""):
+        if value is not None:
+            out[name] = {"value": round(float(value), 3), "samples": int(samples), "note": note, "unit": unit}
+
+    terms = [t for t in (_terminal(L, s) for s in L.stems if s.role in ("tooth", "tall", "lowered")) if t]
+    if terms:
+        ang = _median([t[0] for t in terms]); rnd = _median([t[1] for t in terms])
+        put("top_angle", ang if abs(ang) >= 2.5 else 0.0, len(terms), "زاوية قطع طرف الجذع العلوي", "°")
+        put("top_round", rnd if rnd >= 0.12 else 0.0, len(terms), "استدارة زوايا طرف الجذع (0 مقطوع، 1 نصف دائرة)")
+    ins, outs = _join_profile(L, R)
+    put("join_in", _median(ins), len(ins), "ارتفاع بداية منحنى الفراغ داخل الوصل ÷ ارتفاع الحروف")
+    put("join_out", _median(outs), len(outs), "ارتفاع بداية استدارة الحافة الخارجية الحرة ÷ ارتفاع الحروف")
+    n, ratio, cnt = _ring_shape(lines)
+    put("ring_n", n, cnt, "تربيع الفراغات المغلقة (2 بيضاوي، أكبر = أقرب للمربع)")
+    put("ring_ratio", ratio, cnt, "ارتفاع الفراغ المغلق ÷ ارتفاع الحروف")
+    dn, drot, dc, dsize = _dot_shape(lines)
+    put("dot_n", dn, dc, "شكل النقطة (2 دائرة، أكبر = أقرب للمربع)")
+    put("dot_size", dsize * k if dsize is not None else None, dc, "حجم النقطة (ضلع صندوقها)", "px")
+    if dc:
+        put("dot_rot", drot, dc, "دوران النقطة (45° = معيّن)", "°")
+    reaches = [L.stems[t.stem].x - t.x0 for t in R.tails if t.stem is not None and t.direction == "left"]
+    put("tail_reach", (_median(reaches) / L.stem) if reaches else None, len(reaches), "امتداد الذيل إلى اليسار بوحدة الجذع")
+    ov, oc = _overshoot(lines)
+    put("overshoot", ov * k if ov is not None else None, oc, "نزول القيعان المستديرة تحت القيعان المسطحة", "px")
+    lows = [v for v in L.levels if v.name == "lowered" and v.n >= 2]
+    put("seen_drop", ((L.x_height - lows[0].y) * k) if lows else None, lows[0].n if lows else 0,
+        "انخفاض الأسنان الداخلية عن ارتفاع الحروف", "px")
+    gg = _group_gap(L, R)
+    put("group_gap", gg * k if gg is not None else None, 1, "الأبيض بين حرفين غير متصلين", "px")
+    rc, rn = _top_join_corner(L, R)
+    put("reh_corner", rc * k if rc is not None else None, rn, "استدارة الركن الخارجي للحرف الموصول من أعلى السن", "px")
+    lg, ln = _letter_gap(L, R)
+    put("join_white", lg * k if lg is not None else None, ln, "الأبيض بين حرفين متصلين (غير البياض بين أسنان الحرف الواحد)", "px")
+    from .skeleton import read_skeleton
+    sk = read_skeleton(L)
+    turns = sum(1 for g in sk.segments if g.kind in ("corner", "curve"))
+    corners = sum(1 for g in sk.segments if g.kind == "corner")
+    if turns >= 3:
+        put("angular", sk.angular, turns, "نصيب الزوايا من كل انعطاف في الهيكل (0 منحنيات، 1 زوايا)")
+    if corners >= 2 and sk.corner_r == sk.corner_r:
+        put("corner_r", sk.corner_r * k, corners, "نصف قطر الزاوية على الحافة الخارجية", "px")
+    # how far the tails of ر ز و drop is measured whenever the reading knows them (it used to be read
+    # only when no tail had given its reach, and the tail was then drawn to the full descender)
+    drops, reach = _reh_tails(L, R)
+    if drops:
+        D = max(L.descender, 0.45 * L.x_height)
+        put("tail_drop", _median(drops), len(drops), "نزول ذيل الراء والزاي والواو تحت السطر ÷ النزول (0 على السطر)")
+        put("tail_depth", _median(drops) * D * k, len(drops), "عمق ذيل الراء والزاي والواو تحت السطر", "px")
+        if "tail_reach" not in out:
+            put("tail_reach", _median(reach), len(reach), "امتداد الذيل إلى اليسار بوحدة الجذع")
+    tj = _top_joins(L, R)
+    if tj:
+        put("top_join", 1.0, tj, "حرف ذو ذيل موصول من أعلى السنّ الذي قبله بخط شعري، لا من السطر")
+    return out
+
+
+def _hung(L: Line, R: Reading) -> List[int]:
+    """The stems (ر ز و) that hang from the top of the tooth on their right: same body, no join on
+    the baseline between the two, ink across the top and white under it, and a tail below the
+    baseline (a short tail is still a tail: the stem may have been taken for a tooth)."""
+    X, U = L.x_height, L.stem
+    joined = {(j.right, j.left) for j in R.joins}
+    out = []
+    for i, s in enumerate(L.stems):
+        if s.role not in ("descending", "tooth") or i == 0:
+            continue
+        r = L.stems[i - 1]
+        if r.comp != s.comp or (i - 1, i) in joined or not (0 < r.x - s.x < 3.2 * U) or r.top < 0.85 * X:
+            continue
+        c0, c1 = int(round(L.col_of_x(s.x + s.w / 2))) + 1, int(round(L.col_of_x(r.x - r.w / 2))) - 1
+        if c1 - c0 < 2:
+            continue
+        gap = L.lab[:, c0:c1 + 1] == s.comp
+        top = gap[int(L.row_of_y(min(s.top, r.top))):int(L.row_of_y(0.75 * X)) + 1]
+        low = gap[int(L.row_of_y(0.6 * X)):int(L.row_of_y(0.12 * X)) + 1]
+        if not (top.size and low.size and top.any(axis=0).mean() > 0.85 and low.mean() < 0.1):
+            continue
+        if s.role != "descending":
+            # a tooth-like stem counts only with ink well under the baseline below it
+            sc0, sc1 = int(round(L.col_of_x(s.x - s.w))), int(round(L.col_of_x(s.x + s.w / 2)))
+            # (the line's picture may end a little under the baseline: what shows of the tail is enough)
+            under = L.lab[int(L.row_of_y(-0.04 * X)):, max(0, sc0):sc1 + 1] == s.comp
+            if not under.any():
+                continue
+        out.append(i)
+    return out
+
+
+def _top_joins(L: Line, R: Reading) -> int:
+    """How many descending stems hang from the top of the tooth on their right (see _hung)."""
+    return len(_hung(L, R))
+
+
+def _top_join_corner(L: Line, R: Reading) -> Tuple[Optional[float], int]:
+    """The rounding of the outer top corner of a letter hung from the top of the tooth before it
+    (ر in سیرنگ): going down from the top, how far the stem's outer edge stays inside its line."""
+    X, U = L.x_height, L.stem
+    radii = []
+    for i in _hung(L, R):
+        s = L.stems[i]
+        edge = s.x - s.w / 2                                # the outer (left) edge of the stem
+        c0, c1 = int(round(L.col_of_x(edge - 0.3 * U))), int(round(L.col_of_x(edge + U)))
+        top_row = int(round(L.row_of_y(min(s.top, X) + 0.05 * U)))
+        depth = 0.0
+        for row in range(max(0, top_row), int(round(L.row_of_y(min(s.top, X) - 1.2 * U))) + 1):
+            ink = np.flatnonzero(L.lab[row, max(0, c0):c1 + 1] == s.comp)
+            if not len(ink):
+                continue
+            x = L.x_of_col(max(0, c0) + ink[0])
+            if x - edge > 0.04 * U:                        # the edge is still turning in
+                depth = min(s.top, X) - L.y_of_row(row)
+            else:
+                break
+        if depth > 0:
+            radii.append(depth)
+    return _median(radii), len(radii)
+
+
+def _reh_tails(L: Line, R: Reading) -> Tuple[List[float], List[float]]:
+    """Letters of the ر family in the logo's own text: the lowest point and the left reach of the
+    ink that hangs from their stem. A tail that does not drop rests on the baseline."""
+    drops, reach = [], []
+    X, U = L.x_height, L.stem
+    D = max(L.descender, 0.45 * X)
+    for u in R.units:
+        if u.letter not in "رزژو" or not u.stems:
+            continue
+        s = L.stems[u.stems[-1]]
+        c0, c1 = int(max(0, L.col_of_x(s.x - 5 * U))), int(min(L.lab.shape[1] - 1, L.col_of_x(s.x + U / 2)))
+        m = L.lab[:, c0:c1 + 1] == s.comp
+        if not m.any():
+            continue
+        rows, cols = np.nonzero(m)
+        low = L.y_of_row(rows.max())
+        foot = rows >= L.row_of_y(0.3 * X)
+        if not foot.any():
+            continue
+        left = L.x_of_col(c0 + cols[foot].min())
+        drops.append(max(0.0, -low) / D)
+        reach.append((s.x - left) / U)
+    return drops, reach
