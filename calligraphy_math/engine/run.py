@@ -95,7 +95,7 @@ for n in (A.NAMES if TRANSFER else [LETTER]):
     else:
         r_n, rep = E.transfer_residual(model, res, m)
     with torch.no_grad():
-        st = m.generate(g, r_n)
+        st = m.generate(g, r_n, [r["alpha"] for r in rep])
         dots = m.dots(g, st)
         naskh = [(torch.tensor(c), torch.tensor(w)) for c, w in glyphs[n].strokes]
     naskh_imgs[n] = render_letter(naskh, glyphs[n].dots)

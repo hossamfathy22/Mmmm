@@ -3,7 +3,9 @@
 
   التحويل = أسلوب عام g (ينتقل لكل الحروف)  +  بقية خاصة بالحرف r (تنتقل فقط بالقياس)
 
-الأسلوب العام g (18 معاملاً):
+الأسلوب العام g (18 معاملاً) — مجموعتان:
+  الأداة واليد (تنتقل لكل الحروف): الميل، الدوران، العرض، الوزن، التباين، القلم، الضغط، الاستدقاق
+  قواعد العناصر (تنتقل لكل ضربة بنسبة شبهها α): كسب الانحناء، التفاف الذيل، الخطّاف، استمرار القلم
   الهيكل:  φ'(u) = φ(0) + c·[φ(u) − φ(0)]
                  + σ_main·β·R((u−1+f)/f)        التفاف ذيل الضربة الرئيسة
                  + σ_k·η·R((u−1+h)/h)           خطّاف نهاية الضربات الثانوية
@@ -77,19 +79,24 @@ class Model:
     def zero_residual(self):
         return [dict(D=torch.zeros(K, 2), e=torch.zeros(K)) for _ in range(self.n)]
 
-    def generate(self, g, res):
-        A = affine(g); cg = torch.exp(g[3])
+    def generate(self, g, res, alpha=None):
+        """alpha[k]: شبه الضربة k بضربة حرف التدريب. قواعد العناصر (الانحناء، الذيل، الخطّاف، الاستمرار)
+           تُطبَّق بنسبة alpha؛ الأداة واليد تُطبَّقان دائماً. في حرف التدريب alpha = 1."""
+        A = affine(g)
         f_sw, f_hk = torch.exp(g[5]).clamp(0.03, 0.9), torch.exp(g[7]).clamp(0.03, 0.9)
-        kappa = torch.sigmoid(g[8]); taper_l = torch.exp(g[17]).clamp(0.01, 0.4)
+        taper_l = torch.exp(g[17]).clamp(0.01, 0.4)
         out = []
         for k, b in enumerate(self.base):
+            al_k = 1.0 if alpha is None else float(alpha[k])
+            cg = 1 + al_k * (torch.exp(g[3]) - 1)
+            kappa = al_k * torch.sigmoid(g[8])
             main = k == self.n - 1
             u = torch.linspace(0, 1, len(b["phi"]))
             phi = b["phi"][0] + cg * (b["phi"] - b["phi"][0])
             if main:
-                phi = phi + b["sig"] * g[4] * smoothstep((u - 1 + f_sw) / f_sw)
+                phi = phi + al_k * b["sig"] * g[4] * smoothstep((u - 1 + f_sw) / f_sw)
             elif not self.G.closed[k]:
-                phi = phi + b["sig"] * g[6] * smoothstep((u - 1 + f_hk) / f_hk)
+                phi = phi + al_k * b["sig"] * g[6] * smoothstep((u - 1 + f_hk) / f_hk)
             v = torch.stack([torch.cos(phi), torch.sin(phi)], 1) * b["ds"][:, None]
             c = torch.cat([torch.zeros(1, 2), torch.cumsum(v, 0)]) @ A.T
             att = self.G.attach[k]
