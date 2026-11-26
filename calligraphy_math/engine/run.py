@@ -117,9 +117,10 @@ ax[4].imshow(Image.open(TARGET).convert("RGB")); ax[4].set_title("target")
 for x in ax: x.axis("off")
 fig.savefig(os.path.join(OUT, "1_fit.png"), dpi=110, bbox_inches="tight")
 
-for key, imgs, ttl in (() if not TRANSFER else ("2_alphabet_modern.png", modern_imgs, "transformed alphabet"),
-                       ("3_alphabet_confidence.png", conf_imgs, "confidence: green = residual transferred (similar stroke) · yellow = partial · grey = general style only"),
-                       ("0_alphabet_naskh.png", naskh_imgs, "Sakkal Naskh input"))):
+SHEETS = (("2_alphabet_modern.png", modern_imgs, "transformed alphabet"),
+          ("3_alphabet_confidence.png", conf_imgs, "confidence: green = residual transferred (similar stroke) · yellow = partial · grey = general style only"),
+          ("0_alphabet_naskh.png", naskh_imgs, "Sakkal Naskh input"))
+for key, imgs, ttl in (SHEETS if TRANSFER else ()):
     fig, axes = plt.subplots(4, 7, figsize=(17, 9), facecolor="white")
     for x, n in zip(axes.flat[::-1], A.NAMES):
         x.imshow(imgs[n]); x.set_title(f"{n}  {A.ARABIC[n]}" if False else n, fontsize=9); x.axis("off")
