@@ -1,0 +1,16 @@
+{
+ "letter": "waw",
+ "params_modeA_mean": {
+  "shear s": 0.264,
+  "rotation ρ°": -1.909,
+  "aspect a": 0.422,
+  "curvature gain c": 1.268,
+  "swash β°": -141.909,
+  "swash span f": 0.321,
+  "weight S": 0.131,
+  "contrast γ": 1.983,
+  "pen floor m": 0.198,
+  "pen angle θ°": 78.328
+ },
+ "strokes": 1
+}

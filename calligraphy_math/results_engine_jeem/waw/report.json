@@ -1,0 +1,12 @@
+{
+ "letter": "waw",
+ "trained_on": "jeem",
+ "strokes": [
+  {
+   "stroke": 0,
+   "nearest_target_stroke": 0,
+   "distance": 1.375,
+   "alpha": 0.0
+  }
+ ]
+}
