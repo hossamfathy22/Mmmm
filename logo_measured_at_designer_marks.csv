@@ -1,0 +1,36 @@
+letter,stroke,type,position,width_U,measured_how
+kaf,hook (vertical),vertical,top,0.06,along your line (no centre-line under it)
+kaf,hook (vertical),vertical,bottom,0.052,straight across the stroke where your line crosses it
+kaf,upright (vertical),vertical,top,0.254,straight across the stroke where your line crosses it
+kaf,upright (vertical),vertical,middle,0.115,straight across the stroke where your line crosses it
+kaf,upright (vertical),vertical,bottom,0.085,straight across the stroke where your line crosses it
+kaf,base (horizontal),horizontal,start (right),0.209,straight across the stroke where your line crosses it
+kaf,base (horizontal),horizontal,middle,0.471,straight across the stroke where your line crosses it
+kaf,base (horizontal),horizontal,end (left),0.072,straight across the stroke where your line crosses it
+ye,kashida teh->kaf (horizontal),horizontal,start (right),0.04,straight across the stroke where your line crosses it
+ye,kashida teh->kaf (horizontal),horizontal,middle,0.444,straight across the stroke where your line crosses it
+ye,kashida teh->kaf (horizontal),horizontal,end (left),0.198,straight across the stroke where your line crosses it
+teh,tooth (vertical),vertical,top,0.193,along your line (no centre-line under it)
+teh,tooth (vertical),vertical,bottom,0.064,straight across the stroke where your line crosses it
+teh,base (horizontal),horizontal,start (right),0.046,straight across the stroke where your line crosses it
+teh,base (horizontal),horizontal,middle,0.48,straight across the stroke where your line crosses it
+teh,base (horizontal),horizontal,end (left),0.105,straight across the stroke where your line crosses it
+nun,horn (vertical),vertical,top,0.096,along your line (no centre-line under it)
+nun,horn (vertical),vertical,bottom,0.054,straight across the stroke where your line crosses it
+nun,base (horizontal),horizontal,start (right),0.037,straight across the stroke where your line crosses it
+nun,base (horizontal),horizontal,middle,0.436,straight across the stroke where your line crosses it
+nun,base (horizontal),horizontal,end (left),0.049,straight across the stroke where your line crosses it
+mim,kashida mim->nun (horizontal),horizontal,start (right),0.146,straight across the stroke where your line crosses it
+mim,kashida mim->nun (horizontal),horizontal,middle,0.442,straight across the stroke where your line crosses it
+mim,kashida mim->nun (horizontal),horizontal,end (left),0.154,along your line (no centre-line under it)
+mim,loop,horizontal,top,0.263,straight across the stroke where your line crosses it
+mim,loop,horizontal,right,0.781,straight across the stroke where your line crosses it
+mim,loop,horizontal,bottom,0.438,straight across the stroke where your line crosses it
+waw,head (2nd waw),horizontal,top,0.332,straight across the stroke where your line crosses it
+waw,head (2nd waw),horizontal,left,0.563,along your line (no centre-line under it)
+waw,head (2nd waw),horizontal,right upper,0.098,straight across the stroke where your line crosses it
+waw,head (2nd waw),horizontal,right lower,0.099,straight across the stroke where your line crosses it
+waw,head (2nd waw),horizontal,middle,0.356,straight across the stroke where your line crosses it
+waw,tail (2nd waw),horizontal,tail,0.415,straight across the stroke where your line crosses it
+waw,1st waw,horizontal,tail,0.221,straight across the stroke where your line crosses it
+kaf,? small blue under the upright,horizontal,?,0.158,straight across the stroke where your line crosses it
