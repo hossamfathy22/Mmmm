@@ -1,0 +1,9 @@
+stroke type,place,unified width (U = Latin x-height),what the marks gave
+horizontal,"middle (thickest, ~60% from the start)",0.45,"kaf, kashida teh-kaf, teh, nun, mim kashida: 0.44-0.48"
+horizontal,start/end where it meets a hairline joint,0.06,0.04-0.10
+horizontal,start/end where it meets a thick stem,0.18,0.15-0.21
+vertical,top (free tip),0.12,0.06-0.19 (tips are cut differently)
+vertical,middle,0.12,kaf upright only
+vertical,bottom (into the joint),0.06,0.05-0.09
+vertical,kaf upright head (its own shape),0.25,one stroke only
+joint,vertical bottom -> horizontal start,0.06,both ends measured 0.06: a hairline turn
