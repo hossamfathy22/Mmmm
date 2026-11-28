@@ -5,6 +5,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter1d
 from shapely.geometry import LineString, Point, Polygon
 from .geom import cut, arclen, centrelines
+from . import outline as OL
 
 def _angle(v):
     """direction in degrees, 0 = horizontal, positive = rising to the right (y up), folded to (-90, 90]"""
@@ -346,8 +347,8 @@ def families(vals, weights=None, rel=0.15, floor=0.02, gap=None):
 def full_measure(polys, parts_meta, U, baseline, cls=None):
     cls = cls or {k: centrelines(p, U, recentred=False)[0] for k, p in polys.items()}
     st, bd = strokes(polys, cls, U)
-    rings = {}
-    co = corners(polys, U, rings_out=rings)
+    om = OL.measure(polys, U)                                            # the outline: straight edges, corners (any radius), widths
+    co = [c for c in om['corners'] if c['kind'] != 'flat']
     mids = [s['middle'] for s in st if np.isfinite(s['middle'])]
     if mids:                                                            # runs inside a junction (much wider than the strokes) are not strokes
         med = float(np.median(mids)); st = [s for s in st if s['middle'] <= 1.6*med]
@@ -363,6 +364,9 @@ def full_measure(polys, parts_meta, U, baseline, cls=None):
         angle_V=summarize([s['angle'] if s['angle'] > 0 else s['angle']+180 for s in st if s['kind'] == 'V']),
         angle_H=summarize([s['angle'] for s in st if s['kind'] == 'H']),
         angle_D=summarize([s['angle'] for s in st if s['kind'] == 'D']),
+        edge_angles=om['families']['edge_angles'],
+        edge_widths=om['families']['widths'],
+        corner_families=om['families']['corners'],
         corner_radius_outer=groups([c['radius'] for c in co if c['kind'] == 'outer' and c['radius'] > 0]),
         corner_radius_inner=groups([c['radius'] for c in co if c['kind'] == 'inner' and c['radius'] > 0]),
         corner_angle=groups([c['turn'] for c in co], gap=12.0),
@@ -378,7 +382,7 @@ def full_measure(polys, parts_meta, U, baseline, cls=None):
                    for k in ('square cut', 'slanted cut', 'pointed', 'round') if any(t['shape'] == k for t in te)},
         bend_turn=summarize([b['turn'] for b in bd]), bend_radius=summarize([b['radius'] for b in bd]),
         letter_gap=summarize([s['gap'] for s in spc]))
-    return dict(strokes=st, bends=bd, corners=co, terminals=te, levels=lv, counters=cn, spacing=spc, unified=unified)
+    return dict(strokes=st, bends=bd, corners=co, terminals=te, levels=lv, counters=cn, spacing=spc, unified=unified, outline=om)
 
 def sheet(polys, r, U, baseline, SC=5, pad=10):
     """one picture with everything measured: strokes (angle, width), corners (radius), end cuts (angle), height levels"""

@@ -93,6 +93,10 @@ def full(pid: str, body: dict):
     p.state['step'] = max(p.state.get('step', 1), 6); p.save()
     return J({k: v for k, v in r.items()})
 
+@app.get('/api/projects/{pid}/redraw_check.png')
+def redraw_png(pid: str):
+    return FileResponse(P(pid).f('redraw_check.png'), media_type='image/png', filename='redraw_check.png')
+
 @app.get('/api/projects/{pid}/full_measures.png')
 def full_png(pid: str):
     return FileResponse(P(pid).f('full_measures.png'), media_type='image/png', filename='full_measures.png')
@@ -142,7 +146,8 @@ def report(pid: str):
                unified=(s.get('measure') or {}).get('spec'), table=(s.get('measure') or {}).get('table'), test=(s.get('measure') or {}).get('gate'),
                reference={k: v for k, v in (s.get('reference') or {}).items() if k not in ('glyph_path', 'word_path', 'edges')},
                design=s.get('design'), checks=(s.get('result') or {}).get('checks'),
-               complete_measurements=(s.get('full') or {}).get('unified'), levels=(s.get('full') or {}).get('levels'))
+               complete_measurements=(s.get('full') or {}).get('unified'), levels=(s.get('full') or {}).get('levels'),
+               redraw_check=(s.get('full') or {}).get('redraw'))
     return Response(json.dumps(_np(out), ensure_ascii=False, indent=1), media_type='application/json',
                     headers={'Content-Disposition': 'attachment; filename="logo_report.json"'})
 

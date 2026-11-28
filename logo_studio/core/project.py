@@ -7,6 +7,7 @@ from .measure import measure_mark, spans, unify, gate, CATS
 from .reference import shape_word, to_logo, place
 from .build import build, polygon_svg, render_png
 from .fullmeasure import full_measure, sheet as full_sheet
+from . import outline as OL
 
 ROOT = os.environ.get('LOGO_STUDIO_PROJECTS', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'projects'))
 
@@ -129,6 +130,9 @@ class Project:
         r = full_measure(polys, [q for q in self.state['parts'] if q['name'] in names], self.state['U'], self.state['baseline'],
                          cls={k: self.cls(k) for k in names})
         cv2.imwrite(self.f('full_measures.png'), full_sheet(polys, r, self.state['U'], self.state['baseline']))
+        # the check: draw the parts back from these numbers, level by level, and compare
+        r['redraw'] = OL.check(polys, r['outline'], self.state['U'])
+        cv2.imwrite(self.f('redraw_check.png'), OL.check_sheet(polys, r['outline'], self.state['U']))
         r['parts'] = names
         self.state['full'] = r; self.save()
         return r

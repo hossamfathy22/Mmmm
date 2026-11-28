@@ -267,7 +267,8 @@ const STEPS = {
         <a class="card" href="/api/projects/${S.id}/logo.svg" download>منحنيات الشعار (SVG)</a>
         ${S.state.result ? `<a class="card" href="/api/projects/${S.id}/result.svg" download>الشعار مع الحرف الجديد (SVG)</a>
         <a class="card" href="/api/projects/${S.id}/result.png" download>صورة (PNG)</a>` : '<span class="card muted">ابنِ الحرف أولاً</span>'}
-        ${S.state.full ? `<a class="card" href="/api/projects/${S.id}/full_measures.png" download>صفحة القياسات الكاملة (PNG)</a>` : ''}
+        ${S.state.full ? `<a class="card" href="/api/projects/${S.id}/full_measures.png" download>صفحة القياسات الكاملة (PNG)</a>
+        <a class="card" href="/api/projects/${S.id}/redraw_check.png" download>اختبار الرسم من الأرقام (PNG)</a>` : ''}
         <a class="card" href="/api/projects/${S.id}/report.json" download>التقرير (JSON)</a>
       </div>`;
   },
@@ -281,9 +282,29 @@ const FULL_NAMES = { width_families: 'عائلات العرض (كل عائلة �
 
   bend_turn: 'مقدار الانعطاف', bend_radius: 'نصف قطر الانعطاف (منتصف الضربة)', letter_gap: 'المسافة بين الحروف' };
 const fmtS = s => !s ? '—' : `${(+s.mean).toFixed(3)} <span class="muted">(±${(+s.sd).toFixed(3)}، ${(+s.min).toFixed(2)}–${(+s.max).toFixed(2)}، ${s.n})</span>`;
+const KIND_AR = { outer: 'خارجية', inner: 'داخلية' };
+function renderOutline(r) {
+  const u = r.unified; if (!u.edge_angles) return '';
+  const fam = (list, f) => list.map((g, i) => `<div>عائلة ${i + 1}: ${f(g)}</div>`).join('') || '—';
+  let h = `<h3>على المحيط (الحواف المستقيمة والزوايا)</h3>
+    <p class="muted">يُقسَم محيط كل حرف بالانحناء إلى حواف مستقيمة وزوايا بينها، فتُلتقط الزاوية أياً كان نصف قطر تدويرها. نصف القطر يُقاس من رأس الزاوية: بُعد المحيط عن نقطة التقاء الحافتين. العرض هو المسافة بين حافتين متقابلتين متوازيتين بينهما حبر. نسبة المحيط المستقيم: <b>${Math.round(100 * (r.outline.straight_share || 0))}%</b>.</p>
+    <table><tr><th>القياس</th><th>العائلات</th></tr>
+    <tr><td>اتجاهات الحواف (درجة من الأفق)</td><td class="num" style="text-align:right">${fam(u.edge_angles, g => `${fmtS(g)} <b>— ${Math.round(100 * g.share)}% من الطول</b>`)}</td></tr>
+    <tr><td>عرض الضربات (بين حافتين متقابلتين)</td><td class="num" style="text-align:right">${fam(u.edge_widths, g => `${fmtS(g)} <b>— ${Math.round(100 * g.share)}%</b>`)}</td></tr>
+    <tr><td>الزوايا: النوع، الانفراج، نصف القطر</td><td class="num" style="text-align:right">${(u.corner_families || []).map(g => `<div>${KIND_AR[g.kind]} ${g.sharp ? '(بلا تدوير)' : ''} — انعطاف ${(+g.turn.mean).toFixed(1)}° (${g.turn.n}): ${g.radii.map(x => `r ${(+x.mean).toFixed(3)} <span class="muted">(${x.n})</span>`).join(' ، ')}</div>`).join('')}</td></tr></table>`;
+  if (r.redraw) {
+    h += `<h3>الاختبار: الرسم من الأرقام</h3><p>يُرسم الشعار من هذه الأرقام وحدها على مراحل، ويُقارن بالأصل. الأحمر: في الشعار وناقص من الرسم. الأزرق: زائد في الرسم. حيث يبتعد الرسم عن الشعار فهناك قياس خاطئ.</p>
+      <table><tr><th>المرحلة</th><th>التطابق</th><th>أكبر انحراف (وحدة)</th></tr>`;
+    const NAMES = ['الحواف كما قيست، زوايا حادة', '+ كل زاوية بتدويرها هي', '+ اتجاهات الحواف موحّدة بعائلاتها', '+ العرض موحّد بعائلاته', '+ أنصاف أقطار الزوايا موحّدة بعائلاتها'];
+    for (const l of r.redraw) h += `<tr><td>${l.level}. ${NAMES[l.level - 1]}</td><td class="${l.iou >= .97 ? 'good' : 'bad'}">${(100 * l.iou).toFixed(1)}%</td><td class="num">${(+l.max_off).toFixed(3)}</td></tr>`;
+    h += `</table><p><a href="/api/projects/${S.id}/redraw_check.png?${Date.now()}" target="_blank"><img src="/api/projects/${S.id}/redraw_check.png?${Date.now()}" style="max-width:100%;border:1px solid #ddd"></a></p>`;
+    if ((r.outline.straight_share || 0) < 0.6) h += `<p class="bad">محيط هذا الشعار منحنٍ في أغلبه، فالرسم من الحواف المستقيمة لا يناسبه؛ اعتمد على قياس خط الوسط أدناه.</p>`;
+  }
+  return h;
+}
 function renderFull() {
   const r = S.state.full; if (!r) return; const u = r.unified;
-  let h = `<h3>الأرقام الموحّدة</h3><table><tr><th>القياس</th><th>المتوسط (± الانحراف، من–إلى، العدد)</th></tr>`;
+  let h = renderOutline(r) + `<h3>على خط الوسط (الضربات)</h3><table><tr><th>القياس</th><th>المتوسط (± الانحراف، من–إلى، العدد)</th></tr>`;
   for (const k in FULL_NAMES) { const v = u[k]; if (v === undefined) continue;
     const cell = Array.isArray(v) ? (v.length ? v.map((g, i) => `<div>عائلة ${i + 1}: ${fmtS(g)}${g.share !== undefined ? ` <b>— ${Math.round(100 * g.share)}%</b>` : ''}</div>`).join('') : '—') : (typeof v === 'number' ? v : fmtS(v));
     h += `<tr><td>${FULL_NAMES[k]}</td><td class="num" style="text-align:right">${cell}</td></tr>`; }

@@ -7,16 +7,26 @@ from shapely import affinity
 from logo_studio.core.project import Project
 from logo_studio.core.build import render_png, polygon_svg
 p=Project('20261128-035950-a4f7bf'); U=p.state['U']; base=p.state['baseline']
-T=np.tan(np.radians(19.8))
+from logo_studio.core import outline as OL
+LOGO_M=OL.measure({k:p.polys[k] for k in ('part_01','part_02','part_03','part_06')},U)       # the logo's corrected numbers (on the outline)
+V_ANG=[f['mean'] for f in LOGO_M['families']['edge_angles'] if 45<f['mean']<90][0]          # the verticals: 69.85 deg
+W_MAIN=max((f for f in LOGO_M['families']['widths'] if f['n']>=2),key=lambda f:f['mean'])['mean']   # the strokes: 0.305 U
+T=np.tan(np.radians(90-V_ANG))
 def right_of(x_at_base, xpad=4000):
     """everything right of a line leaning like the logo's verticals, crossing the baseline at x_at_base"""
-    top=base-3*U; return Polygon([(x_at_base,base+20),(x_at_base+(base+20-top)*0+ (base-top)*T+ 0, top),(x_at_base+xpad+(base-top)*T,top),(x_at_base+xpad,base+20)])
+    top=base-3*U; bot=base+20                               # the line passes exactly through (x_at_base, base) at the logo's lean
+    return Polygon([(x_at_base-(bot-base)*T,bot),(x_at_base+(base-top)*T,top),(x_at_base+xpad+(base-top)*T,top),(x_at_base+xpad-(bot-base)*T,bot)])
 ma=p.polys['part_01']
-BOX=ma.intersection(right_of(349.5))                    # the م's box (with its counter)
-ALIF=ma.difference(right_of(349.5))                      # the ا of ما, with its foot on the baseline
+# where ا and م part: the outer edge of the م's left wall half a unit above the baseline, carried down along the lean
+# (the box keeps its whole wall, and none of the ا's foot)
+from shapely.geometry import LineString
+_h=base-0.5*U; _cut=LineString([(0,_h),(1e4,_h)]).intersection(ma); _cut=sorted(getattr(_cut,'geoms',[_cut]),key=lambda q:q.bounds[0])
+CUT=_cut[1].bounds[0]-0.3-0.5*U*T                        # along the outer edge of the م's left wall, down to the baseline
+BOX=ma.intersection(right_of(CUT))                       # the م's box (with its counter and its whole left wall)
+ALIF=ma.difference(right_of(CUT))                        # the ا of ما, with its foot on the baseline
 STEM=max(getattr(_s:=ALIF.intersection(box(0,0,1000,base-0.75*U)),'geoms',[_s]),key=lambda q:q.area)   # the upright only (drop the box sliver the lean cut leaves)        # the upright part of the ا, above the box height
 DOTS2=p.polys['part_03']                                 # the logo's two-dot bar
-W_LINE=0.31*U                                            # the baseline stroke: one stroke width, sitting on the baseline
+W_LINE=W_MAIN*U                                          # the baseline stroke: the logo's stroke width, sitting on the baseline
 def line(xa,xb):
     a,b=min(xa,xb),max(xa,xb); h=W_LINE
     return Polygon([(a,base),(b,base),(b+h*T,base-h),(a+h*T,base-h)])      # ends lean like the logo's cuts
