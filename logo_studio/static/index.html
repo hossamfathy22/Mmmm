@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>استوديو تشريح الشعار</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>استوديو تشريح الشعار</h1>
+  <span id="pid" class="muted"></span>
+  <span id="busy" class="busy" hidden>يعمل…</span>
+</header>
+<div id="app">
+  <nav id="steps">
+    <button data-step="1">١. الشعار والمنحنيات</button>
+    <button data-step="2">٢. الوحدة وخط القاعدة</button>
+    <button data-step="3">٣. تعليم الضربات</button>
+    <button data-step="4">٤. القياس والتوحيد</button>
+    <button data-step="5">٥. الاختبار</button>
+    <button data-step="6">٦. الخط المرجعي</button>
+    <button data-step="7">٧. بناء الحرف</button>
+    <button data-step="8">٨. التصدير</button>
+    <div class="sep"></div>
+    <div id="projects"></div>
+  </nav>
+  <main>
+    <div id="toolbar"></div>
+    <div id="viewwrap">
+      <svg id="view" xmlns="http://www.w3.org/2000/svg">
+        <g id="L-pic"></g><g id="L-logo"></g><g id="L-ref"></g><g id="L-result"></g><g id="L-over"></g><g id="L-temp"></g>
+      </svg>
+      <div id="hint" class="hint"></div>
+    </div>
+    <section id="panel"></section>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
