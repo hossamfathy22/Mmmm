@@ -274,21 +274,25 @@ const STEPS = {
 };
 
 // ---------- panels
-const FULL_NAMES = { stroke_width_all: 'عرض الضربات (كلها)', stroke_width_H: 'عرض الخطوط العرضية', stroke_width_V: 'عرض الخطوط العمودية', stroke_width_D: 'عرض الخطوط المائلة',
+const FULL_NAMES = { width_families: 'عائلات العرض (كل عائلة بنصيبها من طول الضربات)', angle_families: 'عائلات الاتجاه (درجة من الأفق، بنصيبها من الطول)',
+  stroke_width_all: 'عرض الضربات (كلها)', stroke_width_H: 'عرض الخطوط العرضية', stroke_width_V: 'عرض الخطوط العمودية', stroke_width_D: 'عرض الخطوط المائلة',
   change_along_stroke: 'تغيّر العرض على طول الضربة', angle_V: 'زاوية العمودي (من الأفق)', angle_H: 'زاوية العرضي', angle_D: 'زاوية المائل',
   corner_radius_outer: 'تدوير الزوايا الخارجية (نصف القطر)', corner_radius_inner: 'تدوير الزوايا الداخلية', corner_angle: 'انفراج الزوايا (درجة)', sharp_corners: 'زوايا حادة بلا تدوير',
-  end_cut_direction: 'اتجاه قطع الأطراف (من الأفق)', end_cut_vs_square: 'ميل القطع عن القطع العمودي على الضربة', end_width: 'عرض الضربة عند الطرف',
+
   bend_turn: 'مقدار الانعطاف', bend_radius: 'نصف قطر الانعطاف (منتصف الضربة)', letter_gap: 'المسافة بين الحروف' };
 const fmtS = s => !s ? '—' : `${(+s.mean).toFixed(3)} <span class="muted">(±${(+s.sd).toFixed(3)}، ${(+s.min).toFixed(2)}–${(+s.max).toFixed(2)}، ${s.n})</span>`;
 function renderFull() {
   const r = S.state.full; if (!r) return; const u = r.unified;
   let h = `<h3>الأرقام الموحّدة</h3><table><tr><th>القياس</th><th>المتوسط (± الانحراف، من–إلى، العدد)</th></tr>`;
   for (const k in FULL_NAMES) { const v = u[k]; if (v === undefined) continue;
-    const cell = Array.isArray(v) ? (v.length ? v.map((g, i) => `<div>عائلة ${i + 1}: ${fmtS(g)}</div>`).join('') : '—') : (typeof v === 'number' ? v : fmtS(v));
+    const cell = Array.isArray(v) ? (v.length ? v.map((g, i) => `<div>عائلة ${i + 1}: ${fmtS(g)}${g.share !== undefined ? ` <b>— ${Math.round(100 * g.share)}%</b>` : ''}</div>`).join('') : '—') : (typeof v === 'number' ? v : fmtS(v));
     h += `<tr><td>${FULL_NAMES[k]}</td><td class="num" style="text-align:right">${cell}</td></tr>`; }
+  const EK = { 'square cut': 'مقطوع قائماً', 'slanted cut': 'مقطوع بميل', 'pointed': 'مدبّب', 'round': 'مدوّر' };
+  h += `</table><h3>أطراف الضربات</h3><table><tr><th>النوع</th><th>العدد</th><th>ميل القطع عن القائم (°)</th><th>اتجاه القطع (°)</th><th>طول التدبيب</th><th>نصف قطر التدوير</th><th>عرض الضربة</th></tr>`;
+  for (const k in (u.end_kinds || {})) { const e = u.end_kinds[k]; h += `<tr><td>${EK[k] || k}</td><td>${e.n}</td><td class="num">${fmtS(e.cut_vs_square)}</td><td class="num">${fmtS(e.cut_direction)}</td><td class="num">${fmtS(e.taper_length)}</td><td class="num">${fmtS(e.radius)}</td><td class="num">${fmtS(e.width)}</td></tr>`; }
   h += `</table><h3>مستويات الارتفاع فوق خط القاعدة (وحدة)</h3><p class="num">${r.levels.map(l => (+l.height).toFixed(3)).join(' ، ')}</p>
     <h3>الصفحة الكاملة</h3><p><a href="/api/projects/${S.id}/full_measures.png?${Date.now()}" target="_blank"><img src="/api/projects/${S.id}/full_measures.png?${Date.now()}" style="max-width:100%;border:1px solid #ddd"></a></p>
-    <p class="muted">${r.strokes.length} ضربة مستقيمة، ${r.bends.length} انعطاف، ${r.corners.length} زاوية، ${r.terminals.length} طرف مقطوع، ${r.counters.length} فراغ داخلي.</p>`;
+    <p class="muted">${r.strokes.length} ضربة مستقيمة، ${r.bends.length} انعطاف، ${r.corners.length} زاوية، ${r.terminals.length} طرفاً، ${r.counters.length} فراغ داخلي.</p>`;
   $('#fres').innerHTML = h;
   const g = clear('#L-over'); const col = { H: '#1f6fe0', V: '#e09100', D: '#a347c2' };
   for (const s of r.strokes) polyline(s.P, { stroke: col[s.kind], 'stroke-width': U() * .04 }, g);

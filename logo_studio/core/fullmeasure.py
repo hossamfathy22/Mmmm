@@ -71,7 +71,7 @@ def strokes(polys, cls, U):
                 if touches_end and min(w0, w1) < 0.35*wm and arclen(Q)[-1]/U < 0.4:
                     continue                                            # the centre-line running into the corner of an end cut, not a stroke
                 out.append(dict(part=part, edge=ei, P=Q[::3].tolist(), angle=round(a, 1), kind=_kind(a), length=round(float(arclen(Q)[-1]/U), 3),
-                                start=round(float(W[ok[0]]), 3), middle=round(float(np.nanmean(W[9:12])), 3), end=round(float(W[ok[-1]]), 3),
+                                start=round(float(W[ok[0]]), 3), middle=round(float(np.nanmean(W[9:12])) if np.isfinite(W[9:12]).any() else float(np.nanmedian(W)), 3), end=round(float(W[ok[-1]]), 3),
                                 thinnest=round(float(np.nanmin(W)), 3), thickest=round(float(np.nanmax(W)), 3), thickest_at=int(np.nanargmax(W)*5),
                                 W=[None if not np.isfinite(v) else round(float(v), 3) for v in W]))
             for (i, j) in bnds:
@@ -119,7 +119,7 @@ def corners(polys, U, min_turn=25.0, rings_out=None):
                         i1 += 1
                     idx = [t % n for t in range(i0, i1+1)]
                     turn = float(np.degrees(np.sum(da_s[idx])))
-                    if abs(turn) < min_turn:
+                    if abs(turn) < min_turn or abs(turn) > 200:          # > 200: a whole rounded shape (a dot, a ring), not one corner
                         used[idx] = True; continue
                     used[[t % n for t in range(i0-k, i1+k+1)]] = True
                     pts = P[idx]
@@ -232,6 +232,117 @@ def groups(vals, gap=None, rel=0.08, floor=0.012):
             out[-1].append(x)
     return [summarize(g) for g in out]
 
+# ---------------------------------------------------------------- free ends, any kind (generic)
+def ends(polys, cls, U):
+    """every free end of every stroke, whatever its kind: square cut, slanted cut, pointed taper, round end.
+    From the last place the stroke still has its full width, the piece beyond it is read: how deep it goes,
+    where its farthest point lies across the stroke, and how its outline runs."""
+    out = []
+    for part, lst in cls.items():
+        poly = polys[part]
+        for e in lst:
+            P = e['P']
+            for which, kind in enumerate(e['ends']):
+                if kind != 'end' or len(P) < 10:
+                    continue
+                Q = P if which == 1 else P[::-1]                      # tip last
+                s = arclen(Q); back = s[-1]-s
+                W = np.array([cut(poly, Q, k, 3*U)[0] for k in range(len(Q))])
+                body = W[(back > 0.4*U) & (back < 1.2*U)]
+                body = body[body > 0]
+                if not len(body):
+                    continue
+                wb = float(np.median(body))
+                full = np.where((W >= 0.85*wb) & (back <= 1.5*wb))[0]
+                k = int(full.min()) if len(full) else int(np.argmin(np.abs(back-wb)))
+                k = int(np.argmax(np.where(W >= 0.85*wb, np.arange(len(W)), -1)))  # the last full-width place
+                # the stroke's own direction from its body (the centre-line bends into a corner near a slanted cut)
+                bi = np.where((back >= 1.0*wb) & (back <= 2.5*wb))[0]
+                if len(bi) < 3:
+                    bi = np.where(back >= 0.5*wb)[0][-6:]
+                if len(bi) < 2:
+                    continue
+                Bd = Q[bi]; mu_b = Bd.mean(0); _, vb = np.linalg.eigh(np.cov((Bd-mu_b).T)); d = vb[:, 1]
+                if np.dot(d, Q[-1]-Bd[0]) < 0:
+                    d = -d
+                n_ = np.array([-d[1], d[0]])
+                c = mu_b+d*np.dot(Q[k]-mu_b, d)                       # on the stroke's axis, level with the last full-width place
+                # the end piece: the shape beyond the line across the stroke at c
+                from shapely.geometry import Polygon as Pg
+                half = Pg([c+n_*2*wb, c+n_*2*wb+d*3*wb, c-n_*2*wb+d*3*wb, c-n_*2*wb])
+                R = poly.intersection(half)
+                if R.is_empty:
+                    continue
+                Rs = [R] if R.geom_type == 'Polygon' else [g for g in getattr(R, 'geoms', []) if g.geom_type == 'Polygon']
+                if not Rs:
+                    continue
+                R = min(Rs, key=lambda g: g.distance(Point(c)))
+                B = np.array(R.exterior.coords)
+                along = (B-c)@d; across = (B-c)@n_
+                depth = float(along.max())
+                if depth < 0.02*U:
+                    continue
+                F = B[int(np.argmax(along))]; off = float(((F-c)@n_)/(wb/2))
+                def width_at(f):
+                    p0 = c+d*f*depth
+                    g = LineString([p0-n_*2*wb, p0+n_*2*wb]).intersection(R)
+                    return g.length if not g.is_empty else 0.0
+                wf = [width_at(f)/wb for f in (0.25, 0.5, 0.75)]
+                def sides_at(f):
+                    p0 = c+d*f*depth; g = LineString([p0-n_*2*wb, p0+n_*2*wb]).intersection(R)
+                    if g.is_empty:
+                        return None
+                    pts = np.array([q for gg in ([g] if g.geom_type == 'LineString' else [x for x in getattr(g, 'geoms', []) if x.geom_type == 'LineString']) for q in gg.coords])
+                    if not len(pts):
+                        return None
+                    a_ = (pts-c)@n_; return float(a_.max()), float(a_.min())
+                sd_ = sides_at(0.5)
+                stays = sd_ is not None and min(abs(sd_[0]-wb/2), abs(sd_[1]+wb/2)) < 0.15*wb      # one side runs straight on
+                if depth < 0.15*wb:
+                    shape = 'square cut'
+                elif stays and wf[2] < 0.6:
+                    shape = 'slanted cut'                          # one side runs on, the cut goes straight across to it
+                elif wf[1] > 0.75:
+                    shape = 'round'
+                else:
+                    shape = 'pointed'                              # both sides close in
+                rec = dict(part=part, at=F.tolist(), width=round(wb/U, 3), depth=round(depth/U, 3), shape=shape, wf=[round(x, 2) for x in wf],
+                           stroke_direction=round(_angle(d), 1), tip_offset=round(off, 2))
+                if shape in ('square cut', 'slanted cut'):
+                    # the cut edge: outline points of the end piece away from the two sides
+                    sel = B[(along > 0.05*depth) | (np.abs(across) < 0.3*wb)]
+                    if len(sel) >= 3:
+                        mu = sel.mean(0); w_, v_ = np.linalg.eigh(np.cov((sel-mu).T)); ax = v_[:, 1]
+                        rec['cut_direction'] = round(_angle(ax), 1)
+                        rec['cut_vs_square'] = round(float(np.degrees(np.arctan2(depth, wb))) if shape == 'slanted cut' else float(np.degrees(np.arccos(min(1, abs(np.dot(ax, n_)))))), 1)
+                elif shape == 'round':
+                    sel = B[along > 0.3*depth]
+                    rec['radius'] = round(_circle(sel)[1]/U, 3) if len(sel) >= 4 else None
+                else:
+                    rec['taper_length'] = round(depth/U, 3)
+                    rec['taper_angle'] = round(float(np.degrees(2*np.arctan2(wb/2, depth))), 1)
+                out.append(rec)
+    return out
+
+def families(vals, weights=None, rel=0.15, floor=0.02, gap=None):
+    """families of values, each with its share (weights = stroke lengths)"""
+    v = np.array(vals, float); w = np.ones(len(v)) if weights is None else np.array(weights, float)
+    if not len(v):
+        return []
+    o = np.argsort(v); v, w = v[o], w[o]; out = [[0]]
+    for i in range(1, len(v)):
+        tol = gap if gap is not None else max(floor, rel*v[out[-1][-1]])
+        if v[i]-v[out[-1][-1]] > tol:
+            out.append([i])
+        else:
+            out[-1].append(i)
+    res = []
+    for g in out:
+        m_ = float(np.average(v[g], weights=w[g])); sd_ = float(np.sqrt(np.average((v[g]-m_)**2, weights=w[g])))
+        res.append(dict(mean=round(m_, 3), sd=round(sd_, 3), min=round(float(v[g].min()), 3), max=round(float(v[g].max()), 3),
+                        n=len(g), share=round(float(w[g].sum()/w.sum()), 2)))
+    return sorted(res, key=lambda r: -r['share'])
+
 def full_measure(polys, parts_meta, U, baseline, cls=None):
     cls = cls or {k: centrelines(p, U, recentred=False)[0] for k, p in polys.items()}
     st, bd = strokes(polys, cls, U)
@@ -242,7 +353,7 @@ def full_measure(polys, parts_meta, U, baseline, cls=None):
         med = float(np.median(mids)); st = [s for s in st if s['middle'] <= 1.6*med]
     body = [s['middle'] for s in st if s['length'] >= 0.3]
     wh = float(np.median(body)) if body else 0.3
-    te = terminals(co, rings, U, wh); lv = levels(polys, U, baseline); cn = counters(polys, U); spc = spacing(polys, parts_meta, U)
+    te = ends(polys, cls, U); lv = levels(polys, U, baseline); cn = counters(polys, U); spc = spacing(polys, parts_meta, U)
     unified = dict(
         stroke_width_all=summarize(body),
         stroke_width_H=summarize([s['middle'] for s in st if s['kind'] == 'H' and s['length'] >= 0.3]),
@@ -256,9 +367,15 @@ def full_measure(polys, parts_meta, U, baseline, cls=None):
         corner_radius_inner=groups([c['radius'] for c in co if c['kind'] == 'inner' and c['radius'] > 0]),
         corner_angle=groups([c['turn'] for c in co], gap=12.0),
         sharp_corners=int(sum(1 for c in co if c['radius'] == 0)),
-        end_cut_direction=summarize([t['cut_direction'] if t['cut_direction'] > 0 else t['cut_direction']+180 for t in te]),
-        end_cut_vs_square=summarize([t['cut_vs_square'] for t in te]),
-        end_width=summarize([t['width'] for t in te]),
+        width_families=families([s['middle'] for s in st], [s['length'] for s in st]),
+        angle_families=families([s['angle'] if s['angle'] >= 0 else s['angle']+180 for s in st], [s['length'] for s in st], gap=10.0),
+        end_kinds={k: dict(n=sum(1 for t in te if t['shape'] == k),
+                           cut_vs_square=summarize([t.get('cut_vs_square') for t in te if t['shape'] == k]),
+                           cut_direction=summarize([(t['cut_direction'] if t.get('cut_direction', 0) >= 0 else t['cut_direction']+180) for t in te if t['shape'] == k and 'cut_direction' in t]),
+                           taper_length=summarize([t.get('taper_length') for t in te if t['shape'] == k]),
+                           radius=summarize([t.get('radius') for t in te if t['shape'] == k]),
+                           width=summarize([t['width'] for t in te if t['shape'] == k]))
+                   for k in ('square cut', 'slanted cut', 'pointed', 'round') if any(t['shape'] == k for t in te)},
         bend_turn=summarize([b['turn'] for b in bd]), bend_radius=summarize([b['radius'] for b in bd]),
         letter_gap=summarize([s['gap'] for s in spc]))
     return dict(strokes=st, bends=bd, corners=co, terminals=te, levels=lv, counters=cn, spacing=spc, unified=unified)
@@ -292,5 +409,6 @@ def sheet(polys, r, U, baseline, SC=5, pad=10):
         cv2.putText(im, 'r%.2f' % c['radius'], (p[0]+4, p[1]+14), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (40, 40, 220) if c['kind'] == 'outer' else (200, 40, 160), 1, cv2.LINE_AA)
     for t in r['terminals']:                                                # end cuts: angle against square
         p = q(t['at']); cv2.drawMarker(im, p, (0, 120, 0), cv2.MARKER_DIAMOND, 14, 2)
-        cv2.putText(im, 'cut %.0f°' % t['cut_vs_square'], (p[0]+8, p[1]+4), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 120, 0), 1, cv2.LINE_AA)
+        lab = {'square cut': 'square', 'slanted cut': 'cut %.0f°' % t.get('cut_vs_square', 0), 'pointed': 'point %.2f' % t.get('taper_length', 0), 'round': 'round'}[t['shape']]
+        cv2.putText(im, lab, (p[0]+8, p[1]+4), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 120, 0), 1, cv2.LINE_AA)
     return im
