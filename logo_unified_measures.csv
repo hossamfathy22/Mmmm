@@ -3,7 +3,7 @@ horizontal,"middle = thickest (at 45-65%, mean 57%)",0.45,"0.43-0.49 (kaf, kashi
 horizontal,end at a hairline joint,0.06,"0.05-0.07 (kaf base end, teh base start, nun base both ends)"
 horizontal,end at a thick stem,0.19,"0.18-0.20 (kaf base start, kashida end at the kaf upright)"
 vertical,"top, cut tip",0.12,"0.12 (kaf hook, nun horn)"
-vertical,"top, wedge head",0.26,"0.25-0.27 (kaf upright, teh tooth)"
+head top,"top of a head: teh tooth, mim loop, waw head, kaf upright",0.25,"teh 0.17, mim 0.26, waw 0.33, kaf 0.25 - the same place by the designer, averaged"
 vertical,middle,0.1,"0.09-0.11 (hook, horn, kaf upright)"
 vertical,"bottom, into the joint",0.06,0.05-0.09
 joint,start / middle / end,0.06,"0.05-0.07, measured along all three joints"
