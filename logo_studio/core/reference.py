@@ -32,11 +32,19 @@ def _outline(GS, g):
     return polys
 
 def _even_odd(rings):
-    shapes = None
-    for r in rings:
-        p = Polygon(r).buffer(0)
-        shapes = p if shapes is None else shapes.symmetric_difference(p)
-    return shapes if shapes is not None else Polygon()
+    """glyph contours -> shape with the font's own fill rule (non-zero: outer contours turn one way, holes the other;
+    overlapping outer contours stay filled)"""
+    if not rings:
+        return Polygon()
+    sa = lambda r: 0.5*np.sum(r[:, 0]*np.roll(r[:, 1], -1)-np.roll(r[:, 0], -1)*r[:, 1])
+    areas = [sa(r) for r in rings]
+    main = np.sign(areas[int(np.argmax(np.abs(areas)))])
+    outer = [Polygon(r).buffer(0) for r, a in zip(rings, areas) if np.sign(a) == main]
+    holes = [Polygon(r).buffer(0) for r, a in zip(rings, areas) if np.sign(a) != main]
+    g = unary_union(outer)
+    if holes:
+        g = g.difference(unary_union(holes))
+    return g
 
 def shape_word(font_bytes, text, features=None):
     """shape a word with the font; returns glyphs in reading order of the shaped run (font units, y up)"""
