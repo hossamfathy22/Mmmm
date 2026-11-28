@@ -1,5 +1,5 @@
 stroke type,place,unified width (U = Latin x-height),what the marks gave
-horizontal,"middle = thickest (at 45-65%, mean 57%)",0.45,"0.43-0.49 (kaf, kashida, teh, nun, mim kashida)"
+horizontal,"thickest = at the stroke's lowest point (kashida 55/56%, teh 60/57%, nun 47/46%, mim 62/60%; kaf base 60/47%)",0.45,"0.43-0.49 (kaf, kashida, teh, nun, mim kashida)"
 horizontal,end at a thick stem,0.19,"0.18-0.20 (kaf base start, kashida end at the kaf upright)"
 horizontal,"end at a hairline (a joint, or where two letters meet: end of one = start of the next)",0.055,0.04-0.07
 head top,"teh tooth, mim loop, waw head, kaf upright",0.25,0.17 / 0.26 / 0.33 / 0.25 averaged
