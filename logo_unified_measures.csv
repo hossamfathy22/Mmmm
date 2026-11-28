@@ -1,9 +1,11 @@
 stroke type,place,unified width (U = Latin x-height),what the marks gave
-horizontal,"middle (thickest, ~60% from the start)",0.45,"kaf, kashida teh-kaf, teh, nun, mim kashida: 0.44-0.48"
-horizontal,start/end where it meets a hairline joint,0.06,0.04-0.10
-horizontal,start/end where it meets a thick stem,0.18,0.15-0.21
-vertical,top (free tip),0.12,0.06-0.19 (tips are cut differently)
-vertical,middle,0.12,kaf upright only
-vertical,bottom (into the joint),0.06,0.05-0.09
-vertical,kaf upright head (its own shape),0.25,one stroke only
-joint,vertical bottom -> horizontal start,0.06,both ends measured 0.06: a hairline turn
+horizontal,"middle = thickest (at 45-65%, mean 57%)",0.45,"0.43-0.49 (kaf, kashida, teh, nun, mim kashida)"
+horizontal,end at a hairline joint,0.06,"0.05-0.07 (kaf base end, teh base start, nun base both ends)"
+horizontal,end at a thick stem,0.19,"0.18-0.20 (kaf base start, kashida end at the kaf upright)"
+vertical,"top, cut tip",0.12,"0.12 (kaf hook, nun horn)"
+vertical,"top, wedge head",0.26,"0.25-0.27 (kaf upright, teh tooth)"
+vertical,middle,0.1,"0.09-0.11 (hook, horn, kaf upright)"
+vertical,"bottom, into the joint",0.06,0.05-0.09
+joint,start / middle / end,0.06,"0.05-0.07, measured along all three joints"
+open,kashida start at the teh,?,"0.04 at your mark, 0.16 on the kashida centre-line"
+open,mim kashida ends,?,your marks are 0.37 U off the kashida centre-line
