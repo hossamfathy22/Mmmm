@@ -87,6 +87,16 @@ def measure(pid: str, body: dict):
     p.state['step'] = max(p.state.get('step', 1), 5); p.save()
     return J(r)
 
+@app.post('/api/projects/{pid}/full')
+def full(pid: str, body: dict):
+    p = P(pid); r = p.full(body.get('parts') or None)
+    p.state['step'] = max(p.state.get('step', 1), 6); p.save()
+    return J({k: v for k, v in r.items()})
+
+@app.get('/api/projects/{pid}/full_measures.png')
+def full_png(pid: str):
+    return FileResponse(P(pid).f('full_measures.png'), media_type='image/png', filename='full_measures.png')
+
 @app.post('/api/projects/{pid}/font')
 async def font(pid: str, file: UploadFile = File(...)):
     p = P(pid); p.set_font(await file.read(), file.filename); return J(dict(ok=True))
@@ -103,7 +113,7 @@ def shape(pid: str, body: dict):
 def reference(pid: str, body: dict):
     p = P(pid)
     r = p.reference(body['text'], int(body['match_index']), float(body['match_height_u']), int(body['target_index']), float(body['right_x']))
-    p.state['step'] = max(p.state.get('step', 1), 6); p.save()
+    p.state['step'] = max(p.state.get('step', 1), 8); p.save()
     return J(r)
 
 @app.post('/api/projects/{pid}/build')
@@ -114,7 +124,7 @@ def build(pid: str, body: dict):
     if not p.state.get('reference'):
         raise HTTPException(400, 'place the reference letter first')
     r = p.build(body)
-    p.state['step'] = max(p.state.get('step', 1), 7); p.save()
+    p.state['step'] = max(p.state.get('step', 1), 9); p.save()
     return J(r)
 
 @app.get('/api/projects/{pid}/result.svg')
@@ -131,7 +141,8 @@ def report(pid: str):
     out = dict(curves=s.get('report'), unit_px=s.get('U'), baseline=s.get('baseline'), marks=s.get('marks'),
                unified=(s.get('measure') or {}).get('spec'), table=(s.get('measure') or {}).get('table'), test=(s.get('measure') or {}).get('gate'),
                reference={k: v for k, v in (s.get('reference') or {}).items() if k not in ('glyph_path', 'word_path', 'edges')},
-               design=s.get('design'), checks=(s.get('result') or {}).get('checks'))
+               design=s.get('design'), checks=(s.get('result') or {}).get('checks'),
+               complete_measurements=(s.get('full') or {}).get('unified'), levels=(s.get('full') or {}).get('levels'))
     return Response(json.dumps(_np(out), ensure_ascii=False, indent=1), media_type='application/json',
                     headers={'Content-Disposition': 'attachment; filename="logo_report.json"'})
 

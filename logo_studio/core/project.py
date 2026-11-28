@@ -6,6 +6,7 @@ from .geom import polys_of, centrelines
 from .measure import measure_mark, spans, unify, gate, CATS
 from .reference import shape_word, to_logo, place
 from .build import build, polygon_svg, render_png
+from .fullmeasure import full_measure, sheet as full_sheet
 
 ROOT = os.environ.get('LOGO_STUDIO_PROJECTS', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'projects'))
 
@@ -66,7 +67,7 @@ class Project:
         img = self.image()
         r = vectorize(img, box=box)
         self.state.update(box=box, crop=r['crop'], size=r['size'], parts=r['parts'], report=r['report'], picture=[int(img.shape[1]), int(img.shape[0])])
-        for k in ('marks', 'measure', 'reference', 'design', 'result'):
+        for k in ('marks', 'measure', 'full', 'reference', 'design', 'result'):
             self.state.pop(k, None)
         self.state.setdefault('U', None); self.state['U'] = self.suggest_unit(); self.state['baseline'] = self.suggest_baseline()
         open(self.f('logo.svg'), 'w').write(parts_svg(r['parts'], r['size']))
@@ -120,6 +121,17 @@ class Project:
         self.state['measure'] = dict(results=res, spans=sp, table=table, spec=spec, gate=g, overrides=overrides or {}, hairline_one=hairline_one)
         self.save()
         return self.state['measure']
+
+    # ---------- step 5: complete measurements (automatic, the whole logo or the chosen parts)
+    def full(self, parts=None):
+        names = parts or [p['name'] for p in self.state['parts']]
+        polys = {k: self.polys[k] for k in names}
+        r = full_measure(polys, [q for q in self.state['parts'] if q['name'] in names], self.state['U'], self.state['baseline'],
+                         cls={k: self.cls(k) for k in names})
+        cv2.imwrite(self.f('full_measures.png'), full_sheet(polys, r, self.state['U'], self.state['baseline']))
+        r['parts'] = names
+        self.state['full'] = r; self.save()
+        return r
 
     # ---------- step 6: reference
     def set_font(self, data, filename):

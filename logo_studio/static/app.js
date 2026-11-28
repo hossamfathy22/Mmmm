@@ -7,7 +7,7 @@ const S = {                       // everything the page knows about the open pr
   marks: [], measure: null, ref: null, glyphs: [], design: { strokes: [], connections: [], erase: [], hide: [], copies: [] },
   sel: { target: null, match: null }, active: null, vb: null,
 };
-const STEP_NAMES = { 1: 'الشعار والمنحنيات', 2: 'الوحدة وخط القاعدة', 3: 'تعليم الضربات', 4: 'القياس والتوحيد', 5: 'الاختبار', 6: 'الخط المرجعي', 7: 'بناء الحرف', 8: 'التصدير' };
+const STEP_NAMES = { 1: 'الشعار والمنحنيات', 2: 'الوحدة وخط القاعدة', 3: 'تعليم الضربات', 4: 'القياس والتوحيد', 5: 'القياسات الكاملة', 6: 'الاختبار', 7: 'الخط المرجعي', 8: 'بناء الحرف', 9: 'التصدير' };
 
 // ---------- server
 async function api(path, opts = {}) {
@@ -89,7 +89,7 @@ async function drawLogo(highlight) {
   const parts = S.parts || (S.parts = await api(`/api/projects/${S.id}/parts`));
   const g = clear('#L-logo');
   for (const p of parts) {
-    const path = el('path', { d: p.d, fill: (S.step === 7 && S.design.hide.includes(p.name)) ? '#e6e6e6' : '#222', 'fill-rule': 'evenodd', 'data-part': p.name }, g);
+    const path = el('path', { d: p.d, fill: (S.step === 8 && S.design.hide.includes(p.name)) ? '#e6e6e6' : '#222', 'fill-rule': 'evenodd', 'data-part': p.name }, g);
     el('title', {}, path).textContent = p.name;
   }
 }
@@ -204,8 +204,19 @@ const STEPS = {
   },
   5() {
     drawLogo();
+    $('#panel').innerHTML = `<h2>٥. القياسات الكاملة</h2>
+      <p>كل ما يمكن قياسه في الشعار، آلياً، على المنحنيات: كل ضربة مستقيمة بزاويتها وطولها وعرضها على طولها كله، والانعطافات، وكل زاوية في المحيط بانفراجها ونصف قطر تدويرها (خارجية أو داخلية)، وأطراف الضربات بزاوية قطعها، ومستويات الارتفاع، والفراغات الداخلية، والمسافات بين الحروف. ثم يُوحَّد كل نوع بمتوسطه، والقيم التي تأتي عائلات (مثل تدوير صغير وتدوير كبير) تُعرض كل عائلة وحدها.</p>
+      <div class="row">الأجزاء: ${(S.parts || []).map(p => `<label class="chip"><input type="checkbox" data-fp="${p.name}" ${(!S.state.full || (S.state.full.parts || []).includes(p.name)) ? 'checked' : ''}> ${p.name}</label>`).join('')}</div>
+      <div id="fres"></div>`;
+    btn('قِس كل شيء', async () => { try { const parts = [...document.querySelectorAll('[data-fp]')].filter(i => i.checked).map(i => i.dataset.fp);
+      S.state.full = await post(`/api/projects/${S.id}/full`, { parts }); renderFull(); } catch (e) { fail(e); } }, true);
+    if (!S.parts) api(`/api/projects/${S.id}/parts`).then(p => { S.parts = p; setStep(5); });
+    if (S.state.full) renderFull();
+  },
+  6() {
+    drawLogo();
     const g = S.measure && S.measure.gate;
-    $('#panel').innerHTML = `<h2>٥. الاختبار</h2><p>قبل رسم أي حرف جديد تُعاد كل ضربة قيست من الأرقام الموحّدة وحدها، على مسارها هي، ثم تُقارن بالأصل. إن لم تطابق، فالأرقام أو التعليم يحتاجان مراجعة.</p><div id="gres"></div>`;
+    $('#panel').innerHTML = `<h2>٦. الاختبار</h2><p>قبل رسم أي حرف جديد تُعاد كل ضربة قيست من الأرقام الموحّدة وحدها، على مسارها هي، ثم تُقارن بالأصل. إن لم تطابق، فالأرقام أو التعليم يحتاجان مراجعة.</p><div id="gres"></div>`;
     if (!g) { $('#gres').innerHTML = '<p>نفّذ القياس أولاً.</p>'; return; }
     const kind = { H: 'عرضي', V: 'عمودي' };
     let h = `<p>متوسط التطابق: <b class="${g.mean_iou >= .85 ? 'good' : 'bad'}">${(100 * g.mean_iou).toFixed(1)}%</b> <span class="muted">(في Women Tech: 81% لكل ضربة وحدها، و87% للنون كاملة)</span></p>
@@ -214,10 +225,10 @@ const STEPS = {
     $('#gres').innerHTML = h + '</table>';
     const gg = clear('#L-over'); for (const s of S.measure.spans) polyline(s.P, { stroke: s.kind === 'H' ? '#1f6fe0' : s.kind === 'V' ? '#e09100' : '#a347c2', 'stroke-width': U() * .04 }, gg);
   },
-  6() {
+  7() {
     drawLogo(); drawReference();
     const r = S.ref || {};
-    $('#panel').innerHTML = `<h2>٦. الخط المرجعي</h2>
+    $('#panel').innerHTML = `<h2>٧. الخط المرجعي</h2>
       <p>الخط المرجعي من عائلة الشعار نفسها (نسخ، رقعة…)، ويعطي <b>الشكل والحجم والمكان فقط</b>. اكتب كلمة فيها الحرف الجديد، واختر الحرف الجديد، واختر حرفاً موجوداً في الشعار نضبط عليه الحجم.</p>
       <div class="row">ملف الخط: <input type="file" id="font" accept=".ttf,.otf"> ${S.state.font ? '<span class="good">✓ محمّل</span>' : ''}</div>
       <div class="row">الكلمة: <input type="text" id="word" value="${r.text || ''}" style="width:200px"> <button class="btn" id="bShape">شكّل</button></div>
@@ -235,9 +246,9 @@ const STEPS = {
     }, true);
     if (r.glyphs) { S.glyphs = r.glyphs; S.sel.target = r.target_index; S.sel.match = r.match_index; renderGlyphs(); renderEdges(); }
   },
-  7() {
+  8() {
     drawLogo(); drawReference(); drawDesign();
-    $('#panel').innerHTML = `<h2>٧. بناء الحرف</h2>
+    $('#panel').innerHTML = `<h2>٨. بناء الحرف</h2>
       <p>قرّر أنت تقسيم الحرف: كل ضربة مجموعة من خطوط المرجع المرقّمة. اذكر نوعها، وماذا يلتقي بطرفيها: شعيرة أم جذع تخين. السُّمك يأتي كله من الأرقام الموحّدة: العرضي أتخن عند أخفض نقطة فيه، والعمودي يرقّ من أعلاه إلى أسفله. ما يصل الحرف بحرف آخر ارسمه وصلةً مستقلة.</p>
       <h3>الضربات</h3><div id="strokes"></div>
       <h3>الوصلات بالحروف المجاورة</h3><div id="conns"></div>
@@ -248,20 +259,41 @@ const STEPS = {
     btn('أظهر / أخفِ النتيجة', () => { S.showResult = !S.showResult; drawResult(S.showResult); });
     renderStrokes(); renderConnections(); renderErase(); renderHide(); renderCopies(); if (S.state.result) { renderChecks(); drawResult(true); S.showResult = true; }
   },
-  8() {
+  9() {
     drawLogo(); if (S.state.result) drawResult(true);
-    $('#panel').innerHTML = `<h2>٨. التصدير</h2>
+    $('#panel').innerHTML = `<h2>٩. التصدير</h2>
       <p>منحنيات الشعار، والشعار مع الحرف الجديد كمنحنيات بيزيه قابلة للتعديل، وتقرير بكل الأرقام وقرارات التصميم.</p>
       <div class="cards">
         <a class="card" href="/api/projects/${S.id}/logo.svg" download>منحنيات الشعار (SVG)</a>
         ${S.state.result ? `<a class="card" href="/api/projects/${S.id}/result.svg" download>الشعار مع الحرف الجديد (SVG)</a>
         <a class="card" href="/api/projects/${S.id}/result.png" download>صورة (PNG)</a>` : '<span class="card muted">ابنِ الحرف أولاً</span>'}
+        ${S.state.full ? `<a class="card" href="/api/projects/${S.id}/full_measures.png" download>صفحة القياسات الكاملة (PNG)</a>` : ''}
         <a class="card" href="/api/projects/${S.id}/report.json" download>التقرير (JSON)</a>
       </div>`;
   },
 };
 
 // ---------- panels
+const FULL_NAMES = { stroke_width_all: 'عرض الضربات (كلها)', stroke_width_H: 'عرض الخطوط العرضية', stroke_width_V: 'عرض الخطوط العمودية', stroke_width_D: 'عرض الخطوط المائلة',
+  change_along_stroke: 'تغيّر العرض على طول الضربة', angle_V: 'زاوية العمودي (من الأفق)', angle_H: 'زاوية العرضي', angle_D: 'زاوية المائل',
+  corner_radius_outer: 'تدوير الزوايا الخارجية (نصف القطر)', corner_radius_inner: 'تدوير الزوايا الداخلية', corner_angle: 'انفراج الزوايا (درجة)', sharp_corners: 'زوايا حادة بلا تدوير',
+  end_cut_direction: 'اتجاه قطع الأطراف (من الأفق)', end_cut_vs_square: 'ميل القطع عن القطع العمودي على الضربة', end_width: 'عرض الضربة عند الطرف',
+  bend_turn: 'مقدار الانعطاف', bend_radius: 'نصف قطر الانعطاف (منتصف الضربة)', letter_gap: 'المسافة بين الحروف' };
+const fmtS = s => !s ? '—' : `${(+s.mean).toFixed(3)} <span class="muted">(±${(+s.sd).toFixed(3)}، ${(+s.min).toFixed(2)}–${(+s.max).toFixed(2)}، ${s.n})</span>`;
+function renderFull() {
+  const r = S.state.full; if (!r) return; const u = r.unified;
+  let h = `<h3>الأرقام الموحّدة</h3><table><tr><th>القياس</th><th>المتوسط (± الانحراف، من–إلى، العدد)</th></tr>`;
+  for (const k in FULL_NAMES) { const v = u[k]; if (v === undefined) continue;
+    const cell = Array.isArray(v) ? (v.length ? v.map((g, i) => `<div>عائلة ${i + 1}: ${fmtS(g)}</div>`).join('') : '—') : (typeof v === 'number' ? v : fmtS(v));
+    h += `<tr><td>${FULL_NAMES[k]}</td><td class="num" style="text-align:right">${cell}</td></tr>`; }
+  h += `</table><h3>مستويات الارتفاع فوق خط القاعدة (وحدة)</h3><p class="num">${r.levels.map(l => (+l.height).toFixed(3)).join(' ، ')}</p>
+    <h3>الصفحة الكاملة</h3><p><a href="/api/projects/${S.id}/full_measures.png?${Date.now()}" target="_blank"><img src="/api/projects/${S.id}/full_measures.png?${Date.now()}" style="max-width:100%;border:1px solid #ddd"></a></p>
+    <p class="muted">${r.strokes.length} ضربة مستقيمة، ${r.bends.length} انعطاف، ${r.corners.length} زاوية، ${r.terminals.length} طرف مقطوع، ${r.counters.length} فراغ داخلي.</p>`;
+  $('#fres').innerHTML = h;
+  const g = clear('#L-over'); const col = { H: '#1f6fe0', V: '#e09100', D: '#a347c2' };
+  for (const s of r.strokes) polyline(s.P, { stroke: col[s.kind], 'stroke-width': U() * .04 }, g);
+  for (const c of r.corners) el('circle', { cx: c.at[0], cy: c.at[1], r: Math.max(c.radius * U(), U() * .03), fill: 'none', stroke: c.kind === 'outer' ? '#c62828' : '#a347c2', 'stroke-width': U() * .015 }, g);
+}
 function showReport() {
   const r = S.state.report; if (!r) return;
   $('#rep').innerHTML = `<table><tr><th>الأجزاء</th><th>قطع المنحنى</th><th>الزوايا الحادة</th><th>التطابق مع الصورة</th><th>بُعد المنحنى عن الحافة: متوسط / أقصى (بكسل)</th></tr>
@@ -368,7 +400,7 @@ function renderCopies() {
   box.querySelectorAll('[data-rm]').forEach(c => c.onclick = () => { S.design.copies.splice(+c.dataset.rm, 1); renderCopies(); });
 }
 async function runBuild() {
-  try { const r = await post(`/api/projects/${S.id}/build`, S.design); S.state.result = r; S.state.step = Math.max(S.state.step, 8); S.showResult = true; drawResult(true); renderChecks(); }
+  try { const r = await post(`/api/projects/${S.id}/build`, S.design); S.state.result = r; S.state.step = Math.max(S.state.step, 9); S.showResult = true; drawResult(true); renderChecks(); }
   catch (e) { fail(e); }
 }
 function renderChecks() {
@@ -388,7 +420,7 @@ async function openProject(id, step) {
   if (S.ref) { S.sel.target = S.ref.target_index; S.sel.match = S.ref.match_index; }
   $('#pid').textContent = id;
   if (st.size) { fit(...st.size); S.vbFor = 'logo'; } else if (st.picture) fit(...st.picture);
-  setStep(step || Math.min(st.step || 1, 8)); listProjects();
+  setStep(step || Math.min(st.step || 1, 9)); listProjects();
 }
 async function listProjects() {
   const ps = await api('/api/projects');

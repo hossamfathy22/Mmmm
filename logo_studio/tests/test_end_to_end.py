@@ -25,6 +25,9 @@ def run(verbose=True):
     assert abs(sp['H_MID']-0.455) < 0.02 and abs(sp['H_HAIR']-0.06) < 0.015 and abs(sp['H_STEM']-0.19) < 0.03 and abs(sp['HEAD_TOP']-0.27) < 0.03
     assert sp['lowest_point_rule']['holds'] >= 4
     say('5 test', m['gate']['mean_iou']); assert m['gate']['mean_iou'] > 0.75
+    fm = c.post(f'/api/projects/{pid}/full', json={'parts': ['part_09', 'part_04', 'part_02']}).json()
+    say('5b complete measurements: strokes %d, corners %d, end cuts %d, levels %d' % (len(fm['strokes']), len(fm['corners']), len(fm['terminals']), len(fm['levels'])))
+    assert len(fm['strokes']) > 5 and len(fm['corners']) > 10 and fm['unified']['stroke_width_H']['mean'] > 0.3
     c.post(f'/api/projects/{pid}/font', files={'file': ('Mirza.ttf', open(os.path.join(os.path.dirname(F.IMG), 'Mirza.ttf'), 'rb'), 'font/ttf')})
     gl = c.post(f'/api/projects/{pid}/shape', json={'text': 'تحــك'}).json()
     ti = [g['index'] for g in gl if g['name'] == 'uniFEA4'][0]; mi = [g['index'] for g in gl if g['name'] == 'uni066E.init'][0]
