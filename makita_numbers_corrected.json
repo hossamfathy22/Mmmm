@@ -1,0 +1,275 @@
+{
+ "unit_px": 59.900000000000006,
+ "edge_angle_families": [
+  {
+   "mean": 69.845,
+   "sd": 1.301,
+   "min": 66.948,
+   "max": 72.414,
+   "n": 26
+  },
+  {
+   "mean": 0.037,
+   "sd": 0.343,
+   "min": -0.608,
+   "max": 1.194,
+   "n": 21
+  },
+  {
+   "mean": 9.981,
+   "sd": 0.982,
+   "min": 8.24,
+   "max": 11.11,
+   "n": 6
+  },
+  {
+   "mean": 16.422,
+   "sd": 1.112,
+   "min": 14.145,
+   "max": 16.709,
+   "n": 3
+  },
+  {
+   "mean": 46.032,
+   "sd": 0.612,
+   "min": 45.441,
+   "max": 46.666,
+   "n": 2
+  }
+ ],
+ "stroke_width_families": [
+  {
+   "mean": 0.304,
+   "sd": 0.009,
+   "min": 0.283,
+   "max": 0.315,
+   "n": 32
+  },
+  {
+   "mean": 0.267,
+   "sd": 0.003,
+   "min": 0.263,
+   "max": 0.27,
+   "n": 6
+  }
+ ],
+ "corner_families": [
+  {
+   "kind": "outer",
+   "turn": {
+    "mean": 62.538,
+    "sd": 8.401,
+    "min": 45.5,
+    "max": 71.7,
+    "n": 16
+   },
+   "radii": [
+    {
+     "mean": 0.045,
+     "sd": 0.015,
+     "min": 0.027,
+     "max": 0.081,
+     "n": 14
+    },
+    {
+     "mean": 0.272,
+     "sd": 0.0,
+     "min": 0.272,
+     "max": 0.272,
+     "n": 1
+    },
+    {
+     "mean": 0.331,
+     "sd": 0.0,
+     "min": 0.331,
+     "max": 0.331,
+     "n": 1
+    }
+   ]
+  },
+  {
+   "kind": "outer",
+   "turn": {
+    "mean": 110.877,
+    "sd": 0.97,
+    "min": 109.2,
+    "max": 113.3,
+    "n": 13
+   },
+   "radii": [
+    {
+     "mean": 0.019,
+     "sd": 0.003,
+     "min": 0.016,
+     "max": 0.023,
+     "n": 8
+    },
+    {
+     "mean": 0.149,
+     "sd": 0.005,
+     "min": 0.142,
+     "max": 0.153,
+     "n": 4
+    },
+    {
+     "mean": 0.096,
+     "sd": 0.0,
+     "min": 0.096,
+     "max": 0.096,
+     "n": 1
+    }
+   ]
+  },
+  {
+   "kind": "outer",
+   "turn": {
+    "mean": 129.3,
+    "sd": 3.179,
+    "min": 126.3,
+    "max": 133.7,
+    "n": 3
+   },
+   "radii": [
+    {
+     "mean": 0.012,
+     "sd": 0.003,
+     "min": 0.008,
+     "max": 0.016,
+     "n": 3
+    }
+   ]
+  },
+  {
+   "kind": "outer",
+   "turn": {
+    "mean": 90.5,
+    "sd": 0.5,
+    "min": 90.0,
+    "max": 91.0,
+    "n": 2
+   },
+   "radii": [
+    {
+     "mean": 0.029,
+     "sd": 0.003,
+     "min": 0.027,
+     "max": 0.032,
+     "n": 2
+    }
+   ]
+  },
+  {
+   "kind": "inner",
+   "turn": {
+    "mean": 111.4,
+    "sd": 1.925,
+    "min": 109.9,
+    "max": 116.2,
+    "n": 9
+   },
+   "radii": [
+    {
+     "mean": 0.017,
+     "sd": 0.003,
+     "min": 0.012,
+     "max": 0.022,
+     "n": 9
+    }
+   ]
+  },
+  {
+   "kind": "inner",
+   "turn": {
+    "mean": 70.95,
+    "sd": 1.404,
+    "min": 68.7,
+    "max": 73.1,
+    "n": 6
+   },
+   "radii": [
+    {
+     "mean": 0.037,
+     "sd": 0.008,
+     "min": 0.025,
+     "max": 0.051,
+     "n": 6
+    }
+   ]
+  },
+  {
+   "kind": "inner",
+   "turn": {
+    "mean": 162.333,
+    "sd": 5.54,
+    "min": 157.1,
+    "max": 170.0,
+    "n": 3
+   },
+   "radii": [
+    {
+     "mean": 0.009,
+     "sd": 0.002,
+     "min": 0.006,
+     "max": 0.012,
+     "n": 3
+    }
+   ]
+  },
+  {
+   "kind": "inner",
+   "turn": {
+    "mean": 11.9,
+    "sd": 0.0,
+    "min": 11.9,
+    "max": 11.9,
+    "n": 1
+   },
+   "radii": [
+    {
+     "mean": 0.018,
+     "sd": 0.0,
+     "min": 0.018,
+     "max": 0.018,
+     "n": 1
+    }
+   ]
+  }
+ ],
+ "redraw_levels": [
+  {
+   "level": "1 edges as measured, sharp corners",
+   "IoU": 0.9808,
+   "hausdorff_U": 0.125,
+   "missing_U2": 0.0129,
+   "extra_U2": 0.0766
+  },
+  {
+   "level": "2 + each corner rounded with its own radius",
+   "IoU": 0.9931,
+   "hausdorff_U": 0.018,
+   "missing_U2": 0.0103,
+   "extra_U2": 0.0215
+  },
+  {
+   "level": "3 + edge angles unified to their family",
+   "IoU": 0.991,
+   "hausdorff_U": 0.015,
+   "missing_U2": 0.0175,
+   "extra_U2": 0.024
+  },
+  {
+   "level": "4 + stroke width unified to its family",
+   "IoU": 0.9834,
+   "hausdorff_U": 0.027,
+   "missing_U2": 0.0411,
+   "extra_U2": 0.0356
+  },
+  {
+   "level": "5 + corner radii unified to their family",
+   "IoU": 0.9833,
+   "hausdorff_U": 0.052,
+   "missing_U2": 0.0419,
+   "extra_U2": 0.0354
+  }
+ ]
+}
